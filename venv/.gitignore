@@ -1,0 +1,13 @@
+# Ignorer le dossier du virtualenv
+venv/
+
+# Ignorer les fichiers de cache Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignorer les fichiers de logs
+*.log
+
+# Ignorer les fichiers système inutiles
+.DS_Store

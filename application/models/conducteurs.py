@@ -1,0 +1,13 @@
+from sqlalchemy import Column, Integer, String
+from application.config import Base
+from sqlalchemy.orm import relationship
+class Conducteur(Base):
+    __tablename__ = "conducteurs"
+
+    id_conducteur = Column(Integer, primary_key=True, autoincrement=True)
+    nom = Column(String(255))
+    prenom = Column(String(255))
+    numero_telephone = Column(String(255))
+    categorie = Column(String(255))
+affectations = relationship("Affectation", back_populates="conducteur")
+tournees = relationship("Tournee", back_populates="conducteur")
