@@ -14,5 +14,4 @@ class EtapeRotation(Base):
     duree = Column(String(255))
     type = Column(String(255))
 
-    # Relation avec la tournée
-    tournees = relationship("Tournee", back_populates="etapes") # Relation avec Tournee
+   

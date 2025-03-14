@@ -6,8 +6,7 @@ class Equipement(Base):
 
     ID_equipement = Column(Integer, primary_key=True, autoincrement=True)
     quantite = Column(Integer)
-    id_commande = Column(Integer, ForeignKey("commandes.id_commande"))
     nomEquipement = Column(String(255))
     typeEquipement = Column(String(255))
     etat = Column(String(255))
-commande = relationship("Commande", back_populates="equipements")
+commandes = relationship("CommandeEquipement", back_populates="equipement")

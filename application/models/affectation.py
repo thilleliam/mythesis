@@ -7,12 +7,12 @@ class Affectation(Base):
     __tablename__ = "affectations"
 
     id_affectation = Column(Integer, primary_key=True, autoincrement=True)
-    id_conducteur = Column(Integer, ForeignKey("conducteurs.id_conducteur"))
+    id_conducteur = Column(String(255), ForeignKey("conducteurs.id_conducteur"))
     immatriculation_vehicule = Column(String(255), ForeignKey("vehicules.immatriculation"))
     id_tournee = Column(Integer, ForeignKey("tournees.id_tournee"))
     date_affectation = Column(DateTime)
 conducteur = relationship("Conducteur", back_populates="affectations")
 vehicule = relationship("Vehicule", back_populates="affectations")
-tournee = relationship("Tournee", back_populates="affectations")
+tournees = relationship("Tournee", back_populates="affectations")
 
 

@@ -14,5 +14,5 @@ class Commande(Base):
     date_commande = Column(DateTime)
     date_livraison = Column(DateTime)
 client = relationship("Chantier", back_populates="commandes")  # Relation avec Chantier
-equipement = relationship("Equipement", back_populates="commandes") 
+equipements = relationship("CommandeEquipement", back_populates="commandes") 
 tournees = relationship("Tournee", back_populates="commandes")   # Relation avec Tournee
