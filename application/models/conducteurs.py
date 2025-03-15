@@ -9,5 +9,3 @@ class Conducteur(Base):
     prenom = Column(String(255))
     numero_telephone = Column(String(255))
     categorie = Column(String(255))
-affectations = relationship("Affectation", back_populates="conducteur")
-tournees = relationship("Tournee", back_populates="conducteur")

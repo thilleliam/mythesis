@@ -9,4 +9,4 @@ class Equipement(Base):
     nomEquipement = Column(String(255))
     typeEquipement = Column(String(255))
     etat = Column(String(255))
-commandes = relationship("CommandeEquipement", back_populates="equipement")
+commandes = relationship("CommandeEquipement")

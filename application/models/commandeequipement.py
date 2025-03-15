@@ -7,5 +7,5 @@ class CommandeEquipement(Base):
     id_commande = Column(Integer, ForeignKey("commandes.id_commande"), primary_key=True)
     ID_equipement = Column(Integer, ForeignKey("equipements.ID_equipement"), primary_key=True)
 
-    commande = relationship("Commande", back_populates="equipements")
-    equipement = relationship("Equipement", back_populates="commandes")
+    commande = relationship("Commande")
+    equipement = relationship("Equipement")
