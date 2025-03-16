@@ -4,7 +4,7 @@ from tkinter import messagebox, simpledialog
 from sqlalchemy.orm import sessionmaker, configure_mappers
 from application.database import engine
 from sqlalchemy import func
-from datetime import date
+from datetime import date, datetime
 configure_mappers()
 
 # Configuration de la session SQLAlchemy
@@ -54,6 +54,7 @@ class VehiculeApp(ttk.Frame):
         ttk.Button(btn_frame, text="Modifier", command=self.modifier_vehicule, bootstyle=WARNING).pack(side=LEFT, padx=5)
         ttk.Button(btn_frame, text="Supprimer", command=self.supprimer_vehicule, bootstyle=DANGER).pack(side=LEFT, padx=5)
         ttk.Button(btn_frame, text="Total Parcourus", command=self.afficher_total_parcouru, bootstyle=INFO).pack(side=LEFT, padx=5)
+        ttk.Button(btn_frame, text="Affectation", command=self.affectation_tournee, bootstyle=PRIMARY).pack(side=LEFT, padx=5)
 
         # Charger les données
         self.charger_donnees()
@@ -206,6 +207,49 @@ class VehiculeApp(ttk.Frame):
             "Total Parcouru", 
             f"Le véhicule {immatriculation} ({vehicule.marque_modele}) a parcouru un total de {total_km:.2f} km."
         )
+        
+    def affectation_tournee(self):
+        """ Affecte le véhicule sélectionné à une tournée existante """
+        # Import local pour éviter les références circulaires
+        from application.models.vehicule import Vehicule
+        from application.models.tournee import Tournee
+        
+        selected = self.tree.selection()
+        if not selected:
+            messagebox.showwarning("Avertissement", "Veuillez sélectionner un véhicule")
+            return
+
+        # Récupérer l'immatriculation
+        item = self.tree.item(selected[0])
+        immatriculation = item["values"][0]
+
+        # Récupérer l'objet véhicule depuis la base
+        vehicule = session.query(Vehicule).filter_by(immatriculation=immatriculation).first()
+
+        if not vehicule:
+            messagebox.showerror("Erreur", "Véhicule introuvable en base de données.")
+            return
+            
+        # Demander l'ID de la tournée
+        id_tournee = simpledialog.askinteger("Affectation", "ID de la tournée :")
+        if not id_tournee:
+            return
+            
+        # Vérifier si la tournée existe
+        tournee = session.query(Tournee).filter_by(id_tournee=id_tournee).first()
+        if not tournee:
+            messagebox.showerror("Erreur", f"Tournée avec ID {id_tournee} introuvable.")
+            return
+            
+        # Affecter le véhicule à la tournée
+        try:
+            # Mise à jour de l'immatriculation du véhicule dans la tournée
+            tournee.immatriculation_vehicule = immatriculation
+            session.commit()
+            messagebox.showinfo("Succès", f"Véhicule {immatriculation} affecté à la tournée {id_tournee}.")
+        except Exception as e:
+            session.rollback()
+            messagebox.showerror("Erreur", f"Impossible d'affecter le véhicule à la tournée: {str(e)}")
 
 if __name__ == "__main__":
     root = ttk.Window(themename="darkly")

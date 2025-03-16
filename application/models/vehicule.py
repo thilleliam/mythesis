@@ -47,7 +47,7 @@ class Vehicule(Base):
                 session.query(Affectation)
                 .filter(
                     Affectation.immatriculation_vehicule == self.immatriculation,
-                    Affectation.date == aujourd_hui
+                    Affectation.date_affectation == aujourd_hui
                 )
                 .first()
             )
@@ -69,3 +69,29 @@ class Vehicule(Base):
 
         # Si aucune tournée n'a été trouvée, retourne 0
         return total_km or 0
+    def affecter_a_tournee(self, session, id_conducteur, id_commande, objectif, lieu_depart, destination, itineraire, date_heure_depart):
+        """ Affecte le véhicule à une nouvelle tournée si disponible """
+        if not self.est_disponible():
+            raise ValueError(f"Le véhicule {self.immatriculation} n'est pas disponible.")
+
+        try:
+            from application.models.tournee import Tournee
+
+            nouvelle_tournee = Tournee(
+                id_conducteur=id_conducteur,
+                immatriculation_vehicule=self.immatriculation,
+                id_commande=id_commande,
+                objectif=objectif,
+                lieu_depart=lieu_depart,
+                destination=destination,
+                itineraire=itineraire,
+                date_heure_depart=date_heure_depart
+            )
+
+            session.add(nouvelle_tournee)
+            session.commit()
+            return nouvelle_tournee
+
+        except SQLAlchemyError as e:
+            session.rollback()
+            raise RuntimeError(f"Erreur lors de l'affectation du véhicule : {str(e)}")
