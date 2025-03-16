@@ -1,7 +1,8 @@
-# tournee.py
-from application.config import Base 
+from application.config import Base
 from sqlalchemy import Column, Integer, String, DateTime, Float, ForeignKey, Date
 from sqlalchemy.orm import relationship, backref
+from sqlalchemy.orm import validates
+from sqlalchemy.event import listens_for
 
 class Tournee(Base):
     __tablename__ = "tournees"
@@ -18,10 +19,24 @@ class Tournee(Base):
     date_heure_depart = Column(DateTime)
     date_heure_reception = Column(DateTime)
     date_heure_retour = Column(DateTime)
+    date_heure_arrivee = Column(DateTime)
+    duree = Column(String(255))
     
     conducteur = relationship("Conducteur", backref=backref("tournees", uselist=True))
-    # Utilisez backref au lieu de back_populates
     commande = relationship("Commande", backref=backref("tournees", uselist=True))
     vehicule = relationship("Vehicule", backref=backref("tournees", uselist=True))
     affectations = relationship("Affectation", backref=backref("tournee", uselist=False))
     etapes_rotation = relationship("EtapeRotation", backref=backref("tournee", uselist=False))
+
+    def calculer_duree(self) -> str:
+        """ Calcule la durée en heures si ≤ 8h, sinon en jours. """
+        if self.date_heure_depart and self.date_heure_arrivee:
+            duree_heures = (self.date_heure_arrivee - self.date_heure_depart).total_seconds() / 3600
+            return f"{round(duree_heures, 2)} heures" if duree_heures <= 8 else f"{round(duree_heures / 8, 2)} jours"
+        return "Durée inconnue"
+
+@listens_for(Tournee, "before_insert")
+@listens_for(Tournee, "before_update")
+def set_duree(mapper, connection, target):
+    """ Met à jour automatiquement la durée avant d'insérer ou de mettre à jour une tournée. """
+    target.duree = target.calculer_duree()
