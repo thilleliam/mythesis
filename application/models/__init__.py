@@ -10,6 +10,8 @@ from application.models.vehicule import Vehicule
 from application.models.tournee import Tournee
 from application.models.etape import EtapeRotation
 from application.models.affectation import Affectation
+from application.models.transferer_equipement import TransfererEquipement
+from application.models.transferer_equipement import SemaineTransfert
 
 # Configurez les mappeurs après avoir importé tous les modèles
 from sqlalchemy.orm import configure_mappers

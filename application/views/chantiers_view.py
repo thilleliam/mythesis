@@ -204,22 +204,23 @@ class ChantierApp:
                 messagebox.showerror("Erreur", f"Erreur lors de la sélection: {str(e)}")
 
     def charger_donnees(self):
-        self.tree.delete(*self.tree.get_children())
-        try:
-            for chantier in session.query(self.Chantier).all():
-                self.tree.insert("", END, values=(
-                    chantier.id_client, 
-                    chantier.localisation, 
-                    chantier.latitude,
-                    chantier.longitude, 
-                    chantier.nature_terrain, 
-                    chantier.distanceAllerGoudron,
-                    chantier.distanceAllerPiste,
-                    chantier.temps_aller
-                ))
-        except Exception as e:
-            messagebox.showerror("Erreur", f"Erreur lors du chargement des données: {str(e)}")
 
+            # Effacer le tableau actuel
+        self.tree.delete(*self.tree.get_children())
+        for chantier in session.query(self.Chantier).all():
+            self.tree.insert("", "end", values=(
+                chantier.id_client,
+                chantier.localisation or "",
+                chantier.latitude or "",
+                chantier.longitude or "",
+                chantier.nature_terrain or "",
+                chantier.distanceAllerGoudron or "",
+                chantier.distanceAllerPiste or "",
+                chantier.temps_aller or ""
+                ))
+                
+            print(f"Nombre de lignes affichées dans le tableau: {len(self.tree.get_children())}")
+        
     def vider_formulaire(self):
         self.id_client_var.set("")
         self.localisation_var.set("")
