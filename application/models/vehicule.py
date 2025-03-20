@@ -92,6 +92,6 @@ class Vehicule(Base):
             session.commit()
             return nouvelle_tournee
 
-        except SQLAlchemyError as e:
+        except SQLAlchemyError as e: # type: ignore
             session.rollback()
             raise RuntimeError(f"Erreur lors de l'affectation du véhicule : {str(e)}")
