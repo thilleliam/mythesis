@@ -1,4 +1,4 @@
-from sqlalchemy import Column, ForeignKey, Integer, String
+from sqlalchemy import Column, ForeignKey, Integer, String, event
 from application.config import Base
 from sqlalchemy.orm import relationship
 
@@ -30,3 +30,16 @@ class SemaineTransfert(Base):
     
     def __repr__(self):
         return f"<SemaineTransfert(id={self.id}, id_equipement={self.id_equipement}, semaine={self.numero_semaine}, quantite={self.quantite})>"
+# Utilisation d'un événement pour synchroniser les valeurs lors de l'insertion ou de la mise à jour
+@event.listens_for(TransfererEquipement, 'before_insert')
+@event.listens_for(TransfererEquipement, 'before_update')
+def synchronize_equipement_details(mapper, connection, target):
+    from application.models.equipements import Equipement
+    # Synchroniser les caractéristiques de l'équipement
+    equipement = connection.execute(
+        Equipement.__table__.select().where(Equipement.ID_equipement == target.id_equipement)
+    ).fetchone()
+
+    if equipement:
+        target.designation_equipement = equipement.nomEquipement
+        # Vous pouvez également synchroniser d'autres caractéristiques si nécessaire
