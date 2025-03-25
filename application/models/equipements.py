@@ -1,6 +1,6 @@
 from sqlalchemy import Column, ForeignKey, Integer, String
 from application.config import Base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship , backref
 class Equipement(Base):
     __tablename__ = "equipements"
 
@@ -10,3 +10,4 @@ class Equipement(Base):
     typeEquipement = Column(String(255))
     etat = Column(String(255))
 commandes = relationship("CommandeEquipement")
+transferer_equipements = relationship("TransfererEquipement", backref=backref("equipement", lazy="joined"))

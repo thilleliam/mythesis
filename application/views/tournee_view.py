@@ -641,89 +641,88 @@ class TourneeApp:
         cancel_btn.pack(side=tk.LEFT, padx=5)
 
     def build_stats_tab(self):
-        """Construit l'onglet des statistiques"""
+        """Construit l'onglet des statistiques avec une barre de défilement"""
         # Frame principal
         stats_main = ttk.Frame(self.stats_tab)
         stats_main.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
+
+        # Ajouter un ScrolledFrame pour permettre le défilement
+        self.stats_scroll = ScrolledFrame(stats_main, autohide=True)
+        self.stats_scroll.pack(fill=tk.BOTH, expand=True)
+
+        # Conteneur pour les graphiques (à l'intérieur du ScrolledFrame)
+        self.stats_frame = ttk.Frame(self.stats_scroll)
+        self.stats_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+
         # Panneau de filtrage pour les statistiques
-        filter_frame = ttk.LabelFrame(stats_main, text="Filtres", padding=10)
+        filter_frame = ttk.LabelFrame(self.stats_frame, text="Filtres", padding=10)
         filter_frame.pack(fill=tk.X, pady=5)
-        
+
         # Filtres de date
         date_filter_frame = ttk.Frame(filter_frame)
         date_filter_frame.pack(fill=tk.X, pady=5)
-        
+
         ttk.Label(date_filter_frame, text="Du:").pack(side=tk.LEFT, padx=5)
-        
+
         self.stats_date_debut_var = StringVar()
         self.stats_date_debut_jour_var = StringVar(value=str(date.today().day))
         self.stats_date_debut_mois_var = StringVar(value=str(date.today().month))
         self.stats_date_debut_annee_var = StringVar(value=str(date.today().year - 1))
-        
+
         self.stats_date_debut_widget = DateEntry(date_filter_frame, 
                                                 self.stats_date_debut_jour_var, 
                                                 self.stats_date_debut_mois_var, 
                                                 self.stats_date_debut_annee_var)
         self.stats_date_debut_widget.pack(side=tk.LEFT, padx=5)
-        
+
         ttk.Label(date_filter_frame, text="Au:").pack(side=tk.LEFT, padx=5)
-        
+
         self.stats_date_fin_var = StringVar()
         self.stats_date_fin_jour_var = StringVar(value=str(date.today().day))
         self.stats_date_fin_mois_var = StringVar(value=str(date.today().month))
         self.stats_date_fin_annee_var = StringVar(value=str(date.today().year))
-        
+
         self.stats_date_fin_widget = DateEntry(date_filter_frame, 
-                                              self.stats_date_fin_jour_var, 
-                                              self.stats_date_fin_mois_var, 
-                                              self.stats_date_fin_annee_var)
+                                            self.stats_date_fin_jour_var, 
+                                            self.stats_date_fin_mois_var, 
+                                            self.stats_date_fin_annee_var)
         self.stats_date_fin_widget.pack(side=tk.LEFT, padx=5)
-        
+
         # Bouton pour appliquer les filtres
         apply_filter_btn = ttk.Button(date_filter_frame, text="Appliquer", command=self.update_stats, bootstyle=INFO)
         apply_filter_btn.pack(side=tk.LEFT, padx=15)
-        
-        # Conteneur pour les graphiques
-        self.stats_frame = ttk.Frame(stats_main)
-        self.stats_frame.pack(fill=tk.BOTH, expand=True, pady=10)
-        
+
         # Divisé en deux colonnes
         col1_frame = ttk.Frame(self.stats_frame)
         col1_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
-        
+
         col2_frame = ttk.Frame(self.stats_frame)
         col2_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=5)
-        
+
         # Graphiques pour la première colonne
         self.km_par_conducteur_frame = ttk.LabelFrame(col1_frame, text="Kilomètres par conducteur", padding=10)
         self.km_par_conducteur_frame.pack(fill=tk.BOTH, expand=True, pady=5)
-        
+
         self.tournees_par_mois_frame = ttk.LabelFrame(col1_frame, text="Nombre de tournées par mois", padding=10)
         self.tournees_par_mois_frame.pack(fill=tk.BOTH, expand=True, pady=5)
-        
+
         # Graphiques pour la deuxième colonne
         self.km_par_vehicule_frame = ttk.LabelFrame(col2_frame, text="Kilomètres par véhicule", padding=10)
         self.km_par_vehicule_frame.pack(fill=tk.BOTH, expand=True, pady=5)
-        
+
         self.duree_moyenne_frame = ttk.LabelFrame(col2_frame, text="Durée moyenne des tournées", padding=10)
         self.duree_moyenne_frame.pack(fill=tk.BOTH, expand=True, pady=5)
-        
+
         # Statistiques générales
-        stats_summary_frame = ttk.LabelFrame(stats_main, text="Résumé", padding=10)
+        stats_summary_frame = ttk.LabelFrame(self.stats_frame, text="Résumé", padding=10)
         stats_summary_frame.pack(fill=tk.X, pady=5)
-        
+
         self.stats_summary_text = ttk.Label(stats_summary_frame, text="", font=("Segoe UI", 10))
         self.stats_summary_text.pack(fill=tk.X, padx=10, pady=5)
-        
-        # Bouton pour exporter les statistiques
-        export_stats_btn = ttk.Button(stats_main, text="Exporter les statistiques", command=self.exporter_statistiques, bootstyle=SUCCESS)
-        export_stats_btn.pack(anchor=tk.E, padx=10, pady=10)
 
-    def nouvelle_tournee(self):
-        """Initialise le formulaire pour une nouvelle tournée"""
-        self.vider_formulaire()
-        self.notebook.select(1)  # Sélectionne l'onglet du formulaire
+        # Bouton pour exporter les statistiques
+        export_stats_btn = ttk.Button(self.stats_frame, text="Exporter les statistiques", command=self.exporter_statistiques, bootstyle=SUCCESS)
+        export_stats_btn.pack(anchor=tk.E, padx=10, pady=10)
 
     def editer_tournee_selectionnee(self):
         """Édite la tournée sélectionnée dans le tableau"""
@@ -1448,4 +1447,3 @@ if __name__ == "__main__":
     root = ttk.Window(themename="darkly")
     app = TourneeApp(root)
     root.mainloop()
-
