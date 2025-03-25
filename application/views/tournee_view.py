@@ -410,6 +410,10 @@ class TourneeApp:
         # Si l'onglet des statistiques est sélectionné
         if tab_id == 2:  # Stats tab
             self.update_stats()
+    def nouvelle_tournee(self):
+        """Prépare le formulaire pour une nouvelle tournée"""
+        self.vider_formulaire()
+        self.notebook.select(1)  # Switch to the form tab
     
     def build_list_tab(self):
         """Construit l'onglet de liste des tournées"""
