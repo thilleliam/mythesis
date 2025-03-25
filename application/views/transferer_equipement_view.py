@@ -1,4 +1,3 @@
-
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 import tkinter as tk
@@ -122,8 +121,6 @@ class TransfertEquipementApp:
                     self.tree.column(col, width=100, minwidth=80)
                 else:  # Colonnes des semaines
                     self.tree.column(col, width=100, minwidth=80)
-
-                    # Ajouter un second header pour "Qté à transférer"
                     self.tree.heading(col, text=f"{col}\nQté à transférer")
 
             self.tree.pack(fill=BOTH, expand=True)
@@ -142,12 +139,6 @@ class TransfertEquipementApp:
             
             # Récupérer tous les équipements
             equipements = session.query(TransfererEquipement).all()
-            print(f"Chargement de {len(equipements)} équipements depuis la base de données")
-            
-            # Afficher les détails pour le débogage
-            for i, eq in enumerate(equipements):
-                print(f"Équipement {i+1}: {eq.volet} - {eq.designation_equipement} - Total: {eq.total_equipements}")
-                print(f"  Semaines: {[f'S{s.numero_semaine}:{s.quantite}' for s in eq.semaines]}")
             
             for equipement in equipements:
                 # Préparer les valeurs de base
@@ -175,7 +166,6 @@ class TransfertEquipementApp:
                 # Insérer la ligne dans le tableau
                 self.tree.insert("", "end", values=valeurs)
             
-            print(f"Nombre de lignes affichées dans le tableau: {len(self.tree.get_children())}")
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors du chargement des données: {str(e)}")
             import traceback
@@ -217,7 +207,6 @@ class TransfertEquipementApp:
             designation_entry.grid(row=1, column=1, sticky=(W, E), padx=5, pady=5)
 
             ttk.Label(scrollable_frame, text="Modalité de transport").grid(row=2, column=0, sticky=W, padx=5, pady=5)
-            # Ajout de "Tractage" à la liste des options
             modalite_entry = ttk.Combobox(scrollable_frame, values=["Tractable", "Chargeable", "Tractage"])
             modalite_entry.grid(row=2, column=1, sticky=(W, E), padx=5, pady=5)
 
@@ -231,7 +220,7 @@ class TransfertEquipementApp:
                 ttk.Label(scrollable_frame, text=self.colonnes[i]).grid(row=i, column=0, sticky=W, padx=5, pady=5)
                 entry = ttk.Entry(scrollable_frame, width=50)
                 entry.grid(row=i, column=1, sticky=(W, E), padx=5, pady=5)
-                entries_semaine.append((self.colonnes[i].split()[0], entry))  # Stocker le numéro de la semaine et l'entrée
+                entries_semaine.append((self.colonnes[i].split()[0], entry))
 
             def sauvegarder():
                 try:
@@ -255,7 +244,7 @@ class TransfertEquipementApp:
                         total_equipements=total
                     )
                     session.add(equipement)
-                    session.flush()  # Pour obtenir l'ID de l'équipement
+                    session.flush()
 
                     # Ajouter les semaines
                     for num_semaine, entry in entries_semaine:
@@ -291,6 +280,7 @@ class TransfertEquipementApp:
             ttk.Button(btn_frame, text="Sauvegarder", command=sauvegarder, bootstyle=SUCCESS).pack(side=RIGHT, padx=5)
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors de l'ouverture du formulaire: {e}")
+
     def supprimer_ligne(self):
         """Supprime la ligne sélectionnée du tableau."""
         selection = self.tree.selection()
@@ -298,7 +288,6 @@ class TransfertEquipementApp:
             messagebox.showinfo("Information", "Veuillez sélectionner une ligne à supprimer.")
             return
 
-        # Confirmer la suppression
         if messagebox.askyesno("Confirmation", "Êtes-vous sûr de vouloir supprimer cette ligne ?"):
             try:
                 for item in selection:
@@ -306,16 +295,13 @@ class TransfertEquipementApp:
                     volet = values[0]
                     designation = values[1]
                     
-                    # Trouver l'équipement correspondant
                     equipement = session.query(TransfererEquipement).filter_by(
                         volet=volet, 
                         designation_equipement=designation
                     ).first()
                     
                     if equipement:
-                        # Supprimer d'abord les semaines associées
                         session.query(SemaineTransfert).filter_by(id_equipement=equipement.id).delete()
-                        # Puis supprimer l'équipement
                         session.delete(equipement)
                         session.commit()
                     
@@ -333,12 +319,10 @@ class TransfertEquipementApp:
             messagebox.showinfo("Information", "Veuillez sélectionner une ligne à modifier.")
             return
 
-        # Obtenir les valeurs actuelles de la ligne
         item = selection[0]
         valeurs = self.tree.item(item, 'values')
         
         try:
-            # Récupérer l'équipement correspondant
             volet = valeurs[0]
             designation = valeurs[1]
             
@@ -351,16 +335,13 @@ class TransfertEquipementApp:
                 messagebox.showerror("Erreur", "Équipement non trouvé dans la base de données.")
                 return
                 
-            # Créer une fenêtre de dialogue pour la modification
             dialog = ttk.Toplevel(self.root)
             dialog.title("Modifier la ligne")
             dialog.geometry("800x500")
 
-            # Créer un cadre avec une barre de défilement
             main_frame = ttk.Frame(dialog)
             main_frame.pack(fill=BOTH, expand=True, padx=10, pady=10)
 
-            # Créer un canvas avec scrollbar
             canvas = tk.Canvas(main_frame)
             scrollbar = ttk.Scrollbar(main_frame, orient=VERTICAL, command=canvas.yview)
             scrollable_frame = ttk.Frame(canvas)
@@ -376,7 +357,6 @@ class TransfertEquipementApp:
             canvas.pack(side=LEFT, fill=BOTH, expand=True)
             scrollbar.pack(side=RIGHT, fill=Y)
 
-            # Champs pour les données principales
             ttk.Label(scrollable_frame, text="Volet").grid(row=0, column=0, sticky=W, padx=5, pady=5)
             volet_entry = ttk.Entry(scrollable_frame, width=50)
             volet_entry.grid(row=0, column=1, sticky=(W, E), padx=5, pady=5)
@@ -397,10 +377,8 @@ class TransfertEquipementApp:
             total_entry.grid(row=3, column=1, sticky=(W, E), padx=5, pady=5)
             total_entry.insert(0, str(equipement.total_equipements))
 
-            # Dictionnaire des semaines existantes
             semaines_dict = {s.numero_semaine: s.quantite for s in equipement.semaines}
             
-            # Champs pour les semaines
             entries_semaine = []
             for i in range(4, len(self.colonnes)):
                 col = self.colonnes[i]
@@ -410,7 +388,6 @@ class TransfertEquipementApp:
                 entry = ttk.Entry(scrollable_frame, width=50)
                 entry.grid(row=i, column=1, sticky=(W, E), padx=5, pady=5)
                 
-                # Insérer la quantité existante si disponible
                 if num_semaine in semaines_dict:
                     entry.insert(0, str(semaines_dict[num_semaine]))
                 
@@ -418,16 +395,13 @@ class TransfertEquipementApp:
 
             def sauvegarder():
                 try:
-                    # Mettre à jour l'équipement
                     equipement.volet = volet_entry.get()
                     equipement.designation_equipement = designation_entry.get()
                     equipement.modalite_transport = modalite_entry.get()
                     equipement.total_equipements = int(total_entry.get() or 0)
 
-                    # Supprimer toutes les semaines existantes
                     session.query(SemaineTransfert).filter_by(id_equipement=equipement.id).delete()
                     
-                    # Ajouter les nouvelles semaines
                     for num_semaine, entry in entries_semaine:
                         quantite = entry.get().strip()
                         if quantite:
@@ -446,7 +420,6 @@ class TransfertEquipementApp:
                     messagebox.showerror("Erreur", f"Erreur lors de la modification: {e}")
                     session.rollback()
 
-            # Boutons
             btn_frame = ttk.Frame(dialog)
             btn_frame.pack(fill=X, pady=10)
 
@@ -457,76 +430,60 @@ class TransfertEquipementApp:
             messagebox.showerror("Erreur", f"Erreur lors de l'ouverture du formulaire: {e}")
 
     def importer_excel(self):
-        """Importe les données depuis un fichier Excel et les affiche dans le tableau."""
+        """Importe les données depuis un fichier Excel."""
         fichier = filedialog.askopenfilename(filetypes=[("Fichiers Excel", "*.xlsx *.xls")])
         if not fichier: 
             return
 
         try:
-            # Charger le fichier Excel
-            df = pd.read_excel(fichier)
+            df = pd.read_excel(fichier, header=0)
             
-            # Afficher un échantillon pour déboguer
-            print("Aperçu des données:")
-            with pd.option_context('display.max_columns', None):
-                print(df.head())
-            print("Colonnes trouvées:", df.columns.tolist())
-            
-            # Approche plus simple - utiliser les indices de colonnes
-            # Cela suppose que les colonnes sont dans cet ordre:
-            # [Volet, Désignation, Modalité, Total, Semaine12, Semaine11, ...]
+            # Vérifier le format du fichier
             if len(df.columns) < 4:
                 messagebox.showerror("Erreur", "Le fichier Excel doit contenir au moins 4 colonnes")
                 return
                 
-            # Confirmation de l'importation
             if not messagebox.askyesno("Confirmation", 
                                     "Cette action va remplacer toutes les données existantes. Continuer?"):
                 return
             
             try:
-                # Nombre de semaines = nombre de colonnes après les 4 premières
+                # Déterminer le nombre de semaines
                 nb_semaines = len(df.columns) - 4
                 if nb_semaines <= 0:
-                    nb_semaines = 13  # Valeur par défaut
+                    nb_semaines = 13
                     
-                # Mettre à jour l'interface
                 self.entree_semaines.delete(0, tk.END)
                 self.entree_semaines.insert(0, str(nb_semaines))
-                self.generer_tableau()  # Recréer le tableau avec le bon nombre de semaines
+                self.generer_tableau()
                 
-                # Supprimer les données existantes
+                # Vider les tables
                 session.query(SemaineTransfert).delete()
                 session.query(TransfererEquipement).delete()
                 session.commit()
                 
-                # Importer les données ligne par ligne
                 importes = 0
                 for idx, row in df.iterrows():
                     try:
-                        # Extraire les informations de base
+                        # Ignorer les lignes vides ou les en-têtes
+                        if pd.isna(row.iloc[0]) and pd.isna(row.iloc[1]):
+                            continue
+                            
+                        if "volet" in str(row.iloc[0]).lower() or "désignation" in str(row.iloc[1]).lower():
+                            continue
+                        
+                        # Récupérer les valeurs de base
                         volet = str(row.iloc[0]) if pd.notna(row.iloc[0]) else ""
                         designation = str(row.iloc[1]) if pd.notna(row.iloc[1]) else ""
                         modalite = str(row.iloc[2]) if pd.notna(row.iloc[2]) else ""
                         
-                        # Convertir le total en entier
+                        # Gérer le total des équipements
                         try:
                             total_equipements = int(float(row.iloc[3])) if pd.notna(row.iloc[3]) else 0
                         except (ValueError, TypeError):
-                            print(f"Ligne {idx+1}: Valeur non valide pour total: {row.iloc[3]}")
                             total_equipements = 0
                         
-                        # Ignorer les lignes vides ou d'en-tête
-                        if not volet.strip() and not designation.strip():
-                            continue
-                            
-                        # Si c'est la ligne d'en-tête, la sauter
-                        if "volet" in volet.lower() or "désignation" in designation.lower():
-                            continue
-                        
-                        print(f"Import ligne {idx+1}: {volet}, {designation}, {modalite}, {total_equipements}")
-                        
-                        # Créer un nouvel équipement
+                        # Créer l'équipement
                         equipement = TransfererEquipement(
                             volet=volet.strip(),
                             designation_equipement=designation.strip(),
@@ -534,123 +491,85 @@ class TransfertEquipementApp:
                             total_equipements=total_equipements
                         )
                         session.add(equipement)
-                        session.flush()  # Pour obtenir l'ID
+                        session.flush()
                         
-                        # Ajouter les semaines
-                        # Les colonnes de semaines commencent à l'indice 4
+                        # Traiter les semaines
                         for i in range(4, min(len(df.columns), 4 + nb_semaines)):
-                            # Calculer le numéro de semaine (à l'envers: 12, 11, 10, ...)
-                            num_semaine = nb_semaines - (i - 4) - 1
+                            # Extraire le numéro de semaine depuis l'en-tête
+                            col_name = df.columns[i]
+                            try:
+                                # Gérer différents formats de noms de colonnes
+                                if "semaine" in col_name.lower():
+                                    parts = col_name.split()
+                                    num_semaine = int(parts[0])
+                                else:
+                                    # Si le nom de colonne est juste un nombre
+                                    num_semaine = int(col_name)
+                            except (ValueError, IndexError):
+                                # Si le format n'est pas reconnu, utiliser une position relative
+                                num_semaine = nb_semaines - (i - 4) - 1
                             
-                            # Récupérer la valeur
                             val = row.iloc[i]
                             
                             if pd.notna(val) and str(val).strip():
                                 try:
                                     quantite = int(float(val))
                                     if quantite > 0:
-                                        print(f"  Semaine {num_semaine}: {quantite}")
                                         semaine = SemaineTransfert(
                                             id_equipement=equipement.id,
                                             numero_semaine=num_semaine,
                                             quantite=quantite
                                         )
                                         session.add(semaine)
-                                except Exception as e:
-                                    print(f"  Erreur conversion semaine {num_semaine}, valeur '{val}': {e}")
+                                except (ValueError, TypeError):
+                                    continue
                         
                         importes += 1
                         
                     except Exception as e:
-                        print(f"Erreur ligne {idx+1}: {e}")
-                        import traceback
-                        traceback.print_exc()
+                        print(f"Erreur ligne {idx}: {str(e)}")
+                        continue
                         
-                # Commit final
                 session.commit()
-                
-                # Actualiser l'affichage
                 self.charger_donnees()
-                
                 messagebox.showinfo("Succès", f"Données importées avec succès! {importes} équipements importés.")
                 
             except Exception as e:
-                messagebox.showerror("Erreur", f"Problème lors de l'importation: {e}")
+                messagebox.showerror("Erreur", f"Problème lors de l'importation: {str(e)}")
                 session.rollback()
                 import traceback
                 traceback.print_exc()
         except Exception as e:
-            messagebox.showerror("Erreur", f"Problème lors de la lecture du fichier Excel: {e}")
-            import traceback
-            traceback.print_exc()
+            messagebox.showerror("Erreur", f"Problème lors de la lecture du fichier Excel: {str(e)}")
+
     def exporter_excel(self):
-            """Exporte les données du tableau vers un fichier Excel."""
-            # Vérifier si le tableau existe et contient des données
-            if not self.tree or len(self.tree.get_children()) == 0:
-                messagebox.showinfo("Information", "Aucune donnée à exporter.")
-                return
+        """Exporte les données du tableau vers un fichier Excel."""
+        if not self.tree or len(self.tree.get_children()) == 0:
+            messagebox.showinfo("Information", "Aucune donnée à exporter.")
+            return
 
-            fichier = filedialog.asksaveasfilename(
-                defaultextension=".xlsx",
-                filetypes=[("Fichiers Excel", "*.xlsx")]
-            )
+        fichier = filedialog.asksaveasfilename(
+            defaultextension=".xlsx",
+            filetypes=[("Fichiers Excel", "*.xlsx")]
+        )
 
-            if not fichier:
-                return
+        if not fichier:
+            return
 
-            try:
-                # Collecter les données
-                data = []
-                for item_id in self.tree.get_children():
-                    values = self.tree.item(item_id)['values']
-                    data.append(values)
-
-                # Créer le DataFrame et exporter
-                df = pd.DataFrame(data, columns=self.colonnes)
-                df.to_excel(fichier, index=False)
-
-                messagebox.showinfo("Succès", "Données exportées avec succès !")
-
-            except Exception as e:
-                messagebox.showerror("Erreur", f"Problème lors de l'exportation : {e}")
-    # Ajoutez ce code temporairement pour vérifier la configuration de votre base de données
-    def verifier_database(self):
         try:
-            # Vérifier les tables
-            from sqlalchemy import inspect
-            inspector = inspect(engine)
-            
-            # Afficher les tables disponibles
-            print("Tables disponibles:", inspector.get_table_names())
-            
-            # Vérifier les colonnes pour TransfererEquipement
-            print("Colonnes de TransfererEquipement:")
-            for column in inspector.get_columns('transferer_equipement'):
-                print(f"  {column['name']}: {column['type']}")
-                
-            # Vérifier les colonnes pour SemaineTransfert
-            print("Colonnes de SemaineTransfert:")
-            for column in inspector.get_columns('semaine_transfert'):
-                print(f"  {column['name']}: {column['type']}")
-                
-            # Tester une requête simple
-            count = session.query(func.count(TransfererEquipement.id)).scalar()
-            print(f"Nombre d'équipements dans la base: {count}")
-            
-            messagebox.showinfo("Database", f"Base de données vérifiée. {count} équipements trouvés.")
+            data = []
+            for item_id in self.tree.get_children():
+                values = self.tree.item(item_id)['values']
+                data.append(values)
+
+            df = pd.DataFrame(data, columns=self.colonnes)
+            df.to_excel(fichier, index=False)
+
+            messagebox.showinfo("Succès", "Données exportées avec succès !")
         except Exception as e:
-            messagebox.showerror("Erreur", f"Erreur lors de la vérification de la base de données: {e}")
-            import traceback
-            traceback.print_exc()
+            messagebox.showerror("Erreur", f"Problème lors de l'exportation : {e}")
 
-            control_frame = ttk.Frame(self) 
-            control_frame.pack(side=TOP, fill=X, padx=10, pady=10)
-            self.btn_test_db = ttk.Button(control_frame, text="Vérifier DB", command=self.verifier_database)
-            self.btn_test_db.pack(side=LEFT, padx=10)
-
-# Lancer l'application
 if __name__ == "__main__":
     root = ttk.Window(themename="darkly")
     app = TransfertEquipementApp(root)
     root.mainloop()
-
