@@ -1,6 +1,8 @@
 from sqlalchemy import Column, ForeignKey, Integer, String, event
 from application.config import Base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
+
+
 
 class TransfererEquipement(Base):
     __tablename__ = "transferer_equipement"
@@ -10,7 +12,9 @@ class TransfererEquipement(Base):
     designation_equipement = Column(String(255), nullable=False)
     modalite_transport = Column(String(255), nullable=True)  # Ajouté cette colonne
     total_equipements = Column(Integer, nullable=False)
+    id_client = Column(String(255), ForeignKey("chantiers.id_client"), nullable=False) 
     
+    client = relationship("Chantier", backref="equipements_transferes")
     # Relation avec la table des semaines
     semaines = relationship("SemaineTransfert", back_populates="equipement", cascade="all, delete-orphan")
     

@@ -4,8 +4,7 @@ from sqlalchemy.orm import relationship
 
 class Chantier(Base):
     __tablename__ = "chantiers"
-
-    id_client = Column(Integer, primary_key=True)
+    id_client = Column(String(255), primary_key=True)
     localisation = Column(String(255))
     latitude = Column(Float)
     longitude = Column(Float)
@@ -23,7 +22,8 @@ class Chantier(Base):
     
     # Cet attribut doit être indenté à l'intérieur de la classe
 commandes = relationship("Commande", back_populates="client")
-    
+
+
     # Cette méthode doit être indentée à l'intérieur de la classe
 
 # Événement SQLAlchemy pour mettre à jour `temps_aller` avant chaque commit

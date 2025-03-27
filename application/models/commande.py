@@ -7,7 +7,7 @@ class Commande(Base):
     __tablename__ = "commandes"
 
     id_commande = Column(Integer, primary_key=True, autoincrement=True)
-    id_client = Column(Integer, ForeignKey("chantiers.id_client"))
+    id_client = Column(String(255), ForeignKey("chantiers.id_client"))
     nature_service = Column(String(255))
     type_vehicule = Column(String(255))
     quantite_requise = Column(Float)
