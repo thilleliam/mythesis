@@ -24,8 +24,8 @@ class TransfererEquipement(Base):
 class SemaineTransfert(Base):
     __tablename__ = "semaine_transfert"
     
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    id_equipement = Column(Integer, ForeignKey("transferer_equipement.id"), nullable=False)  # Renommé pour correspondre à l'application
+    id_semaine = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(Integer, ForeignKey("transferer_equipement.id"), nullable=False)  # Renommé pour correspondre à l'application
     numero_semaine = Column(Integer, nullable=False)
     quantite = Column(Integer, nullable=True)
     
@@ -41,7 +41,7 @@ def synchronize_equipement_details(mapper, connection, target):
     from application.models.equipements import Equipement
     # Synchroniser les caractéristiques de l'équipement
     equipement = connection.execute(
-        Equipement.__table__.select().where(Equipement.ID_equipement == target.id_equipement)
+        Equipement.__table__.select().where(Equipement.ID_equipement == target.id)  # Use `id` instead of `id_equipement`
     ).fetchone()
 
     if equipement:
