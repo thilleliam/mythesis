@@ -1,781 +1,799 @@
-import traceback
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
-import tkinter as tk
-from tkinter import filedialog, messagebox, simpledialog, StringVar
-import pandas as pd
-from application.models.transferer_equipement import TransfererEquipement, SemaineTransfert
-from application.models.chantiers import Chantier  # Import the Chantier model
+from tkinter import messagebox, simpledialog, StringVar, IntVar, DISABLED, X, LEFT, BOTH
 from sqlalchemy.orm import sessionmaker, configure_mappers
 from application.database import engine
-from sqlalchemy import func, inspect, or_
-import logging
-logging.basicConfig()
-logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
+from sqlalchemy import func, or_
+from datetime import date, datetime
+import re
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import landscape, A4
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+from tkinter import filedialog
+import datetime
+
 configure_mappers()
 
 Session = sessionmaker(bind=engine)
 session = Session()
 
-class TransfertEquipementApp:
+class TransfererEquipementApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Planification des Transferts d'Équipements")
-        self.root.geometry("1300x700")  # Taille optimisée pour afficher toutes les colonnes
+        self.root.title("Gestion des Transferts d'Équipements")
+        self.root.geometry("1200x700")  # Augmenté la hauteur pour plus d'espace
+        
+        # Import local pour éviter les imports circulaires
+        from application.models.transferer_equipement import TransfererEquipement
+        from application.models.chantiers import Chantier
+        self.TransfererEquipement = TransfererEquipement
+        self.Chantier = Chantier
 
-        # Frame principale
+        # Variables
+        self.id_var = IntVar()
+        self.volet_var = StringVar()
+        self.designation_equipement_var = StringVar()
+        self.modalite_transport_var = StringVar()
+        self.total_equipements_var = IntVar(value=1)  # Valeur par défaut à 1
+        self.id_client_var = StringVar()
+        self.localisation_client_var = StringVar()  # Nouvelle variable pour afficher la localisation
+        self.recherche_var = StringVar()  # Variable pour la recherche
+        
+        # Variables pour les semaines
+        self.semaines_vars = {
+            'douze': IntVar(),
+            'onze': IntVar(),
+            'dix': IntVar(),
+            'neuf': IntVar(),
+            'huit': IntVar(),
+            'sept': IntVar(),
+            'six': IntVar(),
+            'cinq': IntVar(),
+            'quatre': IntVar(),
+            'trois': IntVar(),
+            'deux': IntVar(),
+            'un': IntVar(),
+            'zero': IntVar()
+        }
+
+        # Filtre client
+        self.filtre_client_var = StringVar()
+        
+        # Création de l'interface
+        self.creer_interface()
+        
+        # Charger les données
+        self.charger_clients()
+        self.charger_donnees()
+
+    def creer_interface(self):
+        """Crée l'interface utilisateur"""
+        # Frame principal
         main_frame = ttk.Frame(self.root)
-        main_frame.pack(fill=BOTH, expand=True, padx=10, pady=10)
+        main_frame.pack(fill=BOTH, expand=True)
+        
+        # Frame de recherche et filtre
+        top_frame = ttk.Frame(main_frame, padding=10)
+        top_frame.pack(fill=X)
+        
+        # Barre de recherche
+        ttk.Label(top_frame, text="Rechercher:").pack(side=LEFT, padx=5)
+        recherche_entry = ttk.Entry(top_frame, textvariable=self.recherche_var, width=30)
+        recherche_entry.pack(side=LEFT, padx=5)
+        recherche_entry.bind("<Return>", lambda e: self.rechercher())
+        ttk.Button(top_frame, text="Rechercher", command=self.rechercher, bootstyle=INFO).pack(side=LEFT, padx=5)
+        
+        # Filtre client
+        ttk.Label(top_frame, text="Filtrer par client:").pack(side=LEFT, padx=20)
+        self.client_filter_cb = ttk.Combobox(top_frame, textvariable=self.filtre_client_var, state="readonly", width=30)
+        self.client_filter_cb.pack(side=LEFT, padx=5)
+        ttk.Button(top_frame, text="Appliquer filtre", command=self.appliquer_filtre, bootstyle=INFO).pack(side=LEFT, padx=5)
+        ttk.Button(top_frame, text="Réinitialiser", command=self.reinitialiser_filtre, bootstyle=SECONDARY).pack(side=LEFT, padx=5)
+        
+        # Création du notebook pour l'interface à onglets
+        notebook = ttk.Notebook(main_frame)
+        notebook.pack(fill=BOTH, expand=True, padx=10, pady=10)
+        
+        # Onglet de liste des transferts
+        list_frame = ttk.Frame(notebook, padding=10)
+        notebook.add(list_frame, text="Liste des transferts")
+        
+        # Onglet de formulaire
+        form_frame = ttk.Frame(notebook, padding=10)
+        notebook.add(form_frame, text="Formulaire de transfert")
+        
+        # Création du tableau dans l'onglet liste
+        self.creer_tableau(list_frame)
+        
+        # Création du formulaire dans l'onglet formulaire
+        self.creer_formulaire(form_frame)
 
-        # Frame pour les contrôles
-        control_frame = ttk.Frame(main_frame)
-        control_frame.pack(fill=X, pady=10)
+    def creer_tableau(self, parent):
+        """Crée le tableau des transferts d'équipements"""
+        # Frame pour les boutons d'action
+        btn_frame = ttk.Frame(parent, padding=5)
+        btn_frame.pack(fill=X, pady=5)
+        
+        ttk.Button(btn_frame, text="Ajouter nouveau", command=lambda: self.basculer_vers_formulaire(nouveau=True), 
+                  bootstyle=SUCCESS).pack(side=LEFT, padx=5)
+        ttk.Button(btn_frame, text="Modifier sélection", command=self.modifier_selection, 
+                  bootstyle=WARNING).pack(side=LEFT, padx=5)
+        ttk.Button(btn_frame, text="Supprimer sélection", command=self.supprimer, 
+                  bootstyle=DANGER).pack(side=LEFT, padx=5)
+        ttk.Button(btn_frame, text="Rafraîchir", command=self.charger_donnees, 
+                  bootstyle=INFO).pack(side=LEFT, padx=5)
+        
+        # Configuration du tableau
+        columns = ("id", "id_client", "localisation", "volet", "designation_equipement", "modalite_transport", 
+                  "total_equipements", "12_semaines", "11_semaines", "10_semaines", "9_semaines", 
+                  "8_semaines", "7_semaines", "6_semaines", "5_semaines", "4_semaines", 
+                  "3_semaines", "2_semaines", "1_semaines", "0_semaines")
+        
+        self.tree = ttk.Treeview(parent, columns=columns, show="headings")
+        self.tree.pack(fill=BOTH, expand=True)
 
-        # Filtre par client avec autocomplete
-        ttk.Label(control_frame, text="Filtrer par Client:", font=("Arial", 12)).pack(side=LEFT, padx=5)
-        self.client_filter_var = StringVar()
-        self.client_filter_combobox = ttk.Combobox(
-            control_frame, 
-            textvariable=self.client_filter_var, 
-            width=20, 
-            state="readonly"
-        )
-        self.client_filter_combobox.pack(side=LEFT, padx=5)
-        self.client_filter_combobox.bind("<<ComboboxSelected>>", self.filtrer_par_client)
+        # Configuration des en-têtes
+        self.tree.heading("id", text="ID", command=lambda: self.trier_tableau("id"))
+        self.tree.heading("id_client", text="Client", command=lambda: self.trier_tableau("id_client"))
+        self.tree.heading("localisation", text="Localisation", command=lambda: self.trier_tableau("localisation"))
+        self.tree.heading("volet", text="Volet", command=lambda: self.trier_tableau("volet"))
+        self.tree.heading("designation_equipement", text="Désignation Équipement", command=lambda: self.trier_tableau("designation_equipement"))
+        self.tree.heading("modalite_transport", text="Modalité Transport", command=lambda: self.trier_tableau("modalite_transport"))
+        self.tree.heading("total_equipements", text="Total", command=lambda: self.trier_tableau("total_equipements"))
+        
+        # Configuration des en-têtes pour les semaines
+        # Configuration des en-têtes pour les semaines
+        # Configuration des en-têtes pour les semaines
+        for i in range(12, -1, -1):
+            col_name = f"{i}_semaines"  # Toujours au pluriel pour toutes les semaines
+            self.tree.heading(col_name, text=f"{i} sem.", command=lambda i=i: self.trier_tableau(f"{i}_semaines"))
+        # Configuration des largeurs de colonnes
+        self.tree.column("id", width=50)
+        self.tree.column("id_client", width=120)
+        self.tree.column("localisation", width=120)
+        self.tree.column("volet", width=80)
+        self.tree.column("designation_equipement", width=200)
+        self.tree.column("modalite_transport", width=120)
+        self.tree.column("total_equipements", width=60)
+        
+        # Configuration des largeurs pour les semaines
+        for col in columns[7:]:
+            self.tree.column(col, width=60)
 
-        # Bouton pour réinitialiser le filtre
-        self.btn_reinitialiser_filtre = ttk.Button(
-            control_frame, 
-            text="Réinitialiser", 
-            command=self.reinitialiser_filtre, 
-            bootstyle=SECONDARY
-        )
-        self.btn_reinitialiser_filtre.pack(side=LEFT, padx=5)
+        # Binding pour la sélection d'élément avec double-clic
+        self.tree.bind("<Double-1>", self.modifier_selection)
+        
+        # Ajout des barres de défilement
+        y_scrollbar = ttk.Scrollbar(parent, orient="vertical", command=self.tree.yview)
+        y_scrollbar.pack(side="right", fill="y")
+        
+        x_scrollbar = ttk.Scrollbar(parent, orient="horizontal", command=self.tree.xview)
+        x_scrollbar.pack(side="bottom", fill="x")
+        
+        self.tree.configure(yscrollcommand=y_scrollbar.set, xscrollcommand=x_scrollbar.set)
 
-        # Nombre de semaines
-        ttk.Label(control_frame, text="Nombre de semaines :", font=("Arial", 12)).pack(side=LEFT, padx=5)
-        self.entree_semaines = ttk.Entry(control_frame, width=5)
-        self.entree_semaines.pack(side=LEFT, padx=5)
-        self.entree_semaines.insert(0, "13")  # Valeur par défaut pour 13 semaines (0-12)
+    def creer_formulaire(self, parent):
+        """Crée le formulaire de saisie"""
+        # Frame pour les informations de base
+        info_frame = ttk.LabelFrame(parent, text="Informations générales", padding=10)
+        info_frame.pack(fill=X, pady=5)
+        
+        # Première ligne: ID et Client
+        ttk.Label(info_frame, text="ID:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
+        ttk.Entry(info_frame, textvariable=self.id_var, state=DISABLED, width=5).grid(row=0, column=1, padx=5, pady=5, sticky="w")
+        
+        ttk.Label(info_frame, text="Client:").grid(row=0, column=2, padx=5, pady=5, sticky="e")
+        self.client_cb = ttk.Combobox(info_frame, textvariable=self.id_client_var, state="readonly", width=20)
+        self.client_cb.grid(row=0, column=3, padx=5, pady=5, sticky="w")
+        self.client_cb.bind("<<ComboboxSelected>>", self.actualiser_localisation_client)
+        
+        ttk.Label(info_frame, text="Localisation:").grid(row=0, column=4, padx=5, pady=5, sticky="e")
+        ttk.Entry(info_frame, textvariable=self.localisation_client_var, state=DISABLED, width=20).grid(row=0, column=5, padx=5, pady=5, sticky="w")
+        
+        # Deuxième ligne: Volet et Modalité
+        ttk.Label(info_frame, text="Volet:").grid(row=1, column=0, padx=5, pady=5, sticky="e")
+        ttk.Entry(info_frame, textvariable=self.volet_var, width=15).grid(row=1, column=1, padx=5, pady=5, sticky="w", columnspan=2)
+        
+        ttk.Label(info_frame, text="Modalité Transport:").grid(row=1, column=3, padx=5, pady=5, sticky="e")
+        transport_cb = ttk.Combobox(info_frame, textvariable=self.modalite_transport_var, values=["Camion", "Train", "Bateau", "Avion"], width=15)
+        transport_cb.grid(row=1, column=4, padx=5, pady=5, sticky="w")
+        
+        # Troisième ligne: Désignation et Total
+        ttk.Label(info_frame, text="Désignation Équipement:").grid(row=2, column=0, padx=5, pady=5, sticky="e")
+        ttk.Entry(info_frame, textvariable=self.designation_equipement_var, width=30).grid(row=2, column=1, padx=5, pady=5, sticky="w", columnspan=3)
+        
+        ttk.Label(info_frame, text="Total Équipements:").grid(row=2, column=4, padx=5, pady=5, sticky="e")
+        ttk.Spinbox(info_frame, textvariable=self.total_equipements_var, from_=1, to=1000, width=5).grid(row=2, column=5, padx=5, pady=5, sticky="w")
+        
+        # Frame pour les semaines
+        semaines_frame = ttk.LabelFrame(parent, text="Planification des transferts (semaines avant la fin de l'ancien projet)", padding=10)
+        semaines_frame.pack(fill=X, pady=10)
+        
+        # Première ligne de semaines (12 à 7)
+        for i, semaine in enumerate(['douze', 'onze', 'dix', 'neuf', 'huit', 'sept']):
+            ttk.Label(semaines_frame, text=f"{12-i} semaines:").grid(row=0, column=i*2, padx=5, pady=5, sticky="e")
+            ttk.Spinbox(semaines_frame, textvariable=self.semaines_vars[semaine], from_=0, to=1000, width=5).grid(row=0, column=i*2+1, padx=5, pady=5, sticky="w")
+        
+        # Deuxième ligne de semaines (6 à 1)
+        for i, semaine in enumerate(['six', 'cinq', 'quatre', 'trois', 'deux', 'un']):
+            ttk.Label(semaines_frame, text=f"{6-i} semaines:").grid(row=1, column=i*2, padx=5, pady=5, sticky="e")
+            ttk.Spinbox(semaines_frame, textvariable=self.semaines_vars[semaine], from_=0, to=1000, width=5).grid(row=1, column=i*2+1, padx=5, pady=5, sticky="w")
+        
+        # Dernière ligne (0 semaines)
+        ttk.Label(semaines_frame, text="0 semaine:").grid(row=2, column=0, padx=5, pady=5, sticky="e")
+        ttk.Spinbox(semaines_frame, textvariable=self.semaines_vars['zero'], from_=0, to=1000, width=5).grid(row=2, column=1, padx=5, pady=5, sticky="w")
+        
+        # Boutons d'action pour le formulaire
+        btn_frame = ttk.Frame(parent, padding=10)
+        btn_frame.pack(fill=X, pady=10)
+        
+        ttk.Button(btn_frame, text="Enregistrer", command=self.enregistrer, bootstyle=SUCCESS).pack(side=LEFT, padx=5)
+        ttk.Button(btn_frame, text="Vider formulaire", command=self.vider_formulaire, bootstyle=SECONDARY).pack(side=LEFT, padx=5)
+        ttk.Button(btn_frame, text="Annuler", command=lambda: self.root.children['!notebook'].select(0), bootstyle=DANGER).pack(side=LEFT, padx=5)
 
-        # Boutons
-        self.btn_generer = ttk.Button(control_frame, text="Générer", command=self.generer_tableau, bootstyle=SUCCESS)
-        self.btn_generer.pack(side=LEFT, padx=10)
+    def actualiser_localisation_client(self, event=None):
+        """Met à jour la localisation du client sélectionné"""
+        id_client = self.id_client_var.get()
+        if id_client:
+            client = session.query(self.Chantier).filter_by(id_client=id_client).first()
+            if client:
+                self.localisation_client_var.set(client.localisation or "Non spécifiée")
+            else:
+                self.localisation_client_var.set("Client inconnu")
+        else:
+            self.localisation_client_var.set("")
 
-        self.btn_importer = ttk.Button(control_frame, text="Importer depuis Excel", command=self.importer_excel, bootstyle=INFO)
-        self.btn_importer.pack(side=LEFT, padx=10)
+    def basculer_vers_formulaire(self, nouveau=False):
+        """Bascule vers l'onglet du formulaire"""
+        if nouveau:
+            self.vider_formulaire()
+        self.root.children['!notebook'].select(1)  # Sélectionner l'onglet du formulaire
 
-        self.btn_exporter = ttk.Button(control_frame, text="Exporter vers Excel", command=self.exporter_excel, bootstyle=WARNING)
-        self.btn_exporter.pack(side=LEFT, padx=10)
-
-        # Frame pour les boutons d'édition
-        edit_frame = ttk.Frame(main_frame)
-        edit_frame.pack(fill=X, pady=5)
-
-        self.btn_ajouter_ligne = ttk.Button(edit_frame, text="Ajouter un équipement", command=self.ajouter_ligne, bootstyle=PRIMARY)
-        self.btn_ajouter_ligne.pack(side=LEFT, padx=10)
-
-        self.btn_supprimer_ligne = ttk.Button(edit_frame, text="Supprimer", command=self.supprimer_ligne, bootstyle=DANGER)
-        self.btn_supprimer_ligne.pack(side=LEFT, padx=10)
-
-        self.btn_modifier_ligne = ttk.Button(edit_frame, text="Modifier", command=self.modifier_ligne, bootstyle=SECONDARY)
-        self.btn_modifier_ligne.pack(side=LEFT, padx=10)
-
-        # Status bar
-        self.status_var = StringVar()
-        self.status_bar = ttk.Label(main_frame, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W)
-        self.status_bar.pack(side=BOTTOM, fill=X)
-        self.status_var.set("Prêt")
-
-        # Frame pour le tableau
-        self.frame_tableau = ttk.Frame(main_frame)
-        self.frame_tableau.pack(pady=5, fill=BOTH, expand=True)
-
-        # Treeview (tableau)
-        self.tree = None
-        self.colonnes = []
-
-        # Charger la liste des clients pour le filtre
-        self.charger_liste_clients()
-
-        # Initialiser le tableau par défaut
-        self.generer_tableau()
-
-    def charger_liste_clients(self):
-        """Charge la liste des clients pour le filtre."""
+    def charger_clients(self):
+        """Charge la liste des clients pour les combobox"""
         try:
-            # Récupérer tous les clients uniques avec leurs ID
-            clients = session.query(Chantier.id_client).distinct().all()
+            clients = session.query(self.Chantier).order_by(self.Chantier.id_client).all()
+            client_ids = [c.id_client for c in clients]
             
-            # Convertir en liste de chaînes
-            liste_clients = [str(client[0]) for client in clients]
-            
-            # Mettre à jour le combobox
-            self.client_filter_combobox['values'] = ['Tous'] + liste_clients
-            self.client_filter_combobox.set('Tous')
-            self.status_var.set(f"{len(liste_clients)} clients disponibles")
-            
+            # Mise à jour des combobox
+            self.client_cb['values'] = client_ids
+            self.client_filter_cb['values'] = ["Tous"] + client_ids
+            self.filtre_client_var.set("Tous")
         except Exception as e:
-            messagebox.showerror("Erreur", f"Une erreur s'est produite lors du chargement des clients: {str(e)}")
-            self.status_var.set("Erreur de chargement des clients")
+            messagebox.showerror("Erreur", f"Impossible de charger les clients: {str(e)}")
+            print(f"Erreur lors du chargement des clients: {str(e)}")
 
-    def filtrer_par_client(self, event=None):
-        """Filtre les équipements par client sélectionné."""
-        client = self.client_filter_var.get()
-        self.status_var.set(f"Filtre appliqué: {client}")
+    def enregistrer(self):
+        """Enregistre un transfert (ajout ou modification)"""
+        if not self.validation_formulaire():
+            return
+
+        try:
+            # Vérifier s'il s'agit d'un ajout ou d'une modification
+            if self.id_var.get() == 0:  # Ajout
+                transfert = self.TransfererEquipement(
+                    volet=self.volet_var.get() or None,
+                    designation_equipement=self.designation_equipement_var.get(),
+                    modalite_transport=self.modalite_transport_var.get() or None,
+                    total_equipements=self.total_equipements_var.get(),
+                    id_client=self.id_client_var.get(),
+                    douze_semaines_avant=self.semaines_vars['douze'].get() or None,
+                    onze_semaines_avant=self.semaines_vars['onze'].get() or None,
+                    dix_semaines_avant=self.semaines_vars['dix'].get() or None,
+                    neuf_semaines_avant=self.semaines_vars['neuf'].get() or None,
+                    huit_semaines_avant=self.semaines_vars['huit'].get() or None,
+                    sept_semaines_avant=self.semaines_vars['sept'].get() or None,
+                    six_semaines_avant=self.semaines_vars['six'].get() or None,
+                    cinq_semaines_avant=self.semaines_vars['cinq'].get() or None,
+                    quatre_semaines_avant=self.semaines_vars['quatre'].get() or None,
+                    trois_semaines_avant=self.semaines_vars['trois'].get() or None,
+                    deux_semaines_avant=self.semaines_vars['deux'].get() or None,
+                    un_semaines_avant=self.semaines_vars['un'].get() or None,
+                    zero_semaines_avant=self.semaines_vars['zero'].get() or None
+                )
+                session.add(transfert)
+                message_succes = "Transfert d'équipement ajouté avec succès"
+            else:  # Modification
+                transfert = session.query(self.TransfererEquipement).filter_by(id=self.id_var.get()).first()
+                if transfert:
+                    transfert.volet = self.volet_var.get() or None
+                    transfert.designation_equipement = self.designation_equipement_var.get()
+                    transfert.modalite_transport = self.modalite_transport_var.get() or None
+                    transfert.total_equipements = self.total_equipements_var.get()
+                    transfert.id_client = self.id_client_var.get()
+                    transfert.douze_semaines_avant = self.semaines_vars['douze'].get() or None
+                    transfert.onze_semaines_avant = self.semaines_vars['onze'].get() or None
+                    transfert.dix_semaines_avant = self.semaines_vars['dix'].get() or None
+                    transfert.neuf_semaines_avant = self.semaines_vars['neuf'].get() or None
+                    transfert.huit_semaines_avant = self.semaines_vars['huit'].get() or None
+                    transfert.sept_semaines_avant = self.semaines_vars['sept'].get() or None
+                    transfert.six_semaines_avant = self.semaines_vars['six'].get() or None
+                    transfert.cinq_semaines_avant = self.semaines_vars['cinq'].get() or None
+                    transfert.quatre_semaines_avant = self.semaines_vars['quatre'].get() or None
+                    transfert.trois_semaines_avant = self.semaines_vars['trois'].get() or None
+                    transfert.deux_semaines_avant = self.semaines_vars['deux'].get() or None
+                    transfert.un_semaines_avant = self.semaines_vars['un'].get() or None
+                    transfert.zero_semaines_avant = self.semaines_vars['zero'].get() or None
+                message_succes = "Transfert d'équipement modifié avec succès"
+            
+            session.commit()
+            messagebox.showinfo("Succès", message_succes)
+            self.charger_donnees()
+            self.vider_formulaire()
+            # Revenir à l'onglet liste
+            self.root.children['!notebook'].select(0)
+        except Exception as e:
+            session.rollback()
+            messagebox.showerror("Erreur", f"Impossible d'enregistrer le transfert: {str(e)}")
+            print(f"Erreur lors de l'enregistrement: {str(e)}")
+
+    def modifier_selection(self, event=None):
+        """Prépare le formulaire pour modifier un élément sélectionné"""
+        selection = self.tree.selection()
+        if not selection:
+            messagebox.showwarning("Attention", "Sélectionnez un transfert à modifier.")
+            return
+            
+        item_id = self.tree.item(selection[0], "values")[0]
+        try:
+            transfert = session.query(self.TransfererEquipement).filter_by(id=item_id).first()
+            if transfert:
+                # Remplir le formulaire avec les données
+                self.id_var.set(transfert.id)
+                self.id_client_var.set(transfert.id_client)
+                self.volet_var.set(transfert.volet or "")
+                self.designation_equipement_var.set(transfert.designation_equipement)
+                self.modalite_transport_var.set(transfert.modalite_transport or "")
+                self.total_equipements_var.set(transfert.total_equipements)
+                
+                # Mise à jour des variables pour les semaines
+                self.semaines_vars['douze'].set(transfert.douze_semaines_avant or 0)
+                self.semaines_vars['onze'].set(transfert.onze_semaines_avant or 0)
+                self.semaines_vars['dix'].set(transfert.dix_semaines_avant or 0)
+                self.semaines_vars['neuf'].set(transfert.neuf_semaines_avant or 0)
+                self.semaines_vars['huit'].set(transfert.huit_semaines_avant or 0)
+                self.semaines_vars['sept'].set(transfert.sept_semaines_avant or 0)
+                self.semaines_vars['six'].set(transfert.six_semaines_avant or 0)
+                self.semaines_vars['cinq'].set(transfert.cinq_semaines_avant or 0)
+                self.semaines_vars['quatre'].set(transfert.quatre_semaines_avant or 0)
+                self.semaines_vars['trois'].set(transfert.trois_semaines_avant or 0)
+                self.semaines_vars['deux'].set(transfert.deux_semaines_avant or 0)
+                self.semaines_vars['un'].set(transfert.un_semaines_avant or 0)
+                self.semaines_vars['zero'].set(transfert.zero_semaines_avant or 0)
+                
+                # Mise à jour de la localisation
+                self.actualiser_localisation_client()
+                
+                # Basculer vers l'onglet formulaire
+                self.basculer_vers_formulaire()
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Impossible de charger les données du transfert: {str(e)}")
+            print(f"Erreur lors du chargement du transfert {item_id}: {str(e)}")
+
+    def supprimer(self):
+        """Supprime un transfert d'équipement"""
+        selection = self.tree.selection()
+        if not selection:
+            messagebox.showwarning("Attention", "Sélectionnez un transfert à supprimer")
+            return
+            
+        item_id = self.tree.item(selection[0], "values")[0]
+        confirmation = messagebox.askyesno("Confirmation", "Êtes-vous sûr de vouloir supprimer ce transfert d'équipement?")
+        
+        if confirmation:
+            try:
+                session.query(self.TransfererEquipement).filter_by(id=item_id).delete()
+                session.commit()
+                messagebox.showinfo("Succès", "Transfert d'équipement supprimé avec succès")
+                self.charger_donnees()
+                self.vider_formulaire()
+            except Exception as e:
+                session.rollback()
+                messagebox.showerror("Erreur", f"Impossible de supprimer le transfert: {str(e)}")
+
+    def charger_donnees(self):
+        """Charge les données dans le tableau"""
+        # Effacer les données existantes
+        self.tree.delete(*self.tree.get_children())
+        
+        try:
+            # Préparer la requête avec jointure pour obtenir les informations du chantier
+            query = session.query(
+                self.TransfererEquipement, 
+                self.Chantier.localisation
+            ).join(
+                self.Chantier, 
+                self.TransfererEquipement.id_client == self.Chantier.id_client, 
+                isouter=True
+            )
+            
+            # Appliquer le filtre client si nécessaire
+            if self.filtre_client_var.get() != "Tous":
+                query = query.filter(self.TransfererEquipement.id_client == self.filtre_client_var.get())
+            
+            # Appliquer le filtre de recherche si présent
+            if self.recherche_var.get():
+                recherche = f"%{self.recherche_var.get()}%"
+                query = query.filter(
+                    or_(
+                        self.TransfererEquipement.id_client.like(recherche),
+                        self.TransfererEquipement.volet.like(recherche),
+                        self.TransfererEquipement.designation_equipement.like(recherche),
+                        self.TransfererEquipement.modalite_transport.like(recherche),
+                        self.Chantier.localisation.like(recherche)
+                    )
+                )
+            
+            # Exécuter la requête
+            resultats = query.all()
+            
+            # Remplir le tableau
+            for transfert, localisation in resultats:
+                self.tree.insert("", "end", values=(
+                    transfert.id, 
+                    transfert.id_client,
+                    localisation or "Non spécifiée",
+                    transfert.volet or "-",
+                    transfert.designation_equipement,
+                    transfert.modalite_transport or "-",
+                    transfert.total_equipements,
+                    transfert.douze_semaines_avant or 0,
+                    transfert.onze_semaines_avant or 0,
+                    transfert.dix_semaines_avant or 0,
+                    transfert.neuf_semaines_avant or 0,
+                    transfert.huit_semaines_avant or 0,
+                    transfert.sept_semaines_avant or 0,
+                    transfert.six_semaines_avant or 0,
+                    transfert.cinq_semaines_avant or 0,
+                    transfert.quatre_semaines_avant or 0,
+                    transfert.trois_semaines_avant or 0,
+                    transfert.deux_semaines_avant or 0,
+                    transfert.un_semaines_avant or 0,
+                    transfert.zero_semaines_avant or 0
+                ))
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Impossible de charger les données: {str(e)}")
+            print(f"Erreur lors du chargement des données: {str(e)}")
+
+    def vider_formulaire(self):
+        """Réinitialise les champs du formulaire"""
+        self.id_var.set(0)
+        self.id_client_var.set("")
+        self.localisation_client_var.set("")
+        self.volet_var.set("")
+        self.designation_equipement_var.set("")
+        self.modalite_transport_var.set("")
+        self.total_equipements_var.set(1)  # Valeur par défaut à 1
+        
+        # Réinitialisation des semaines
+        for semaine in self.semaines_vars:
+            self.semaines_vars[semaine].set(0)
+
+    def validation_formulaire(self):
+        """Valide les champs du formulaire avant ajout/modification"""
+        # Vérifier que les champs obligatoires sont remplis
+        if not self.designation_equipement_var.get():
+            messagebox.showerror("Erreur", "La désignation de l'équipement est obligatoire")
+            return False
+            
+        if not self.id_client_var.get():
+            messagebox.showerror("Erreur", "Le client est obligatoire")
+            return False
+            
+        # Vérifier que les valeurs numériques sont valides
+        try:
+            if self.total_equipements_var.get() <= 0:
+                messagebox.showerror("Erreur", "Le total des équipements doit être supérieur à 0")
+                return False
+        except:
+            messagebox.showerror("Erreur", "Le total des équipements doit être un nombre valide")
+            return False
+            
+        # Vérifier que les valeurs des semaines sont valides
+        for semaine, var in self.semaines_vars.items():
+            try:
+                if var.get() < 0:
+                    messagebox.showerror("Erreur", f"La valeur pour {semaine} semaines doit être positive ou nulle")
+                    return False
+            except:
+                messagebox.showerror("Erreur", f"La valeur pour {semaine} semaines doit être un nombre valide")
+                return False
+            
+        return True
+
+    def appliquer_filtre(self):
+        """Applique le filtre client sélectionné"""
         self.charger_donnees()
 
     def reinitialiser_filtre(self):
-        """Réinitialise le filtre des clients."""
-        self.client_filter_combobox.set('Tous')
-        self.status_var.set("Filtre réinitialisé")
+        """Réinitialise le filtre client"""
+        self.filtre_client_var.set("Tous")
+        self.recherche_var.set("")
         self.charger_donnees()
-
-    def generer_tableau(self):
-        """Génère dynamiquement les colonnes selon le nombre de semaines entrées."""
-        try:
-            nb_semaines = int(self.entree_semaines.get())
-            if nb_semaines <= 0:
-                messagebox.showerror("Erreur", "Le nombre de semaines doit être supérieur à 0.")
-                return
-
-            # Colonnes principales
-            self.colonnes = [
-                "ID Client",
-                "Volet",
-                "Désignation de l'équipement à transférer",
-                "Modalité de transport",
-                "Total des équipements"
-            ]
-
-            # Ajouter les colonnes pour chaque semaine
-            for i in range(nb_semaines):
-                semaine_num = nb_semaines - i - 1
-                self.colonnes.append(f"{semaine_num:02d} semaines avant la fin")
-
-            # Détruire l'ancien tableau s'il existe
-            if self.tree:
-                for widget in self.frame_tableau.winfo_children():
-                    widget.destroy()
-
-            # Scrollbars
-            scroll_y = ttk.Scrollbar(self.frame_tableau, orient=VERTICAL)
-            scroll_x = ttk.Scrollbar(self.frame_tableau, orient=HORIZONTAL)
-
-            # Créer un nouveau tableau
-            self.tree = ttk.Treeview(
-                self.frame_tableau,
-                columns=self.colonnes,
-                show="headings",
-                yscrollcommand=scroll_y.set,
-                xscrollcommand=scroll_x.set
-            )
-
-            # Configurer les scrollbars
-            scroll_y.config(command=self.tree.yview)
-            scroll_y.pack(side=RIGHT, fill=Y)
-
-            scroll_x.config(command=self.tree.xview)
-            scroll_x.pack(side=BOTTOM, fill=X)
-
-            # Configurer les colonnes
-            for i, col in enumerate(self.colonnes):
-                self.tree.heading(col, text=col)
-
-                # Largeur adaptée selon le type de colonne
-                if i == 0:  # ID Client
-                    self.tree.column(col, width=80, minwidth=60)
-                elif i == 1:  # Volet
-                    self.tree.column(col, width=80, minwidth=60)
-                elif i == 2:  # Désignation
-                    self.tree.column(col, width=250, minwidth=150)
-                elif i == 3:  # Modalité
-                    self.tree.column(col, width=120, minwidth=100)
-                elif i == 4:  # Total
-                    self.tree.column(col, width=80, minwidth=60)
-                else:  # Colonnes des semaines
-                    self.tree.column(col, width=80, minwidth=60)
-                    self.tree.heading(col, text=f"{col}\nQuantité")
-
-            # Ajouter des tags pour colorer les lignes alternées
-            self.tree.tag_configure('oddrow', background='#f0f0f0')
-            self.tree.tag_configure('evenrow', background='#e0e0e0')
-
-            # Ajouter des événements de souris pour améliorer l'expérience utilisateur
-            self.tree.bind("<Double-1>", lambda event: self.modifier_ligne())
-            self.tree.bind("<ButtonRelease-1>", self.on_tree_select)
-
-            self.tree.pack(fill=BOTH, expand=True)
-
-            # Charger les données depuis la base de données
-            self.charger_donnees()
-            self.status_var.set(f"Tableau généré avec {nb_semaines} semaines")
-
-        except ValueError:
-            messagebox.showerror("Erreur", "Veuillez entrer un nombre valide pour les semaines.")
-            self.status_var.set("Erreur: nombre de semaines invalide")
-
-    def on_tree_select(self, event):
-        """Met à jour la barre d'état avec l'info de la ligne sélectionnée"""
-        selection = self.tree.selection()
-        if selection:
-            item = selection[0]
-            values = self.tree.item(item, 'values')
-            self.status_var.set(f"Sélectionné: {values[2]} - Client: {values[0]}")
-
-    def charger_donnees(self):
-        """Charge les données depuis la base de données et les affiche dans le tableau."""
-        try:
-            # Effacer le tableau actuel
-            self.tree.delete(*self.tree.get_children())
-            
-            # Récupérer le filtre client
-            client_filtre = self.client_filter_var.get()
-            
-            # Construire la requête de base
-            query = session.query(TransfererEquipement)
-            
-            # Appliquer le filtre client
-            if client_filtre and client_filtre != 'Tous':
-                query = query.filter(TransfererEquipement.id_client == client_filtre)
-            
-            # Récupérer les équipements
-            equipements = query.all()
-            
-            for i, equipement in enumerate(equipements):
-                # Préparer les valeurs de base
-                valeurs = [
-                    equipement.id_client or "",
-                    equipement.volet or "",
-                    equipement.designation_equipement or "",
-                    equipement.modalite_transport or "",
-                    equipement.total_equipements
-                ]
-                
-                # Créer un dictionnaire des semaines pour cet équipement
-                semaines_dict = {s.numero_semaine: s.quantite for s in equipement.semaines}
-                
-                # Pour chaque colonne de semaine dans le tableau
-                for j in range(len(self.colonnes) - 5):  # -5 pour les 5 premières colonnes
-                    # Obtenir le numéro de semaine à partir du nom de la colonne
-                    col_name = self.colonnes[j+5]
-                    try:
-                        semaine_num = int(col_name.split()[0])
-                        # Ajouter la quantité si disponible, sinon une chaîne vide
-                        valeurs.append(semaines_dict.get(semaine_num, ""))
-                    except (ValueError, IndexError):
-                        valeurs.append("")  # En cas d'erreur, ajouter une chaîne vide
-                
-                # Insérer la ligne dans le tableau avec tag pour coloration alternée
-                tag = 'evenrow' if i % 2 == 0 else 'oddrow'
-                self.tree.insert("", "end", values=valeurs, tags=(tag,))
-            
-            self.status_var.set(f"{len(equipements)} équipements affichés")
-            
-        except Exception as e:
-            messagebox.showerror("Erreur", f"Erreur lors du chargement des données: {str(e)}")
-            self.status_var.set("Erreur lors du chargement des données")
-            traceback.print_exc()
-
-    def ajouter_ligne(self):
-        """Ajoute une ligne vide au tableau puis ouvre une boîte de dialogue pour la remplir."""
-        try:
-            dialog = ttk.Toplevel(self.root)
-            dialog.title("Ajouter un équipement à transférer")
-            dialog.geometry("800x500")
-
-            main_frame = ttk.Frame(dialog)
-            main_frame.pack(fill=BOTH, expand=True, padx=10, pady=10)
-
-            # Canvas avec scrollbar
-            canvas = tk.Canvas(main_frame)
-            scrollbar = ttk.Scrollbar(main_frame, orient=VERTICAL, command=canvas.yview)
-            scrollable_frame = ttk.Frame(canvas)
-
-            scrollable_frame.bind(
-                "<Configure>",
-                lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-            )
-
-            canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-            canvas.configure(yscrollcommand=scrollbar.set)
-
-            canvas.pack(side=LEFT, fill=BOTH, expand=True)
-            scrollbar.pack(side=RIGHT, fill=Y)
-
-            # Récupérer la liste des clients
-            clients = session.query(Chantier.id_client).distinct().all()
-            clients_liste = [str(client[0]) for client in clients]
-
-            # Champs pour les données principales - Utilisation d'un style de formulaire plus clair
-            style = ttk.Style()
-            style.configure("TLabel", font=("Arial", 10))
-            
-            # Formulaire avec LabelFrame pour regrouper les champs
-            info_frame = ttk.LabelFrame(scrollable_frame, text="Informations générales", padding=10)
-            info_frame.pack(fill=X, padx=5, pady=5)
-            
-            # ID Client (Obligatoire)
-            ttk.Label(info_frame, text="ID Client *").grid(row=0, column=0, sticky=W, padx=5, pady=5)
-            client_entry = ttk.Combobox(info_frame, values=clients_liste, width=47)
-            client_entry.grid(row=0, column=1, sticky=(W, E), padx=5, pady=5)
-
-            # Volet (Optionnel)
-            ttk.Label(info_frame, text="Volet").grid(row=1, column=0, sticky=W, padx=5, pady=5)
-            volet_entry = ttk.Entry(info_frame, width=50)
-            volet_entry.grid(row=1, column=1, sticky=(W, E), padx=5, pady=5)
-
-            # Désignation (Obligatoire)
-            ttk.Label(info_frame, text="Désignation de l'équipement *").grid(row=2, column=0, sticky=W, padx=5, pady=5)
-            designation_entry = ttk.Entry(info_frame, width=50)
-            designation_entry.grid(row=2, column=1, sticky=(W, E), padx=5, pady=5)
-
-            # Modalité de transport (Optionnel mais avec valeurs suggérées)
-            ttk.Label(info_frame, text="Modalité de transport").grid(row=3, column=0, sticky=W, padx=5, pady=5)
-            modalite_entry = ttk.Combobox(info_frame, values=["Tractable", "Chargeable", "Tractage"])
-            modalite_entry.grid(row=3, column=1, sticky=(W, E), padx=5, pady=5)
-
-            # Total des équipements (Obligatoire)
-            ttk.Label(info_frame, text="Total des équipements *").grid(row=4, column=0, sticky=W, padx=5, pady=5)
-            total_entry = ttk.Entry(info_frame, width=50)
-            total_entry.grid(row=4, column=1, sticky=(W, E), padx=5, pady=5)
-            total_entry.insert(0, "0")  # Valeur par défaut
-            
-            # Note explicative
-            ttk.Label(scrollable_frame, text="* Champs obligatoires", font=("Arial", 8, "italic")).pack(anchor=W, padx=5)
-            
-            # Frame pour les semaines
-            semaines_frame = ttk.LabelFrame(scrollable_frame, text="Planification des transferts par semaine", padding=10)
-            semaines_frame.pack(fill=X, padx=5, pady=10, expand=True)
-            
-            entries_semaine = []
-            # Organiser les semaines en grille pour une meilleure disposition
-            cols_per_row = 3  # Nombre de semaines par ligne
-            for i in range(5, len(self.colonnes)):
-                row_idx = (i - 5) // cols_per_row
-                col_idx = (i - 5) % cols_per_row * 2  # * 2 pour laisser de l'espace entre les colonnes
-                
-                ttk.Label(semaines_frame, text=self.colonnes[i]).grid(row=row_idx, column=col_idx, sticky=W, padx=5, pady=5)
-                entry = ttk.Entry(semaines_frame, width=10)
-                entry.grid(row=row_idx, column=col_idx + 1, sticky=W, padx=5, pady=5)
-                entries_semaine.append((self.colonnes[i].split()[0], entry))
-
-            def sauvegarder():
-                try:
-                    # Vérifier que les champs obligatoires sont remplis
-                    if not client_entry.get().strip():
-                        messagebox.showerror("Erreur", "L'ID client est obligatoire.")
-                        return
-                    
-                    if not designation_entry.get().strip():
-                        messagebox.showerror("Erreur", "La désignation de l'équipement est obligatoire.")
-                        return
-                        
-                    # Pour le total, utiliser 0 si vide
-                    try:
-                        total = int(total_entry.get() or 0)
-                    except ValueError:
-                        messagebox.showerror("Erreur", "Le total doit être un nombre entier.")
-                        return
-                    
-                    # Créer un nouvel équipement
-                    equipement = TransfererEquipement(
-                        id_client=client_entry.get().strip(),
-                        volet=volet_entry.get().strip(),
-                        designation_equipement=designation_entry.get().strip(),
-                        modalite_transport=modalite_entry.get().strip(),
-                        total_equipements=total
-                    )
-                    session.add(equipement)
-                    session.flush()
-
-                    # Ajouter les semaines
-                    for num_semaine, entry in entries_semaine:
-                        quantite = entry.get().strip()
-                        if quantite:
-                            try:
-                                quantite_int = int(quantite)
-                                if quantite_int > 0:
-                                    semaine = SemaineTransfert(
-                                        id=equipement.id,  # Utiliser id au lieu de id_equipement pour correspondre à votre modèle
-                                        numero_semaine=int(num_semaine),
-                                        quantite=quantite_int
-                                    )
-                                    session.add(semaine)
-                            except ValueError:
-                                messagebox.showerror("Erreur", f"La quantité pour la semaine {num_semaine} doit être un nombre entier.")
-                                session.rollback()
-                                return
-
-                    session.commit()
-                    self.charger_donnees()
-                    dialog.destroy()
-                    messagebox.showinfo("Succès", "Équipement ajouté avec succès.")
-                    self.status_var.set("Équipement ajouté avec succès")
-                except Exception as e:
-                    messagebox.showerror("Erreur", f"Erreur lors de l'ajout: {e}")
-                    session.rollback()
-                    self.status_var.set("Erreur lors de l'ajout de l'équipement")
-
-            # Boutons
-            btn_frame = ttk.Frame(dialog)
-            btn_frame.pack(fill=X, pady=10)
-
-            ttk.Button(btn_frame, text="Annuler", command=dialog.destroy, bootstyle=SECONDARY).pack(side=RIGHT, padx=5)
-            ttk.Button(btn_frame, text="Sauvegarder", command=sauvegarder, bootstyle=SUCCESS).pack(side=RIGHT, padx=5)
-        except Exception as e:
-            messagebox.showerror("Erreur", f"Erreur lors de l'ouverture du formulaire: {e}")
-            self.status_var.set("Erreur lors de l'ouverture du formulaire")
-            
-    def supprimer_ligne(self):
-        """Supprime la ligne sélectionnée dans le tableau."""
-        selection = self.tree.selection()
-        if not selection:
-            messagebox.showinfo("Information", "Veuillez sélectionner une ligne à supprimer.")
-            return
-
-        # Confirmation de suppression
-        confirmation = messagebox.askyesno("Confirmation", "Êtes-vous sûr de vouloir supprimer cette ligne ?")
-        if not confirmation:
-            return
-
-        try:
-            # Récupérer les valeurs de la ligne sélectionnée
-            item = selection[0]
-            valeurs = self.tree.item(item, 'values')
-            
-            # Récupérer les informations nécessaires pour identifier l'équipement
-            id_client = valeurs[0]
-            volet = valeurs[1]
-            designation = valeurs[2]
-            
-            # Rechercher l'équipement correspondant dans la base de données
-            equipement = session.query(TransfererEquipement).filter_by(
-                id_client=id_client,
-                volet=volet, 
-                designation_equipement=designation
-            ).first()
-            
-            if not equipement:
-                messagebox.showerror("Erreur", "Équipement non trouvé dans la base de données.")
-                return
-            
-            # Supprimer d'abord les enregistrements de semaines associés
-            session.query(SemaineTransfert).filter_by(id=equipement.id).delete()
-            
-            # Puis supprimer l'équipement
-            session.delete(equipement)
-            
-            # Valider les changements
-            session.commit()
-            
-            # Supprimer de l'affichage
-            self.tree.delete(item)
-            
-            messagebox.showinfo("Succès", "Équipement supprimé avec succès.")
-            self.status_var.set("Équipement supprimé avec succès")
-            
-        except Exception as e:
-            # En cas d'erreur, annuler la transaction
-            session.rollback()
-            messagebox.showerror("Erreur", f"Erreur lors de la suppression: {e}")
-            self.status_var.set("Erreur lors de la suppression")
-
-    def modifier_ligne(self):
-        """Ouvre une fenêtre pour modifier la ligne sélectionnée."""
-        selection = self.tree.selection()
-        if not selection:
-            messagebox.showinfo("Information", "Veuillez sélectionner une ligne à modifier.")
-            return
-
-        item = selection[0]
-        valeurs = self.tree.item(item, 'values')
         
-        try:
-            id_client = valeurs[0]
-            volet = valeurs[1]
-            designation = valeurs[2]
-            
-            equipement = session.query(TransfererEquipement).filter_by(
-                id_client=id_client,
-                volet=volet, 
-                designation_equipement=designation
-            ).first()
-            
-            if not equipement:
-                messagebox.showerror("Erreur", "Équipement non trouvé dans la base de données.")
-                return
-                
-            dialog = ttk.Toplevel(self.root)
-            dialog.title("Modifier la ligne")
-            dialog.geometry("800x500")
-
-            main_frame = ttk.Frame(dialog)
-            main_frame.pack(fill=BOTH, expand=True, padx=10, pady=10)
-
-            # Canvas avec scrollbar
-            canvas = tk.Canvas(main_frame)
-            scrollbar = ttk.Scrollbar(main_frame, orient=VERTICAL, command=canvas.yview)
-            scrollable_frame = ttk.Frame(canvas)
-
-            scrollable_frame.bind(
-                "<Configure>",
-                lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-            )
-
-            canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-            canvas.configure(yscrollcommand=scrollbar.set)
-
-            canvas.pack(side=LEFT, fill=BOTH, expand=True)
-            scrollbar.pack(side=RIGHT, fill=Y)
-
-            # Récupérer la liste des clients
-            clients = session.query(Chantier.id_client).distinct().all()
-            clients_liste = [str(client[0]) for client in clients]
-
-            # Champs pour les données principales
-            ttk.Label(scrollable_frame, text="ID Client").grid(row=0, column=0, sticky=W, padx=5, pady=5)
-            client_entry = ttk.Combobox(scrollable_frame, values=clients_liste, width=47)
-            client_entry.grid(row=0, column=1, sticky=(W, E), padx=5, pady=5)
-            client_entry.set(equipement.id_client)
-
-            ttk.Label(scrollable_frame, text="Volet").grid(row=1, column=0, sticky=W, padx=5, pady=5)
-            volet_entry = ttk.Entry(scrollable_frame, width=50)
-            volet_entry.grid(row=1, column=1, sticky=(W, E), padx=5, pady=5)
-            volet_entry.insert(0, equipement.volet)
-
-            ttk.Label(scrollable_frame, text="Désignation de l'équipement").grid(row=2, column=0, sticky=W, padx=5, pady=5)
-            designation_entry = ttk.Entry(scrollable_frame, width=50)
-            designation_entry.grid(row=2, column=1, sticky=(W, E), padx=5, pady=5)
-            designation_entry.insert(0, equipement.designation_equipement)
-
-            ttk.Label(scrollable_frame, text="Modalité de transport").grid(row=3, column=0, sticky=W, padx=5, pady=5)
-            modalite_entry = ttk.Combobox(scrollable_frame, values=["Tractable", "Chargeable", "Tractage"])
-            modalite_entry.grid(row=3, column=1, sticky=(W, E), padx=5, pady=5)
-            modalite_entry.set(equipement.modalite_transport)
-
-            ttk.Label(scrollable_frame, text="Total des équipements").grid(row=4, column=0, sticky=W, padx=5, pady=5)
-            total_entry = ttk.Entry(scrollable_frame, width=50)
-            total_entry.grid(row=4, column=1, sticky=(W, E), padx=5, pady=5)
-            total_entry.insert(0, str(equipement.total_equipements))
-
-            semaines_dict = {s.numero_semaine: s.quantite for s in equipement.semaines}
-            
-            entries_semaine = []
-            for i in range(5, len(self.colonnes)):
-                col = self.colonnes[i]
-                num_semaine = int(col.split()[0])
-                
-                ttk.Label(scrollable_frame, text=col).grid(row=i, column=0, sticky=W, padx=5, pady=5)
-                entry = ttk.Entry(scrollable_frame, width=50)
-                entry.grid(row=i, column=1, sticky=(W, E), padx=5, pady=5)
-                
-                if num_semaine in semaines_dict:
-                    entry.insert(0, str(semaines_dict[num_semaine]))
-                
-                entries_semaine.append((num_semaine, entry))
-
-            def sauvegarder():
-                try:
-                    # Vérifier que l'ID client est renseigné
-                    if not client_entry.get().strip():
-                        messagebox.showerror("Erreur", "L'ID client est obligatoire.")
-                        return
-
-                    equipement.id_client = client_entry.get().strip()
-                    equipement.volet = volet_entry.get()
-                    equipement.designation_equipement = designation_entry.get()
-                    equipement.modalite_transport = modalite_entry.get()
-                    equipement.total_equipements = int(total_entry.get() or 0)
-
-                    # Modifié: Utiliser 'id' au lieu de 'id_equipement'
-                    session.query(SemaineTransfert).filter_by(id=equipement.id).delete()
-                    
-                    for num_semaine, entry in entries_semaine:
-                        quantite = entry.get().strip()
-                        if quantite:
-                            semaine = SemaineTransfert(
-                                id=equipement.id,  # Modifié: Utiliser 'id' au lieu de 'id_equipement'
-                                numero_semaine=num_semaine,
-                                quantite=int(quantite)
-                            )
-                            session.add(semaine)
-
-                    session.commit()
-                    self.charger_donnees()
-                    dialog.destroy()
-                    messagebox.showinfo("Succès", "Équipement modifié avec succès.")
-                except Exception as e:
-                    messagebox.showerror("Erreur", f"Erreur lors de la modification: {e}")
-                    session.rollback()
-
-            btn_frame = ttk.Frame(dialog)
-            btn_frame.pack(fill=X, pady=10)
-
-            ttk.Button(btn_frame, text="Annuler", command=dialog.destroy, bootstyle=SECONDARY).pack(side=RIGHT, padx=5)
-            ttk.Button(btn_frame, text="Sauvegarder", command=sauvegarder, bootstyle=SUCCESS).pack(side=RIGHT, padx=5)
-        except Exception as e:
-            messagebox.showerror("Erreur", f"Problème lors de l'importation: {str(e)}")
-            session.rollback()
-            import traceback
-            traceback.print_exc()
-
-# Modification de la méthode importer_excel pour utiliser 'id' au lieu de 'id_equipement'
-    def importer_excel(self):
-        """Importe les données depuis un fichier Excel."""
-        fichier = filedialog.askopenfilename(filetypes=[("Fichiers Excel", "*.xlsx *.xls")])
-        if not fichier:
-            return
-
-        try:
-            df = pd.read_excel(fichier, header=0)
-
-            # Vérifier le format du fichier
-            if len(df.columns) < 5:
-                messagebox.showerror("Erreur", "Le fichier Excel doit contenir au moins 5 colonnes")
-                return
-
-            if not messagebox.askyesno("Confirmation",
-                                    "Cette action va remplacer toutes les données existantes. Continuer?"):
-                return
-
+    def rechercher(self):
+        """Effectue une recherche dans les données"""
+        self.charger_donnees()
+        
+    def trier_tableau(self, colonne):
+        """Trie le tableau selon la colonne spécifiée"""
+        # Récupérer toutes les lignes avec leurs valeurs
+        data = [(self.tree.set(child, colonne), child) for child in self.tree.get_children('')]
+        
+        # Déterminer l'ordre de tri (croissant par défaut)
+        # Si la colonne est numérique, convertir en entier pour le tri
+        if colonne in ["id", "total_equipements"] or "_semaines" in colonne:
+            # Pour les colonnes numériques
             try:
-                # Déterminer le nombre de semaines
-                nb_semaines = len(df.columns) - 5
-                if nb_semaines <= 0:
-                    nb_semaines = 13
-
-                self.entree_semaines.delete(0, tk.END)
-                self.entree_semaines.insert(0, str(nb_semaines))
-                self.generer_tableau()
-
-                # Vider les tables
-                session.query(SemaineTransfert).delete()
-                session.query(TransfererEquipement).delete()
-                session.commit()
-
-                importes = 0
-                for idx, row in df.iterrows():
-                    try:
-                        # Imprimer les valeurs lues pour le débogage
-                        print(f"Ligne {idx}: {row.values}")
-
-                        # Ignorer les lignes vides ou les en-têtes
-                        if pd.isna(row.iloc[0]) and pd.isna(row.iloc[1]):
-                            print(f"Ligne {idx} ignorée : lignes vides")
-                            continue
-
-                        if "volet" in str(row.iloc[1]).lower() or "désignation" in str(row.iloc[2]).lower():
-                            print(f"Ligne {idx} ignorée : en-tête détectée")
-                            continue
-
-                        # Récupérer les valeurs de base
-                        id_client = str(row.iloc[0]) if pd.notna(row.iloc[0]) else ""
-                        volet = str(row.iloc[1]) if pd.notna(row.iloc[1]) else ""
-                        designation = str(row.iloc[2]) if pd.notna(row.iloc[2]) else ""
-                        modalite = str(row.iloc[3]) if pd.notna(row.iloc[3]) else ""
-
-                        # Gérer le total des équipements
-                        try:
-                            total_equipements = int(float(row.iloc[4])) if pd.notna(row.iloc[4]) else 0
-                        except (ValueError, TypeError):
-                            total_equipements = 0
-
-                        # Créer l'équipement
-                        equipement = TransfererEquipement(
-                            id_client=id_client.strip(),
-                            volet=volet.strip(),
-                            designation_equipement=designation.strip(),
-                            modalite_transport=modalite.strip(),
-                            total_equipements=total_equipements
-                        )
-                        session.add(equipement)
-                        session.flush()
-
-                        # Traiter les semaines
-                        for i in range(5, min(len(df.columns), 5 + nb_semaines)):
-                            # Extraire le numéro de semaine depuis l'en-tête
-                            col_name = df.columns[i]
-                            try:
-                                # Gérer différents formats de noms de colonnes
-                                if "semaine" in col_name.lower():
-                                    parts = col_name.split()
-                                    num_semaine = int(parts[0])
-                                else:
-                                    # Si le nom de colonne est juste un nombre
-                                    num_semaine = int(col_name)
-                            except (ValueError, IndexError):
-                                # Si le format n'est pas reconnu, utiliser une position relative
-                                num_semaine = nb_semaines - (i - 5) - 1
-
-                            val = row.iloc[i]
-
-                            if pd.notna(val) and str(val).strip():
-                                try:
-                                    quantite = int(float(val))
-                                    if quantite > 0:
-                                        semaine = SemaineTransfert(
-                                            id=equipement.id,  # Use `id` instead of `id_equipement`
-                                            numero_semaine=num_semaine,
-                                            quantite=quantite
-                                        )
-                                        session.add(semaine)
-                                except (ValueError, TypeError):
-                                    continue
-
-                        importes += 1
-
-                    except Exception as e:
-                        print(f"Erreur ligne {idx}: {str(e)}")
-                        session.rollback()  # Ajoutez un rollback ici pour gérer les erreurs individuelles
-                        continue
-
-                session.commit()
-                self.charger_donnees()
-                messagebox.showinfo("Succès", f"Données importées avec succès! {importes} équipements importés.")
-
-            except Exception as e:
-                messagebox.showerror("Erreur", f"Problème lors de l'importation: {str(e)}")
-                session.rollback()
-                import traceback
-                traceback.print_exc()
-        except Exception as e:
-            messagebox.showerror("Erreur", f"Problème lors de la lecture du fichier Excel: {str(e)}")
-
+                # Vérifier si nous trions déjà par cette colonne
+                last_sort = getattr(self, "_last_sort", None)
+                if last_sort == (colonne, "asc"):
+                    # Inverser l'ordre
+                    data.sort(key=lambda x: int(x[0]) if x[0].isdigit() else 0, reverse=True)
+                    self._last_sort = (colonne, "desc")
+                else:
+                    # Tri croissant
+                    data.sort(key=lambda x: int(x[0]) if x[0].isdigit() else 0)
+                    self._last_sort = (colonne, "asc")
+            except ValueError:
+                # En cas d'erreur, tri en tant que chaîne
+                data.sort(reverse=(getattr(self, "_last_sort", None) == (colonne, "asc")))
+                self._last_sort = (colonne, "desc" if getattr(self, "_last_sort", None) == (colonne, "asc") else "asc")
+        else:
+            # Pour les colonnes de texte
+            last_sort = getattr(self, "_last_sort", None)
+            if last_sort == (colonne, "asc"):
+                data.sort(reverse=True)
+                self._last_sort = (colonne, "desc")
+            else:
+                data.sort()
+                self._last_sort = (colonne, "asc")
+                
+        # Réorganiser les éléments dans l'ordre trié
+        for index, (val, item) in enumerate(data):
+            self.tree.move(item, '', index)
     
-    def exporter_excel(self):
-        """Exporte les données du tableau vers un fichier Excel."""
+    def exporter_donnees(self):
+        """Exporte les données actuelles vers un fichier CSV"""
+        from tkinter import filedialog
+        import csv
+        
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".csv",
+            filetypes=[("Fichiers CSV", "*.csv"), ("Tous les fichiers", "*.*")],
+            title="Exporter les données"
+        )
+        
+        if not filename:
+            return
+            
         try:
-            # Ouvrir le dialogue de sauvegarde
-            fichier = filedialog.asksaveasfilename(
-                defaultextension=".xlsx",
-                filetypes=[("Fichiers Excel", "*.xlsx")],
-                title="Exporter vers Excel"
+            with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
+                writer = csv.writer(csvfile)
+                
+                # Écrire les en-têtes
+                headers = []
+                for col in self.tree["columns"]:
+                    headers.append(self.tree.heading(col)["text"])
+                writer.writerow(headers)
+                
+                # Écrire les données
+                for item_id in self.tree.get_children():
+                    values = self.tree.item(item_id, "values")
+                    writer.writerow(values)
+                    
+            messagebox.showinfo("Succès", f"Données exportées avec succès vers {filename}")
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur lors de l'exportation: {str(e)}")
+    
+    def importer_donnees(self):
+        """Importe des données depuis un fichier CSV"""
+        from tkinter import filedialog
+        import csv
+        
+        filename = filedialog.askopenfilename(
+            filetypes=[("Fichiers CSV", "*.csv"), ("Tous les fichiers", "*.*")],
+            title="Importer des données"
+        )
+        
+        if not filename:
+            return
+            
+        try:
+            with open(filename, 'r', encoding='utf-8') as csvfile:
+                reader = csv.reader(csvfile)
+                
+                # Sauter l'en-tête
+                next(reader)
+                
+                # Pour chaque ligne, ajouter un nouvel enregistrement
+                for row in reader:
+                    if len(row) < 7:  # Vérifier qu'il y a au moins les colonnes essentielles
+                        continue
+                        
+                    # Créer un nouveau transfert
+                    transfert = self.TransfererEquipement(
+                        id_client=row[1],
+                        volet=row[3] if row[3] != "-" else None,
+                        designation_equipement=row[4],
+                        modalite_transport=row[5] if row[5] != "-" else None,
+                        total_equipements=int(row[6]) if row[6].isdigit() else 0
+                    )
+                    
+                    # Ajouter les semaines si disponibles
+                    if len(row) > 7:
+                        transfert.douze_semaines_avant = int(row[7]) if row[7].isdigit() else None
+                    if len(row) > 8:
+                        transfert.onze_semaines_avant = int(row[8]) if row[8].isdigit() else None
+                    if len(row) > 9:
+                        transfert.dix_semaines_avant = int(row[9]) if row[9].isdigit() else None
+                    if len(row) > 10:
+                        transfert.neuf_semaines_avant = int(row[10]) if row[10].isdigit() else None
+                    if len(row) > 11:
+                        transfert.huit_semaines_avant = int(row[11]) if row[11].isdigit() else None
+                    if len(row) > 12:
+                        transfert.sept_semaines_avant = int(row[12]) if row[12].isdigit() else None
+                    if len(row) > 13:
+                        transfert.six_semaines_avant = int(row[13]) if row[13].isdigit() else None
+                    if len(row) > 14:
+                        transfert.cinq_semaines_avant = int(row[14]) if row[14].isdigit() else None
+                    if len(row) > 15:
+                        transfert.quatre_semaines_avant = int(row[15]) if row[15].isdigit() else None
+                    if len(row) > 16:
+                        transfert.trois_semaines_avant = int(row[16]) if row[16].isdigit() else None
+                    if len(row) > 17:
+                        transfert.deux_semaines_avant = int(row[17]) if row[17].isdigit() else None
+                    if len(row) > 18:
+                        transfert.un_semaines_avant = int(row[18]) if row[18].isdigit() else None
+                    if len(row) > 19:
+                        transfert.zero_semaines_avant = int(row[19]) if row[19].isdigit() else None
+                    
+                    # Ajouter à la session
+                    session.add(transfert)
+                
+                # Committer toutes les modifications
+                session.commit()
+                messagebox.showinfo("Succès", "Données importées avec succès")
+                self.charger_donnees()
+        except Exception as e:
+            session.rollback()
+            messagebox.showerror("Erreur", f"Erreur lors de l'importation: {str(e)}")
+            
+    def generer_rapport(self):
+        """Génère un rapport PDF des transferts d'équipements"""
+        try:
+            
+            
+            # Demander où enregistrer le fichier
+            filename = filedialog.asksaveasfilename(
+                defaultextension=".pdf",
+                filetypes=[("Fichiers PDF", "*.pdf"), ("Tous les fichiers", "*.*")],
+                title="Enregistrer le rapport"
             )
             
-            if not fichier:
-                return  # Annulation de la sauvegarde
+            if not filename:
+                return
+                
+            # Créer le document
+            doc = SimpleDocTemplate(filename, pagesize=landscape(A4))
+            styles = getSampleStyleSheet()
+            elements = []
             
-            # Préparer les données
-            donnees = []
+            # Titre
+            title_style = styles["Heading1"]
+            title_style.alignment = 1  # Centre
+            elements.append(Paragraph("Rapport des Transferts d'Équipements", title_style))
+            elements.append(Spacer(1, 20))
+            
+            # Sous-titre avec date
+            date_str = datetime.datetime.now().strftime("%d/%m/%Y à %H:%M")
+            subtitle_style = styles["Heading3"]
+            subtitle_style.alignment = 1  # Centre
+            elements.append(Paragraph(f"Généré le {date_str}", subtitle_style))
+            elements.append(Spacer(1, 20))
+            
+            # Filtres appliqués
+            if self.filtre_client_var.get() != "Tous":
+                elements.append(Paragraph(f"Filtre par client: {self.filtre_client_var.get()}", styles["Normal"]))
+                elements.append(Spacer(1, 10))
+            
+            if self.recherche_var.get():
+                elements.append(Paragraph(f"Recherche: {self.recherche_var.get()}", styles["Normal"]))
+                elements.append(Spacer(1, 10))
+            
+            # Préparation des données
+            data = []
+            
+            # En-têtes du tableau
+            headers = ["ID", "Client", "Volet", "Désignation", "Transport", "Total"]
+            for i in range(12, -1, -1):
+                headers.append(f"{i} sem.")
+            data.append(headers)
+            
+            # Contenu du tableau
             for item in self.tree.get_children():
-                valeurs = self.tree.item(item, 'values')
-                donnees.append(valeurs)
+                values = list(self.tree.item(item, "values"))
+                # Supprimer la colonne "localisation" pour le PDF
+                values.pop(2)
+                data.append(values)
             
-            # Créer un DataFrame
-            df = pd.DataFrame(donnees, columns=self.colonnes)
+            # Création du tableau
+            table = Table(data)
             
-            # Exporter vers Excel
-            df.to_excel(fichier, index=False, engine='openpyxl')
+            # Style du tableau
+            table_style = TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('ALIGN', (5, 1), (-1, -1), 'CENTER'),  # Centrer les colonnes numériques
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ])
             
-            messagebox.showinfo("Succès", f"Données exportées vers {fichier}")
-        
+            # Alternance de couleurs pour les lignes
+            for i in range(1, len(data)):
+                if i % 2 == 0:
+                    table_style.add('BACKGROUND', (0, i), (-1, i), colors.lightgrey)
+            
+            table.setStyle(table_style)
+            elements.append(table)
+            
+            # Générer le PDF
+            doc.build(elements)
+            
+            messagebox.showinfo("Succès", f"Rapport généré avec succès: {filename}")
+            
+            # Ouvrir le fichier PDF
+            import os, subprocess
+            if os.name == 'nt':  # Windows
+                os.startfile(filename)
+            elif os.name == 'posix':  # macOS et Linux
+                subprocess.run(['xdg-open', filename])
+        except ImportError:
+            messagebox.showerror("Erreur", "Le module ReportLab est nécessaire pour cette fonction. Installez-le avec 'pip install reportlab'.")
         except Exception as e:
-            messagebox.showerror("Erreur", f"Erreur lors de l'exportation: {e}")
-        # Les méthodes importer_excel et exporter_excel 
-        # devront aussi être légèrement modifiées pour inclure id_client
+            messagebox.showerror("Erreur", f"Erreur lors de la génération du rapport: {str(e)}")
+
+
+def main():
+    """Point d'entrée principal"""
+    try:
+        # Créer une fenêtre avec le thème darkly
+        root = ttk.Window(themename="darkly")
+        
+        # Ajouter le menu principal
+        menu_bar = ttk.Menu(root)
+        root.config(menu=menu_bar)
+        
+        # Menu Fichier
+        file_menu = ttk.Menu(menu_bar, tearoff=0)
+        menu_bar.add_cascade(label="Fichier", menu=file_menu)
+        
+        # Création de l'application et ajout des options de menu
+        app = TransfererEquipementApp(root)
+        
+        file_menu.add_command(label="Exporter les données", command=app.exporter_donnees)
+        file_menu.add_command(label="Importer des données", command=app.importer_donnees)
+        file_menu.add_separator()
+        file_menu.add_command(label="Générer un rapport", command=app.generer_rapport)
+        file_menu.add_separator()
+        file_menu.add_command(label="Quitter", command=root.quit)
+        
+        # Définir la taille minimale de la fenêtre
+        root.update()
+        root.minsize(root.winfo_width(), root.winfo_height())
+        
+        # Démarrer l'application
+        root.mainloop()
+    finally:
+        # Fermer la session SQLAlchemy à la fin
+        if session:
+            session.close()
+
 
 if __name__ == "__main__":
-    root = ttk.Window(themename="darkly")
-    app = TransfertEquipementApp(root)
-    root.mainloop()
+    main()
