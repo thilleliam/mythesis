@@ -1,0 +1,583 @@
+2025-04-13 18:00:21,057 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2025-04-13 18:00:21,231 - sqlalchemy.engine.Engine - INFO - SELECT chantiers.id_client AS chantiers_id_client, chantiers.localisation AS chantiers_localisation, chantiers.latitude AS chantiers_latitude, chantiers.longitude AS chantiers_longitude, chantiers.nature_terrain AS chantiers_nature_terrain, chantiers.`distanceAllerGoudron` AS `chantiers_distanceAllerGoudron`, chantiers.`distanceAllerPiste` AS `chantiers_distanceAllerPiste`, chantiers.temps_aller AS chantiers_temps_aller 
+FROM chantiers
+2025-04-13 18:00:21,232 - sqlalchemy.engine.Engine - INFO - [generated in 0.00092s] {}
+2025-04-13 18:00:21,240 - sqlalchemy.engine.Engine - INFO - SELECT vehicules.immatriculation AS vehicules_immatriculation, vehicules.numero_chassis AS vehicules_numero_chassis, vehicules.numero_interne AS vehicules_numero_interne, vehicules.marque_modele AS vehicules_marque_modele, vehicules.type_vehicule AS vehicules_type_vehicule, vehicules.capacite_tonne AS vehicules_capacite_tonne, vehicules.capacite_volume AS vehicules_capacite_volume, vehicules.etat AS vehicules_etat 
+FROM vehicules 
+WHERE vehicules.etat = %(etat_1)s
+2025-04-13 18:00:21,241 - sqlalchemy.engine.Engine - INFO - [generated in 0.00090s] {'etat_1': 'Disponible'}
+2025-04-13 18:00:21,245 - vehicle_assignment - INFO - Véhicules disponibles: 46
+2025-04-13 18:00:21,246 - vehicle_assignment - INFO - Chantiers récupérés: 10
+2025-04-13 18:00:21,246 - vehicle_assignment - INFO - Recherche des équipements pour la semaine 0 (colonne: 12_semaines_avant_la_fin_de_l'ancien_projet)
+2025-04-13 18:00:21,250 - sqlalchemy.engine.Engine - INFO - SELECT transferer_equipement.id AS transferer_equipement_id, transferer_equipement.volet AS transferer_equipement_volet, transferer_equipement.designation_equipement AS transferer_equipement_designation_equipement, transferer_equipement.modalite_transport AS transferer_equipement_modalite_transport, transferer_equipement.total_equipements AS transferer_equipement_total_equipements, transferer_equipement.id_client AS transferer_equipement_id_client, transferer_equipement.`12_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_12_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_11_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`10_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_10_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`9_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_9_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`8_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_8_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`7_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_7_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`6_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_6_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`5_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_5_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`4_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_4_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`3_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_3_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`2_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_2_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`1_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_1_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`0_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_0_semaines_avant_la_fin_de_l'ancien_projet` 
+FROM transferer_equipement
+2025-04-13 18:00:21,254 - sqlalchemy.engine.Engine - INFO - [generated in 0.00403s] {}
+2025-04-13 18:00:21,257 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 12_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 317: 'TransfererEquipement' object has no attribute '12_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:00:21,257 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 12_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 318: 'TransfererEquipement' object has no attribute '12_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:00:21,257 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 12_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 319: 'TransfererEquipement' object has no attribute '12_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:00:21,257 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 12_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 320: 'TransfererEquipement' object has no attribute '12_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:00:21,257 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 12_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 321: 'TransfererEquipement' object has no attribute '12_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:00:21,257 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 12_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 322: 'TransfererEquipement' object has no attribute '12_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:00:21,257 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 12_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 323: 'TransfererEquipement' object has no attribute '12_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:00:21,258 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 12_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 324: 'TransfererEquipement' object has no attribute '12_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:00:21,258 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 12_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 325: 'TransfererEquipement' object has no attribute '12_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:00:21,258 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 12_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 326: 'TransfererEquipement' object has no attribute '12_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:00:21,258 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 12_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 327: 'TransfererEquipement' object has no attribute '12_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:00:21,258 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 12_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 328: 'TransfererEquipement' object has no attribute '12_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:00:21,258 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 12_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 329: 'TransfererEquipement' object has no attribute '12_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:00:21,258 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 12_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 330: 'TransfererEquipement' object has no attribute '12_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:00:21,258 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 12_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 331: 'TransfererEquipement' object has no attribute '12_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:00:21,258 - vehicle_assignment - WARNING - Aucun équipement trouvé pour cette semaine.
+2025-04-13 18:00:21,258 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2025-04-13 18:00:54,411 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2025-04-13 18:00:54,416 - sqlalchemy.engine.Engine - INFO - SELECT chantiers.id_client AS chantiers_id_client, chantiers.localisation AS chantiers_localisation, chantiers.latitude AS chantiers_latitude, chantiers.longitude AS chantiers_longitude, chantiers.nature_terrain AS chantiers_nature_terrain, chantiers.`distanceAllerGoudron` AS `chantiers_distanceAllerGoudron`, chantiers.`distanceAllerPiste` AS `chantiers_distanceAllerPiste`, chantiers.temps_aller AS chantiers_temps_aller 
+FROM chantiers
+2025-04-13 18:00:54,418 - sqlalchemy.engine.Engine - INFO - [generated in 0.00195s] {}
+2025-04-13 18:00:54,425 - sqlalchemy.engine.Engine - INFO - SELECT vehicules.immatriculation AS vehicules_immatriculation, vehicules.numero_chassis AS vehicules_numero_chassis, vehicules.numero_interne AS vehicules_numero_interne, vehicules.marque_modele AS vehicules_marque_modele, vehicules.type_vehicule AS vehicules_type_vehicule, vehicules.capacite_tonne AS vehicules_capacite_tonne, vehicules.capacite_volume AS vehicules_capacite_volume, vehicules.etat AS vehicules_etat 
+FROM vehicules 
+WHERE vehicules.etat = %(etat_1)s
+2025-04-13 18:00:54,426 - sqlalchemy.engine.Engine - INFO - [generated in 0.00196s] {'etat_1': 'Disponible'}
+2025-04-13 18:00:54,431 - vehicle_assignment - INFO - Véhicules disponibles: 46
+2025-04-13 18:00:54,432 - vehicle_assignment - INFO - Chantiers récupérés: 10
+2025-04-13 18:00:54,432 - vehicle_assignment - INFO - Recherche des équipements pour la semaine 11 (colonne: 1_semaines_avant_la_fin_de_l'ancien_projet)
+2025-04-13 18:00:54,436 - sqlalchemy.engine.Engine - INFO - SELECT transferer_equipement.id AS transferer_equipement_id, transferer_equipement.volet AS transferer_equipement_volet, transferer_equipement.designation_equipement AS transferer_equipement_designation_equipement, transferer_equipement.modalite_transport AS transferer_equipement_modalite_transport, transferer_equipement.total_equipements AS transferer_equipement_total_equipements, transferer_equipement.id_client AS transferer_equipement_id_client, transferer_equipement.`12_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_12_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_11_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`10_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_10_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`9_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_9_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`8_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_8_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`7_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_7_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`6_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_6_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`5_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_5_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`4_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_4_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`3_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_3_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`2_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_2_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`1_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_1_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`0_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_0_semaines_avant_la_fin_de_l'ancien_projet` 
+FROM transferer_equipement
+2025-04-13 18:00:54,441 - sqlalchemy.engine.Engine - INFO - [generated in 0.00458s] {}
+2025-04-13 18:00:54,443 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 1_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 317: 'TransfererEquipement' object has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:00:54,445 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 1_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 318: 'TransfererEquipement' object has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:00:54,445 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 1_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 319: 'TransfererEquipement' object has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:00:54,445 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 1_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 320: 'TransfererEquipement' object has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:00:54,445 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 1_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 321: 'TransfererEquipement' object has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:00:54,445 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 1_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 322: 'TransfererEquipement' object has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:00:54,445 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 1_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 323: 'TransfererEquipement' object has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:00:54,446 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 1_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 324: 'TransfererEquipement' object has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:00:54,446 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 1_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 325: 'TransfererEquipement' object has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:00:54,446 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 1_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 326: 'TransfererEquipement' object has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:00:54,446 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 1_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 327: 'TransfererEquipement' object has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:00:54,446 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 1_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 328: 'TransfererEquipement' object has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:00:54,446 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 1_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 329: 'TransfererEquipement' object has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:00:54,446 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 1_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 330: 'TransfererEquipement' object has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:00:54,446 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 1_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 331: 'TransfererEquipement' object has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:00:54,446 - vehicle_assignment - WARNING - Aucun équipement trouvé pour cette semaine.
+2025-04-13 18:00:54,447 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2025-04-13 18:07:15,958 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2025-04-13 18:07:15,963 - sqlalchemy.engine.Engine - INFO - SELECT chantiers.id_client AS chantiers_id_client, chantiers.localisation AS chantiers_localisation, chantiers.latitude AS chantiers_latitude, chantiers.longitude AS chantiers_longitude, chantiers.nature_terrain AS chantiers_nature_terrain, chantiers.`distanceAllerGoudron` AS `chantiers_distanceAllerGoudron`, chantiers.`distanceAllerPiste` AS `chantiers_distanceAllerPiste`, chantiers.temps_aller AS chantiers_temps_aller 
+FROM chantiers
+2025-04-13 18:07:15,966 - sqlalchemy.engine.Engine - INFO - [generated in 0.00330s] {}
+2025-04-13 18:07:15,972 - sqlalchemy.engine.Engine - INFO - SELECT vehicules.immatriculation AS vehicules_immatriculation, vehicules.numero_chassis AS vehicules_numero_chassis, vehicules.numero_interne AS vehicules_numero_interne, vehicules.marque_modele AS vehicules_marque_modele, vehicules.type_vehicule AS vehicules_type_vehicule, vehicules.capacite_tonne AS vehicules_capacite_tonne, vehicules.capacite_volume AS vehicules_capacite_volume, vehicules.etat AS vehicules_etat 
+FROM vehicules 
+WHERE vehicules.etat = %(etat_1)s
+2025-04-13 18:07:15,973 - sqlalchemy.engine.Engine - INFO - [generated in 0.00108s] {'etat_1': 'Disponible'}
+2025-04-13 18:07:15,979 - vehicle_assignment - INFO - Véhicules disponibles: 46
+2025-04-13 18:07:15,979 - vehicle_assignment - INFO - Chantiers récupérés: 10
+2025-04-13 18:07:15,979 - vehicle_assignment - INFO - Recherche des équipements pour la semaine 11 (colonne: 1_semaines_avant_la_fin_de_l'ancien_projet)
+2025-04-13 18:07:15,985 - sqlalchemy.engine.Engine - INFO - SELECT transferer_equipement.id AS transferer_equipement_id, transferer_equipement.volet AS transferer_equipement_volet, transferer_equipement.designation_equipement AS transferer_equipement_designation_equipement, transferer_equipement.modalite_transport AS transferer_equipement_modalite_transport, transferer_equipement.total_equipements AS transferer_equipement_total_equipements, transferer_equipement.id_client AS transferer_equipement_id_client, transferer_equipement.`12_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_12_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_11_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`10_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_10_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`9_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_9_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`8_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_8_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`7_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_7_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`6_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_6_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`5_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_5_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`4_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_4_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`3_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_3_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`2_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_2_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`1_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_1_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`0_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_0_semaines_avant_la_fin_de_l'ancien_projet` 
+FROM transferer_equipement
+2025-04-13 18:07:15,991 - sqlalchemy.engine.Engine - INFO - [generated in 0.00616s] {}
+2025-04-13 18:07:15,996 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 1_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 317: 'TransfererEquipement' object has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:07:15,996 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 1_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 318: 'TransfererEquipement' object has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:07:15,996 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 1_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 319: 'TransfererEquipement' object has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:07:15,996 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 1_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 320: 'TransfererEquipement' object has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:07:15,996 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 1_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 321: 'TransfererEquipement' object has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:07:15,996 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 1_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 322: 'TransfererEquipement' object has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:07:15,996 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 1_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 323: 'TransfererEquipement' object has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:07:15,996 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 1_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 324: 'TransfererEquipement' object has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:07:15,996 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 1_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 325: 'TransfererEquipement' object has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:07:15,996 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 1_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 326: 'TransfererEquipement' object has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:07:15,996 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 1_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 327: 'TransfererEquipement' object has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:07:15,997 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 1_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 328: 'TransfererEquipement' object has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:07:15,997 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 1_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 329: 'TransfererEquipement' object has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:07:15,997 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 1_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 330: 'TransfererEquipement' object has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:07:15,997 - vehicle_assignment - WARNING - Erreur d'accès à l'attribut 1_semaines_avant_la_fin_de_l'ancien_projet pour le transfert 331: 'TransfererEquipement' object has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:07:15,997 - vehicle_assignment - WARNING - Aucun équipement trouvé pour cette semaine.
+2025-04-13 18:07:15,997 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2025-04-13 18:08:30,638 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2025-04-13 18:08:30,640 - sqlalchemy.engine.Engine - INFO - SELECT chantiers.id_client AS chantiers_id_client, chantiers.localisation AS chantiers_localisation, chantiers.latitude AS chantiers_latitude, chantiers.longitude AS chantiers_longitude, chantiers.nature_terrain AS chantiers_nature_terrain, chantiers.`distanceAllerGoudron` AS `chantiers_distanceAllerGoudron`, chantiers.`distanceAllerPiste` AS `chantiers_distanceAllerPiste`, chantiers.temps_aller AS chantiers_temps_aller 
+FROM chantiers
+2025-04-13 18:08:30,640 - sqlalchemy.engine.Engine - INFO - [generated in 0.00083s] {}
+2025-04-13 18:08:30,650 - sqlalchemy.engine.Engine - INFO - SELECT vehicules.immatriculation AS vehicules_immatriculation, vehicules.numero_chassis AS vehicules_numero_chassis, vehicules.numero_interne AS vehicules_numero_interne, vehicules.marque_modele AS vehicules_marque_modele, vehicules.type_vehicule AS vehicules_type_vehicule, vehicules.capacite_tonne AS vehicules_capacite_tonne, vehicules.capacite_volume AS vehicules_capacite_volume, vehicules.etat AS vehicules_etat 
+FROM vehicules 
+WHERE vehicules.etat = %(etat_1)s
+2025-04-13 18:08:30,651 - sqlalchemy.engine.Engine - INFO - [generated in 0.00128s] {'etat_1': 'Disponible'}
+2025-04-13 18:08:30,656 - vehicle_assignment - INFO - Véhicules disponibles: 46
+2025-04-13 18:08:30,656 - vehicle_assignment - INFO - Chantiers récupérés: 10
+2025-04-13 18:08:30,656 - vehicle_assignment - INFO - Recherche des équipements pour la semaine 11 (colonne: 1_semaines_avant_la_fin_de_l'ancien_projet)
+2025-04-13 18:08:30,657 - vehicle_assignment - ERROR - Erreur lors de l'affectation des véhicules: Textual SQL expression '\n    SELECT * FROM transf...' should be explicitly declared as text('\n    SELECT * FROM transf...')
+Traceback (most recent call last):
+  File "c:\Users\BIG-computer\tms_app\application\models\optimiseraffectation.py", line 122, in solve_vehicle_assignment
+    equipements_a_transferer = get_equipements_a_transferer(session, semaine_actuelle)
+  File "c:\Users\BIG-computer\tms_app\application\models\optimiseraffectation.py", line 70, in get_equipements_a_transferer
+    result = session.execute(query)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\orm\session.py", line 2365, in execute
+    return self._execute_internal(
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\orm\session.py", line 2149, in _execute_internal
+    statement = coercions.expect(roles.StatementRole, statement)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\sql\coercions.py", line 395, in expect
+    resolved = impl._literal_coercion(
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\sql\coercions.py", line 621, in _literal_coercion
+    return self._text_coercion(element, argname, **kw)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\sql\coercions.py", line 614, in _text_coercion
+    return _no_text_coercion(element, argname)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\sql\coercions.py", line 584, in _no_text_coercion
+    raise exc_cls(
+sqlalchemy.exc.ArgumentError: Textual SQL expression '\n    SELECT * FROM transf...' should be explicitly declared as text('\n    SELECT * FROM transf...')
+2025-04-13 18:08:30,772 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2025-04-13 18:10:04,089 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2025-04-13 18:10:04,092 - sqlalchemy.engine.Engine - INFO - SELECT chantiers.id_client AS chantiers_id_client, chantiers.localisation AS chantiers_localisation, chantiers.latitude AS chantiers_latitude, chantiers.longitude AS chantiers_longitude, chantiers.nature_terrain AS chantiers_nature_terrain, chantiers.`distanceAllerGoudron` AS `chantiers_distanceAllerGoudron`, chantiers.`distanceAllerPiste` AS `chantiers_distanceAllerPiste`, chantiers.temps_aller AS chantiers_temps_aller 
+FROM chantiers
+2025-04-13 18:10:04,093 - sqlalchemy.engine.Engine - INFO - [generated in 0.00089s] {}
+2025-04-13 18:10:04,098 - sqlalchemy.engine.Engine - INFO - SELECT vehicules.immatriculation AS vehicules_immatriculation, vehicules.numero_chassis AS vehicules_numero_chassis, vehicules.numero_interne AS vehicules_numero_interne, vehicules.marque_modele AS vehicules_marque_modele, vehicules.type_vehicule AS vehicules_type_vehicule, vehicules.capacite_tonne AS vehicules_capacite_tonne, vehicules.capacite_volume AS vehicules_capacite_volume, vehicules.etat AS vehicules_etat 
+FROM vehicules 
+WHERE vehicules.etat = %(etat_1)s
+2025-04-13 18:10:04,099 - sqlalchemy.engine.Engine - INFO - [generated in 0.00101s] {'etat_1': 'Disponible'}
+2025-04-13 18:10:04,103 - vehicle_assignment - INFO - Véhicules disponibles: 46
+2025-04-13 18:10:04,103 - vehicle_assignment - INFO - Chantiers récupérés: 10
+2025-04-13 18:10:04,103 - vehicle_assignment - INFO - Recherche des équipements pour la semaine 11 (colonne: 1_semaines_avant_la_fin_de_l'ancien_projet)
+2025-04-13 18:10:04,103 - vehicle_assignment - WARNING - Erreur lors de l'accès à la colonne 1_semaines_avant_la_fin_de_l'ancien_projet: type object 'TransfererEquipement' has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+2025-04-13 18:10:04,103 - vehicle_assignment - INFO - Essai avec une autre méthode de requête...
+2025-04-13 18:10:04,104 - sqlalchemy.engine.Engine - INFO - SELECT * FROM transferer_equipement WHERE `1_semaines_avant_la_fin_de_l''ancien_projet` IS NOT NULL AND `1_semaines_avant_la_fin_de_l''ancien_projet` > 0
+2025-04-13 18:10:04,104 - sqlalchemy.engine.Engine - INFO - [generated in 0.00055s] {}
+2025-04-13 18:10:04,106 - vehicle_assignment - ERROR - Erreur lors de l'affectation des véhicules: (pymysql.err.OperationalError) (1054, "Unknown column '1_semaines_avant_la_fin_de_l''ancien_projet' in 'where clause'")
+[SQL: SELECT * FROM transferer_equipement WHERE `1_semaines_avant_la_fin_de_l''ancien_projet` IS NOT NULL AND `1_semaines_avant_la_fin_de_l''ancien_projet` > 0]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+Traceback (most recent call last):
+  File "c:\Users\BIG-computer\tms_app\application\models\optimiseraffectation.py", line 64, in get_equipements_a_transferer
+    colonne = getattr(TransfererEquipement, colonne_semaine)
+AttributeError: type object 'TransfererEquipement' has no attribute '1_semaines_avant_la_fin_de_l'ancien_projet'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\engine\base.py", line 1964, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\engine\default.py", line 942, in do_execute
+    cursor.execute(statement, parameters)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\pymysql\cursors.py", line 153, in execute
+    result = self._query(query)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\pymysql\cursors.py", line 322, in _query
+    conn.query(q)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\pymysql\connections.py", line 563, in query
+    self._affected_rows = self._read_query_result(unbuffered=unbuffered)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\pymysql\connections.py", line 825, in _read_query_result
+    result.read()
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\pymysql\connections.py", line 1199, in read
+    first_packet = self.connection._read_packet()
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\pymysql\connections.py", line 775, in _read_packet
+    packet.raise_for_error()
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\pymysql\protocol.py", line 219, in raise_for_error
+    err.raise_mysql_exception(self._data)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\pymysql\err.py", line 150, in raise_mysql_exception
+    raise errorclass(errno, errval)
+pymysql.err.OperationalError: (1054, "Unknown column '1_semaines_avant_la_fin_de_l''ancien_projet' in 'where clause'")
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "c:\Users\BIG-computer\tms_app\application\models\optimiseraffectation.py", line 145, in solve_vehicle_assignment
+    equipements_a_transferer = get_equipements_a_transferer(session, semaine_actuelle)
+  File "c:\Users\BIG-computer\tms_app\application\models\optimiseraffectation.py", line 76, in get_equipements_a_transferer
+    result = session.execute(sql_query)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\orm\session.py", line 2365, in execute
+    return self._execute_internal(
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\orm\session.py", line 2260, in _execute_internal
+    result = conn.execute(
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\engine\base.py", line 1416, in execute
+    return meth(
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\sql\elements.py", line 516, in _execute_on_connection
+    return connection._execute_clauseelement(
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\engine\base.py", line 1638, in _execute_clauseelement
+    ret = self._execute_context(
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\engine\base.py", line 1843, in _execute_context
+    return self._exec_single_context(
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\engine\base.py", line 1983, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\engine\base.py", line 2352, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\engine\base.py", line 1964, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\engine\default.py", line 942, in do_execute
+    cursor.execute(statement, parameters)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\pymysql\cursors.py", line 153, in execute
+    result = self._query(query)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\pymysql\cursors.py", line 322, in _query
+    conn.query(q)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\pymysql\connections.py", line 563, in query
+    self._affected_rows = self._read_query_result(unbuffered=unbuffered)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\pymysql\connections.py", line 825, in _read_query_result
+    result.read()
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\pymysql\connections.py", line 1199, in read
+    first_packet = self.connection._read_packet()
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\pymysql\connections.py", line 775, in _read_packet
+    packet.raise_for_error()
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\pymysql\protocol.py", line 219, in raise_for_error
+    err.raise_mysql_exception(self._data)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\pymysql\err.py", line 150, in raise_mysql_exception
+    raise errorclass(errno, errval)
+sqlalchemy.exc.OperationalError: (pymysql.err.OperationalError) (1054, "Unknown column '1_semaines_avant_la_fin_de_l''ancien_projet' in 'where clause'")
+[SQL: SELECT * FROM transferer_equipement WHERE `1_semaines_avant_la_fin_de_l''ancien_projet` IS NOT NULL AND `1_semaines_avant_la_fin_de_l''ancien_projet` > 0]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2025-04-13 18:10:04,344 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2025-04-13 18:13:23,539 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2025-04-13 18:13:23,539 - sqlalchemy.engine.Engine - INFO - SELECT chantiers.id_client AS chantiers_id_client, chantiers.localisation AS chantiers_localisation, chantiers.latitude AS chantiers_latitude, chantiers.longitude AS chantiers_longitude, chantiers.nature_terrain AS chantiers_nature_terrain, chantiers.`distanceAllerGoudron` AS `chantiers_distanceAllerGoudron`, chantiers.`distanceAllerPiste` AS `chantiers_distanceAllerPiste`, chantiers.temps_aller AS chantiers_temps_aller 
+FROM chantiers
+2025-04-13 18:13:23,539 - sqlalchemy.engine.Engine - INFO - [generated in 0.00198s] {}
+2025-04-13 18:13:23,555 - sqlalchemy.engine.Engine - INFO - SELECT vehicules.immatriculation AS vehicules_immatriculation, vehicules.numero_chassis AS vehicules_numero_chassis, vehicules.numero_interne AS vehicules_numero_interne, vehicules.marque_modele AS vehicules_marque_modele, vehicules.type_vehicule AS vehicules_type_vehicule, vehicules.capacite_tonne AS vehicules_capacite_tonne, vehicules.capacite_volume AS vehicules_capacite_volume, vehicules.etat AS vehicules_etat 
+FROM vehicules 
+WHERE vehicules.etat = %(etat_1)s
+2025-04-13 18:13:23,578 - sqlalchemy.engine.Engine - INFO - [generated in 0.02494s] {'etat_1': 'Disponible'}
+2025-04-13 18:13:23,596 - vehicle_assignment - INFO - Véhicules disponibles: 46
+2025-04-13 18:13:23,596 - vehicle_assignment - INFO - Chantiers récupérés: 10
+2025-04-13 18:13:23,596 - vehicle_assignment - INFO - Recherche des équipements pour la semaine 11 (colonne: 1_semaines_avant_la_fin_de_l'ancien_projet)
+2025-04-13 18:13:23,596 - vehicle_assignment - WARNING - Erreur lors de l'accès à la colonne 1_semaines_avant_la_fin_de_l'ancien_projet: Column 1_semaines_avant_la_fin_de_l'ancien_projet not found on model
+2025-04-13 18:13:23,596 - vehicle_assignment - INFO - Essai avec une autre méthode de requête...
+2025-04-13 18:13:23,597 - sqlalchemy.engine.Engine - INFO - SELECT * FROM transferer_equipement WHERE `1_semaines_avant_la_fin_de_l''ancien_projet` IS NOT NULL AND `1_semaines_avant_la_fin_de_l''ancien_projet` > 0
+2025-04-13 18:13:23,597 - sqlalchemy.engine.Engine - INFO - [generated in 0.00060s] {}
+2025-04-13 18:13:23,599 - vehicle_assignment - ERROR - Erreur lors de l'exécution de la requête SQL: (pymysql.err.OperationalError) (1054, "Unknown column '1_semaines_avant_la_fin_de_l''ancien_projet' in 'where clause'")
+[SQL: SELECT * FROM transferer_equipement WHERE `1_semaines_avant_la_fin_de_l''ancien_projet` IS NOT NULL AND `1_semaines_avant_la_fin_de_l''ancien_projet` > 0]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2025-04-13 18:13:23,599 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2025-04-13 18:17:54,897 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2025-04-13 18:17:54,897 - sqlalchemy.engine.Engine - INFO - SELECT chantiers.id_client AS chantiers_id_client, chantiers.localisation AS chantiers_localisation, chantiers.latitude AS chantiers_latitude, chantiers.longitude AS chantiers_longitude, chantiers.nature_terrain AS chantiers_nature_terrain, chantiers.`distanceAllerGoudron` AS `chantiers_distanceAllerGoudron`, chantiers.`distanceAllerPiste` AS `chantiers_distanceAllerPiste`, chantiers.temps_aller AS chantiers_temps_aller 
+FROM chantiers
+2025-04-13 18:17:54,897 - sqlalchemy.engine.Engine - INFO - [generated in 0.00089s] {}
+2025-04-13 18:17:54,914 - sqlalchemy.engine.Engine - INFO - SELECT vehicules.immatriculation AS vehicules_immatriculation, vehicules.numero_chassis AS vehicules_numero_chassis, vehicules.numero_interne AS vehicules_numero_interne, vehicules.marque_modele AS vehicules_marque_modele, vehicules.type_vehicule AS vehicules_type_vehicule, vehicules.capacite_tonne AS vehicules_capacite_tonne, vehicules.capacite_volume AS vehicules_capacite_volume, vehicules.etat AS vehicules_etat 
+FROM vehicules 
+WHERE vehicules.etat = %(etat_1)s
+2025-04-13 18:17:54,915 - sqlalchemy.engine.Engine - INFO - [generated in 0.00131s] {'etat_1': 'Disponible'}
+2025-04-13 18:17:54,918 - vehicle_assignment - INFO - Véhicules disponibles: 46
+2025-04-13 18:17:54,919 - vehicle_assignment - INFO - Chantiers récupérés: 10
+2025-04-13 18:17:54,919 - vehicle_assignment - INFO - Recherche des équipements pour la semaine 11 (colonne: 1_semaines_avant_la_fin_de_l'ancien_projet)
+2025-04-13 18:17:54,919 - vehicle_assignment - WARNING - Erreur lors de l'accès à la colonne 1_semaines_avant_la_fin_de_l'ancien_projet: Column 1_semaines_avant_la_fin_de_l'ancien_projet not found on model
+2025-04-13 18:17:54,919 - vehicle_assignment - INFO - Essai avec une autre méthode de requête...
+2025-04-13 18:17:54,919 - sqlalchemy.engine.Engine - INFO - SELECT * FROM transferer_equipement WHERE `1_semaines_avant_la_fin_de_l''ancien_projet` IS NOT NULL AND `1_semaines_avant_la_fin_de_l''ancien_projet` > 0
+2025-04-13 18:17:54,920 - sqlalchemy.engine.Engine - INFO - [generated in 0.00062s] {}
+2025-04-13 18:17:54,921 - vehicle_assignment - ERROR - Erreur lors de l'exécution de la requête SQL: (pymysql.err.OperationalError) (1054, "Unknown column '1_semaines_avant_la_fin_de_l''ancien_projet' in 'where clause'")
+[SQL: SELECT * FROM transferer_equipement WHERE `1_semaines_avant_la_fin_de_l''ancien_projet` IS NOT NULL AND `1_semaines_avant_la_fin_de_l''ancien_projet` > 0]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2025-04-13 18:17:54,922 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2025-04-13 18:18:20,995 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2025-04-13 18:18:20,995 - sqlalchemy.engine.Engine - INFO - SELECT chantiers.id_client AS chantiers_id_client, chantiers.localisation AS chantiers_localisation, chantiers.latitude AS chantiers_latitude, chantiers.longitude AS chantiers_longitude, chantiers.nature_terrain AS chantiers_nature_terrain, chantiers.`distanceAllerGoudron` AS `chantiers_distanceAllerGoudron`, chantiers.`distanceAllerPiste` AS `chantiers_distanceAllerPiste`, chantiers.temps_aller AS chantiers_temps_aller 
+FROM chantiers
+2025-04-13 18:18:20,995 - sqlalchemy.engine.Engine - INFO - [generated in 0.00176s] {}
+2025-04-13 18:18:21,010 - sqlalchemy.engine.Engine - INFO - SELECT vehicules.immatriculation AS vehicules_immatriculation, vehicules.numero_chassis AS vehicules_numero_chassis, vehicules.numero_interne AS vehicules_numero_interne, vehicules.marque_modele AS vehicules_marque_modele, vehicules.type_vehicule AS vehicules_type_vehicule, vehicules.capacite_tonne AS vehicules_capacite_tonne, vehicules.capacite_volume AS vehicules_capacite_volume, vehicules.etat AS vehicules_etat 
+FROM vehicules 
+WHERE vehicules.etat = %(etat_1)s
+2025-04-13 18:18:21,011 - sqlalchemy.engine.Engine - INFO - [generated in 0.00197s] {'etat_1': 'Disponible'}
+2025-04-13 18:18:21,013 - vehicle_assignment - INFO - Véhicules disponibles: 46
+2025-04-13 18:18:21,013 - vehicle_assignment - INFO - Chantiers récupérés: 10
+2025-04-13 18:18:21,013 - vehicle_assignment - INFO - Recherche des équipements pour la semaine 6 (colonne: 6_semaines_avant_la_fin_de_l'ancien_projet)
+2025-04-13 18:18:21,013 - vehicle_assignment - WARNING - Erreur lors de l'accès à la colonne 6_semaines_avant_la_fin_de_l'ancien_projet: Column 6_semaines_avant_la_fin_de_l'ancien_projet not found on model
+2025-04-13 18:18:21,013 - vehicle_assignment - INFO - Essai avec une autre méthode de requête...
+2025-04-13 18:18:21,013 - sqlalchemy.engine.Engine - INFO - SELECT * FROM transferer_equipement WHERE `6_semaines_avant_la_fin_de_l''ancien_projet` IS NOT NULL AND `6_semaines_avant_la_fin_de_l''ancien_projet` > 0
+2025-04-13 18:18:21,013 - sqlalchemy.engine.Engine - INFO - [generated in 0.00154s] {}
+2025-04-13 18:18:21,013 - vehicle_assignment - ERROR - Erreur lors de l'exécution de la requête SQL: (pymysql.err.OperationalError) (1054, "Unknown column '6_semaines_avant_la_fin_de_l''ancien_projet' in 'where clause'")
+[SQL: SELECT * FROM transferer_equipement WHERE `6_semaines_avant_la_fin_de_l''ancien_projet` IS NOT NULL AND `6_semaines_avant_la_fin_de_l''ancien_projet` > 0]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2025-04-13 18:18:21,013 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2025-04-13 18:19:07,880 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2025-04-13 18:19:07,883 - sqlalchemy.engine.Engine - INFO - SELECT chantiers.id_client AS chantiers_id_client, chantiers.localisation AS chantiers_localisation, chantiers.latitude AS chantiers_latitude, chantiers.longitude AS chantiers_longitude, chantiers.nature_terrain AS chantiers_nature_terrain, chantiers.`distanceAllerGoudron` AS `chantiers_distanceAllerGoudron`, chantiers.`distanceAllerPiste` AS `chantiers_distanceAllerPiste`, chantiers.temps_aller AS chantiers_temps_aller 
+FROM chantiers
+2025-04-13 18:19:07,884 - sqlalchemy.engine.Engine - INFO - [generated in 0.00090s] {}
+2025-04-13 18:19:07,891 - sqlalchemy.engine.Engine - INFO - SELECT vehicules.immatriculation AS vehicules_immatriculation, vehicules.numero_chassis AS vehicules_numero_chassis, vehicules.numero_interne AS vehicules_numero_interne, vehicules.marque_modele AS vehicules_marque_modele, vehicules.type_vehicule AS vehicules_type_vehicule, vehicules.capacite_tonne AS vehicules_capacite_tonne, vehicules.capacite_volume AS vehicules_capacite_volume, vehicules.etat AS vehicules_etat 
+FROM vehicules 
+WHERE vehicules.etat = %(etat_1)s
+2025-04-13 18:19:07,892 - sqlalchemy.engine.Engine - INFO - [generated in 0.00145s] {'etat_1': 'Disponible'}
+2025-04-13 18:19:07,895 - vehicle_assignment - INFO - Véhicules disponibles: 46
+2025-04-13 18:19:07,896 - vehicle_assignment - INFO - Chantiers récupérés: 10
+2025-04-13 18:19:07,896 - vehicle_assignment - INFO - Recherche des équipements pour la semaine 10 (colonne: 2_semaines_avant_la_fin_de_l'ancien_projet)
+2025-04-13 18:19:07,896 - vehicle_assignment - WARNING - Erreur lors de l'accès à la colonne 2_semaines_avant_la_fin_de_l'ancien_projet: Column 2_semaines_avant_la_fin_de_l'ancien_projet not found on model
+2025-04-13 18:19:07,896 - vehicle_assignment - INFO - Essai avec une autre méthode de requête...
+2025-04-13 18:19:07,896 - sqlalchemy.engine.Engine - INFO - SELECT * FROM transferer_equipement WHERE `2_semaines_avant_la_fin_de_l''ancien_projet` IS NOT NULL AND `2_semaines_avant_la_fin_de_l''ancien_projet` > 0
+2025-04-13 18:19:07,897 - sqlalchemy.engine.Engine - INFO - [generated in 0.00059s] {}
+2025-04-13 18:19:07,898 - vehicle_assignment - ERROR - Erreur lors de l'exécution de la requête SQL: (pymysql.err.OperationalError) (1054, "Unknown column '2_semaines_avant_la_fin_de_l''ancien_projet' in 'where clause'")
+[SQL: SELECT * FROM transferer_equipement WHERE `2_semaines_avant_la_fin_de_l''ancien_projet` IS NOT NULL AND `2_semaines_avant_la_fin_de_l''ancien_projet` > 0]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2025-04-13 18:19:07,898 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2025-04-13 18:19:14,758 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2025-04-13 18:19:14,758 - sqlalchemy.engine.Engine - INFO - SELECT chantiers.id_client AS chantiers_id_client, chantiers.localisation AS chantiers_localisation, chantiers.latitude AS chantiers_latitude, chantiers.longitude AS chantiers_longitude, chantiers.nature_terrain AS chantiers_nature_terrain, chantiers.`distanceAllerGoudron` AS `chantiers_distanceAllerGoudron`, chantiers.`distanceAllerPiste` AS `chantiers_distanceAllerPiste`, chantiers.temps_aller AS chantiers_temps_aller 
+FROM chantiers
+2025-04-13 18:19:14,758 - sqlalchemy.engine.Engine - INFO - [generated in 0.00090s] {}
+2025-04-13 18:19:14,758 - sqlalchemy.engine.Engine - INFO - SELECT vehicules.immatriculation AS vehicules_immatriculation, vehicules.numero_chassis AS vehicules_numero_chassis, vehicules.numero_interne AS vehicules_numero_interne, vehicules.marque_modele AS vehicules_marque_modele, vehicules.type_vehicule AS vehicules_type_vehicule, vehicules.capacite_tonne AS vehicules_capacite_tonne, vehicules.capacite_volume AS vehicules_capacite_volume, vehicules.etat AS vehicules_etat 
+FROM vehicules 
+WHERE vehicules.etat = %(etat_1)s
+2025-04-13 18:19:14,758 - sqlalchemy.engine.Engine - INFO - [generated in 0.00107s] {'etat_1': 'Disponible'}
+2025-04-13 18:19:14,774 - vehicle_assignment - INFO - Véhicules disponibles: 46
+2025-04-13 18:19:14,774 - vehicle_assignment - INFO - Chantiers récupérés: 10
+2025-04-13 18:19:14,774 - vehicle_assignment - INFO - Recherche des équipements pour la semaine 9 (colonne: 3_semaines_avant_la_fin_de_l'ancien_projet)
+2025-04-13 18:19:14,775 - vehicle_assignment - WARNING - Erreur lors de l'accès à la colonne 3_semaines_avant_la_fin_de_l'ancien_projet: Column 3_semaines_avant_la_fin_de_l'ancien_projet not found on model
+2025-04-13 18:19:14,775 - vehicle_assignment - INFO - Essai avec une autre méthode de requête...
+2025-04-13 18:19:14,775 - sqlalchemy.engine.Engine - INFO - SELECT * FROM transferer_equipement WHERE `3_semaines_avant_la_fin_de_l''ancien_projet` IS NOT NULL AND `3_semaines_avant_la_fin_de_l''ancien_projet` > 0
+2025-04-13 18:19:14,776 - sqlalchemy.engine.Engine - INFO - [generated in 0.00059s] {}
+2025-04-13 18:19:14,777 - vehicle_assignment - ERROR - Erreur lors de l'exécution de la requête SQL: (pymysql.err.OperationalError) (1054, "Unknown column '3_semaines_avant_la_fin_de_l''ancien_projet' in 'where clause'")
+[SQL: SELECT * FROM transferer_equipement WHERE `3_semaines_avant_la_fin_de_l''ancien_projet` IS NOT NULL AND `3_semaines_avant_la_fin_de_l''ancien_projet` > 0]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2025-04-13 18:19:14,777 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2025-04-13 18:19:27,525 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2025-04-13 18:19:27,525 - sqlalchemy.engine.Engine - INFO - SELECT chantiers.id_client AS chantiers_id_client, chantiers.localisation AS chantiers_localisation, chantiers.latitude AS chantiers_latitude, chantiers.longitude AS chantiers_longitude, chantiers.nature_terrain AS chantiers_nature_terrain, chantiers.`distanceAllerGoudron` AS `chantiers_distanceAllerGoudron`, chantiers.`distanceAllerPiste` AS `chantiers_distanceAllerPiste`, chantiers.temps_aller AS chantiers_temps_aller 
+FROM chantiers
+2025-04-13 18:19:27,525 - sqlalchemy.engine.Engine - INFO - [generated in 0.00166s] {}
+2025-04-13 18:19:27,549 - sqlalchemy.engine.Engine - INFO - SELECT vehicules.immatriculation AS vehicules_immatriculation, vehicules.numero_chassis AS vehicules_numero_chassis, vehicules.numero_interne AS vehicules_numero_interne, vehicules.marque_modele AS vehicules_marque_modele, vehicules.type_vehicule AS vehicules_type_vehicule, vehicules.capacite_tonne AS vehicules_capacite_tonne, vehicules.capacite_volume AS vehicules_capacite_volume, vehicules.etat AS vehicules_etat 
+FROM vehicules 
+WHERE vehicules.etat = %(etat_1)s
+2025-04-13 18:19:27,550 - sqlalchemy.engine.Engine - INFO - [generated in 0.00230s] {'etat_1': 'Disponible'}
+2025-04-13 18:19:27,558 - vehicle_assignment - INFO - Véhicules disponibles: 46
+2025-04-13 18:19:27,559 - vehicle_assignment - INFO - Chantiers récupérés: 10
+2025-04-13 18:19:27,559 - vehicle_assignment - INFO - Recherche des équipements pour la semaine 3 (colonne: 9_semaines_avant_la_fin_de_l'ancien_projet)
+2025-04-13 18:19:27,559 - vehicle_assignment - WARNING - Erreur lors de l'accès à la colonne 9_semaines_avant_la_fin_de_l'ancien_projet: Column 9_semaines_avant_la_fin_de_l'ancien_projet not found on model
+2025-04-13 18:19:27,559 - vehicle_assignment - INFO - Essai avec une autre méthode de requête...
+2025-04-13 18:19:27,560 - sqlalchemy.engine.Engine - INFO - SELECT * FROM transferer_equipement WHERE `9_semaines_avant_la_fin_de_l''ancien_projet` IS NOT NULL AND `9_semaines_avant_la_fin_de_l''ancien_projet` > 0
+2025-04-13 18:19:27,561 - sqlalchemy.engine.Engine - INFO - [generated in 0.00109s] {}
+2025-04-13 18:19:27,562 - vehicle_assignment - ERROR - Erreur lors de l'exécution de la requête SQL: (pymysql.err.OperationalError) (1054, "Unknown column '9_semaines_avant_la_fin_de_l''ancien_projet' in 'where clause'")
+[SQL: SELECT * FROM transferer_equipement WHERE `9_semaines_avant_la_fin_de_l''ancien_projet` IS NOT NULL AND `9_semaines_avant_la_fin_de_l''ancien_projet` > 0]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2025-04-13 18:19:27,562 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2025-04-13 18:19:35,274 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2025-04-13 18:19:35,292 - sqlalchemy.engine.Engine - INFO - SELECT chantiers.id_client AS chantiers_id_client, chantiers.localisation AS chantiers_localisation, chantiers.latitude AS chantiers_latitude, chantiers.longitude AS chantiers_longitude, chantiers.nature_terrain AS chantiers_nature_terrain, chantiers.`distanceAllerGoudron` AS `chantiers_distanceAllerGoudron`, chantiers.`distanceAllerPiste` AS `chantiers_distanceAllerPiste`, chantiers.temps_aller AS chantiers_temps_aller 
+FROM chantiers
+2025-04-13 18:19:35,293 - sqlalchemy.engine.Engine - INFO - [generated in 0.00104s] {}
+2025-04-13 18:19:35,299 - sqlalchemy.engine.Engine - INFO - SELECT vehicules.immatriculation AS vehicules_immatriculation, vehicules.numero_chassis AS vehicules_numero_chassis, vehicules.numero_interne AS vehicules_numero_interne, vehicules.marque_modele AS vehicules_marque_modele, vehicules.type_vehicule AS vehicules_type_vehicule, vehicules.capacite_tonne AS vehicules_capacite_tonne, vehicules.capacite_volume AS vehicules_capacite_volume, vehicules.etat AS vehicules_etat 
+FROM vehicules 
+WHERE vehicules.etat = %(etat_1)s
+2025-04-13 18:19:35,301 - sqlalchemy.engine.Engine - INFO - [generated in 0.00157s] {'etat_1': 'Disponible'}
+2025-04-13 18:19:35,304 - vehicle_assignment - INFO - Véhicules disponibles: 46
+2025-04-13 18:19:35,305 - vehicle_assignment - INFO - Chantiers récupérés: 10
+2025-04-13 18:19:35,305 - vehicle_assignment - INFO - Recherche des équipements pour la semaine 4 (colonne: 8_semaines_avant_la_fin_de_l'ancien_projet)
+2025-04-13 18:19:35,305 - vehicle_assignment - WARNING - Erreur lors de l'accès à la colonne 8_semaines_avant_la_fin_de_l'ancien_projet: Column 8_semaines_avant_la_fin_de_l'ancien_projet not found on model
+2025-04-13 18:19:35,305 - vehicle_assignment - INFO - Essai avec une autre méthode de requête...
+2025-04-13 18:19:35,306 - sqlalchemy.engine.Engine - INFO - SELECT * FROM transferer_equipement WHERE `8_semaines_avant_la_fin_de_l''ancien_projet` IS NOT NULL AND `8_semaines_avant_la_fin_de_l''ancien_projet` > 0
+2025-04-13 18:19:35,308 - sqlalchemy.engine.Engine - INFO - [generated in 0.00173s] {}
+2025-04-13 18:19:35,309 - vehicle_assignment - ERROR - Erreur lors de l'exécution de la requête SQL: (pymysql.err.OperationalError) (1054, "Unknown column '8_semaines_avant_la_fin_de_l''ancien_projet' in 'where clause'")
+[SQL: SELECT * FROM transferer_equipement WHERE `8_semaines_avant_la_fin_de_l''ancien_projet` IS NOT NULL AND `8_semaines_avant_la_fin_de_l''ancien_projet` > 0]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2025-04-13 18:19:35,309 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2025-04-13 18:19:43,534 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2025-04-13 18:19:43,537 - sqlalchemy.engine.Engine - INFO - SELECT chantiers.id_client AS chantiers_id_client, chantiers.localisation AS chantiers_localisation, chantiers.latitude AS chantiers_latitude, chantiers.longitude AS chantiers_longitude, chantiers.nature_terrain AS chantiers_nature_terrain, chantiers.`distanceAllerGoudron` AS `chantiers_distanceAllerGoudron`, chantiers.`distanceAllerPiste` AS `chantiers_distanceAllerPiste`, chantiers.temps_aller AS chantiers_temps_aller 
+FROM chantiers
+2025-04-13 18:19:43,538 - sqlalchemy.engine.Engine - INFO - [generated in 0.00083s] {}
+2025-04-13 18:19:43,544 - sqlalchemy.engine.Engine - INFO - SELECT vehicules.immatriculation AS vehicules_immatriculation, vehicules.numero_chassis AS vehicules_numero_chassis, vehicules.numero_interne AS vehicules_numero_interne, vehicules.marque_modele AS vehicules_marque_modele, vehicules.type_vehicule AS vehicules_type_vehicule, vehicules.capacite_tonne AS vehicules_capacite_tonne, vehicules.capacite_volume AS vehicules_capacite_volume, vehicules.etat AS vehicules_etat 
+FROM vehicules 
+WHERE vehicules.etat = %(etat_1)s
+2025-04-13 18:19:43,545 - sqlalchemy.engine.Engine - INFO - [generated in 0.00125s] {'etat_1': 'Disponible'}
+2025-04-13 18:19:43,549 - vehicle_assignment - INFO - Véhicules disponibles: 46
+2025-04-13 18:19:43,550 - vehicle_assignment - INFO - Chantiers récupérés: 10
+2025-04-13 18:19:43,550 - vehicle_assignment - INFO - Recherche des équipements pour la semaine 5 (colonne: 7_semaines_avant_la_fin_de_l'ancien_projet)
+2025-04-13 18:19:43,550 - vehicle_assignment - WARNING - Erreur lors de l'accès à la colonne 7_semaines_avant_la_fin_de_l'ancien_projet: Column 7_semaines_avant_la_fin_de_l'ancien_projet not found on model
+2025-04-13 18:19:43,550 - vehicle_assignment - INFO - Essai avec une autre méthode de requête...
+2025-04-13 18:19:43,551 - sqlalchemy.engine.Engine - INFO - SELECT * FROM transferer_equipement WHERE `7_semaines_avant_la_fin_de_l''ancien_projet` IS NOT NULL AND `7_semaines_avant_la_fin_de_l''ancien_projet` > 0
+2025-04-13 18:19:43,552 - sqlalchemy.engine.Engine - INFO - [generated in 0.00077s] {}
+2025-04-13 18:19:43,553 - vehicle_assignment - ERROR - Erreur lors de l'exécution de la requête SQL: (pymysql.err.OperationalError) (1054, "Unknown column '7_semaines_avant_la_fin_de_l''ancien_projet' in 'where clause'")
+[SQL: SELECT * FROM transferer_equipement WHERE `7_semaines_avant_la_fin_de_l''ancien_projet` IS NOT NULL AND `7_semaines_avant_la_fin_de_l''ancien_projet` > 0]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2025-04-13 18:19:43,553 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2025-04-13 18:29:22,997 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2025-04-13 18:29:23,000 - sqlalchemy.engine.Engine - INFO - SELECT chantiers.id_client AS chantiers_id_client, chantiers.localisation AS chantiers_localisation, chantiers.latitude AS chantiers_latitude, chantiers.longitude AS chantiers_longitude, chantiers.nature_terrain AS chantiers_nature_terrain, chantiers.`distanceAllerGoudron` AS `chantiers_distanceAllerGoudron`, chantiers.`distanceAllerPiste` AS `chantiers_distanceAllerPiste`, chantiers.temps_aller AS chantiers_temps_aller 
+FROM chantiers
+2025-04-13 18:29:23,001 - sqlalchemy.engine.Engine - INFO - [generated in 0.00084s] {}
+2025-04-13 18:29:23,006 - sqlalchemy.engine.Engine - INFO - SELECT vehicules.immatriculation AS vehicules_immatriculation, vehicules.numero_chassis AS vehicules_numero_chassis, vehicules.numero_interne AS vehicules_numero_interne, vehicules.marque_modele AS vehicules_marque_modele, vehicules.type_vehicule AS vehicules_type_vehicule, vehicules.capacite_tonne AS vehicules_capacite_tonne, vehicules.capacite_volume AS vehicules_capacite_volume, vehicules.etat AS vehicules_etat 
+FROM vehicules 
+WHERE vehicules.etat = %(etat_1)s
+2025-04-13 18:29:23,007 - sqlalchemy.engine.Engine - INFO - [generated in 0.00115s] {'etat_1': 'Disponible'}
+2025-04-13 18:29:23,010 - vehicle_assignment - INFO - Recherche des équipements pour la semaine 5 (colonne: cinq_semaines_avant)
+2025-04-13 18:29:23,014 - sqlalchemy.engine.Engine - INFO - SELECT transferer_equipement.id AS transferer_equipement_id, transferer_equipement.volet AS transferer_equipement_volet, transferer_equipement.designation_equipement AS transferer_equipement_designation_equipement, transferer_equipement.modalite_transport AS transferer_equipement_modalite_transport, transferer_equipement.total_equipements AS transferer_equipement_total_equipements, transferer_equipement.id_client AS transferer_equipement_id_client, transferer_equipement.`12_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_12_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_11_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`10_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_10_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`9_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_9_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`8_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_8_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`7_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_7_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`6_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_6_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`5_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_5_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`4_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_4_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`3_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_3_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`2_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_2_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`1_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_1_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`0_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_0_semaines_avant_la_fin_de_l'ancien_projet` 
+FROM transferer_equipement 
+WHERE transferer_equipement.`5_semaines_avant_la_fin_de_l'ancien_projet` IS NOT NULL AND transferer_equipement.`5_semaines_avant_la_fin_de_l'ancien_projet` > %(5_semaines_avant_la_fin_de_l'ancien_projet_1)s
+2025-04-13 18:29:23,020 - sqlalchemy.engine.Engine - INFO - [generated in 0.00536s] {"5_semaines_avant_la_fin_de_l'ancien_projet_1": 0}
+2025-04-13 18:29:23,024 - vehicle_assignment - INFO - Nombre d'équipements trouvés: 12
+2025-04-13 18:29:23,727 - vehicle_assignment - INFO - Solution optimale trouvée
+2025-04-13 18:29:23,728 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2025-04-13 18:34:46,556 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2025-04-13 18:34:46,560 - sqlalchemy.engine.Engine - INFO - SELECT chantiers.id_client AS chantiers_id_client, chantiers.localisation AS chantiers_localisation, chantiers.latitude AS chantiers_latitude, chantiers.longitude AS chantiers_longitude, chantiers.nature_terrain AS chantiers_nature_terrain, chantiers.`distanceAllerGoudron` AS `chantiers_distanceAllerGoudron`, chantiers.`distanceAllerPiste` AS `chantiers_distanceAllerPiste`, chantiers.temps_aller AS chantiers_temps_aller 
+FROM chantiers
+2025-04-13 18:34:46,561 - sqlalchemy.engine.Engine - INFO - [generated in 0.00089s] {}
+2025-04-13 18:34:46,567 - sqlalchemy.engine.Engine - INFO - SELECT vehicules.immatriculation AS vehicules_immatriculation, vehicules.numero_chassis AS vehicules_numero_chassis, vehicules.numero_interne AS vehicules_numero_interne, vehicules.marque_modele AS vehicules_marque_modele, vehicules.type_vehicule AS vehicules_type_vehicule, vehicules.capacite_tonne AS vehicules_capacite_tonne, vehicules.capacite_volume AS vehicules_capacite_volume, vehicules.etat AS vehicules_etat 
+FROM vehicules 
+WHERE vehicules.etat = %(etat_1)s
+2025-04-13 18:34:46,567 - sqlalchemy.engine.Engine - INFO - [generated in 0.00104s] {'etat_1': 'Disponible'}
+2025-04-13 18:34:46,571 - vehicle_assignment - INFO - Recherche des équipements pour la semaine 5 (colonne: cinq_semaines_avant)
+2025-04-13 18:34:46,579 - sqlalchemy.engine.Engine - INFO - SELECT transferer_equipement.id AS transferer_equipement_id, transferer_equipement.volet AS transferer_equipement_volet, transferer_equipement.designation_equipement AS transferer_equipement_designation_equipement, transferer_equipement.modalite_transport AS transferer_equipement_modalite_transport, transferer_equipement.total_equipements AS transferer_equipement_total_equipements, transferer_equipement.id_client AS transferer_equipement_id_client, transferer_equipement.`12_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_12_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_11_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`10_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_10_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`9_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_9_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`8_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_8_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`7_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_7_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`6_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_6_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`5_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_5_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`4_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_4_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`3_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_3_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`2_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_2_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`1_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_1_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`0_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_0_semaines_avant_la_fin_de_l'ancien_projet` 
+FROM transferer_equipement 
+WHERE transferer_equipement.`5_semaines_avant_la_fin_de_l'ancien_projet` IS NOT NULL AND transferer_equipement.`5_semaines_avant_la_fin_de_l'ancien_projet` > %(5_semaines_avant_la_fin_de_l'ancien_projet_1)s
+2025-04-13 18:34:46,584 - sqlalchemy.engine.Engine - INFO - [generated in 0.00453s] {"5_semaines_avant_la_fin_de_l'ancien_projet_1": 0}
+2025-04-13 18:34:46,586 - vehicle_assignment - INFO - Nombre d'équipements trouvés: 12
+2025-04-13 18:34:46,787 - vehicle_assignment - INFO - Solution optimale trouvée
+2025-04-13 18:34:46,788 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2025-04-13 18:35:09,501 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2025-04-13 18:35:09,506 - sqlalchemy.engine.Engine - INFO - SELECT chantiers.id_client AS chantiers_id_client, chantiers.localisation AS chantiers_localisation, chantiers.latitude AS chantiers_latitude, chantiers.longitude AS chantiers_longitude, chantiers.nature_terrain AS chantiers_nature_terrain, chantiers.`distanceAllerGoudron` AS `chantiers_distanceAllerGoudron`, chantiers.`distanceAllerPiste` AS `chantiers_distanceAllerPiste`, chantiers.temps_aller AS chantiers_temps_aller 
+FROM chantiers
+2025-04-13 18:35:09,509 - sqlalchemy.engine.Engine - INFO - [generated in 0.00266s] {}
+2025-04-13 18:35:09,519 - sqlalchemy.engine.Engine - INFO - SELECT vehicules.immatriculation AS vehicules_immatriculation, vehicules.numero_chassis AS vehicules_numero_chassis, vehicules.numero_interne AS vehicules_numero_interne, vehicules.marque_modele AS vehicules_marque_modele, vehicules.type_vehicule AS vehicules_type_vehicule, vehicules.capacite_tonne AS vehicules_capacite_tonne, vehicules.capacite_volume AS vehicules_capacite_volume, vehicules.etat AS vehicules_etat 
+FROM vehicules 
+WHERE vehicules.etat = %(etat_1)s
+2025-04-13 18:35:09,521 - sqlalchemy.engine.Engine - INFO - [generated in 0.00211s] {'etat_1': 'Disponible'}
+2025-04-13 18:35:09,528 - vehicle_assignment - INFO - Recherche des équipements pour la semaine 11 (colonne: onze_semaines_avant)
+2025-04-13 18:35:09,533 - sqlalchemy.engine.Engine - INFO - SELECT transferer_equipement.id AS transferer_equipement_id, transferer_equipement.volet AS transferer_equipement_volet, transferer_equipement.designation_equipement AS transferer_equipement_designation_equipement, transferer_equipement.modalite_transport AS transferer_equipement_modalite_transport, transferer_equipement.total_equipements AS transferer_equipement_total_equipements, transferer_equipement.id_client AS transferer_equipement_id_client, transferer_equipement.`12_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_12_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_11_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`10_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_10_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`9_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_9_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`8_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_8_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`7_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_7_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`6_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_6_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`5_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_5_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`4_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_4_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`3_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_3_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`2_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_2_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`1_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_1_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`0_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_0_semaines_avant_la_fin_de_l'ancien_projet` 
+FROM transferer_equipement 
+WHERE transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` IS NOT NULL AND transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` > %(11_semaines_avant_la_fin_de_l'ancien_projet_1)s
+2025-04-13 18:35:09,536 - sqlalchemy.engine.Engine - INFO - [generated in 0.00444s] {"11_semaines_avant_la_fin_de_l'ancien_projet_1": 0}
+2025-04-13 18:35:09,539 - vehicle_assignment - INFO - Nombre d'équipements trouvés: 42
+2025-04-13 18:35:09,901 - vehicle_assignment - INFO - Solution optimale trouvée
+2025-04-13 18:35:09,903 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2025-04-14 18:55:27,781 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2025-04-14 18:55:27,801 - sqlalchemy.engine.Engine - INFO - SELECT chantiers.id_client AS chantiers_id_client, chantiers.localisation AS chantiers_localisation, chantiers.latitude AS chantiers_latitude, chantiers.longitude AS chantiers_longitude, chantiers.nature_terrain AS chantiers_nature_terrain, chantiers.`distanceAllerGoudron` AS `chantiers_distanceAllerGoudron`, chantiers.`distanceAllerPiste` AS `chantiers_distanceAllerPiste`, chantiers.temps_aller AS chantiers_temps_aller 
+FROM chantiers
+2025-04-14 18:55:27,803 - sqlalchemy.engine.Engine - INFO - [generated in 0.00171s] {}
+2025-04-14 18:55:27,810 - sqlalchemy.engine.Engine - INFO - SELECT vehicules.immatriculation AS vehicules_immatriculation, vehicules.numero_chassis AS vehicules_numero_chassis, vehicules.numero_interne AS vehicules_numero_interne, vehicules.marque_modele AS vehicules_marque_modele, vehicules.type_vehicule AS vehicules_type_vehicule, vehicules.capacite_tonne AS vehicules_capacite_tonne, vehicules.capacite_volume AS vehicules_capacite_volume, vehicules.etat AS vehicules_etat 
+FROM vehicules 
+WHERE vehicules.etat = %(etat_1)s
+2025-04-14 18:55:27,810 - sqlalchemy.engine.Engine - INFO - [generated in 0.00317s] {'etat_1': 'Disponible'}
+2025-04-14 18:55:27,911 - vehicle_assignment - INFO - Recherche des équipements pour la semaine 11 (colonne: onze_semaines_avant)
+2025-04-14 18:55:27,914 - sqlalchemy.engine.Engine - INFO - SELECT transferer_equipement.id AS transferer_equipement_id, transferer_equipement.volet AS transferer_equipement_volet, transferer_equipement.designation_equipement AS transferer_equipement_designation_equipement, transferer_equipement.modalite_transport AS transferer_equipement_modalite_transport, transferer_equipement.total_equipements AS transferer_equipement_total_equipements, transferer_equipement.id_client AS transferer_equipement_id_client, transferer_equipement.`12_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_12_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_11_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`10_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_10_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`9_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_9_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`8_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_8_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`7_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_7_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`6_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_6_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`5_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_5_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`4_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_4_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`3_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_3_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`2_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_2_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`1_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_1_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`0_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_0_semaines_avant_la_fin_de_l'ancien_projet` 
+FROM transferer_equipement 
+WHERE transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` IS NOT NULL AND transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` > %(11_semaines_avant_la_fin_de_l'ancien_projet_1)s
+2025-04-14 18:55:27,917 - sqlalchemy.engine.Engine - INFO - [generated in 0.00287s] {"11_semaines_avant_la_fin_de_l'ancien_projet_1": 0}
+2025-04-14 18:55:27,919 - vehicle_assignment - INFO - Nombre d'équipements trouvés: 42
+2025-04-14 18:55:29,458 - vehicle_assignment - INFO - Solution optimale trouvée
+2025-04-14 18:55:29,459 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2025-04-14 19:04:32,885 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2025-04-14 19:04:32,885 - sqlalchemy.engine.Engine - INFO - SELECT chantiers.id_client AS chantiers_id_client, chantiers.localisation AS chantiers_localisation, chantiers.latitude AS chantiers_latitude, chantiers.longitude AS chantiers_longitude, chantiers.nature_terrain AS chantiers_nature_terrain, chantiers.`distanceAllerGoudron` AS `chantiers_distanceAllerGoudron`, chantiers.`distanceAllerPiste` AS `chantiers_distanceAllerPiste`, chantiers.temps_aller AS chantiers_temps_aller 
+FROM chantiers
+2025-04-14 19:04:32,885 - sqlalchemy.engine.Engine - INFO - [generated in 0.00080s] {}
+2025-04-14 19:04:32,885 - sqlalchemy.engine.Engine - INFO - SELECT vehicules.immatriculation AS vehicules_immatriculation, vehicules.numero_chassis AS vehicules_numero_chassis, vehicules.numero_interne AS vehicules_numero_interne, vehicules.marque_modele AS vehicules_marque_modele, vehicules.type_vehicule AS vehicules_type_vehicule, vehicules.capacite_tonne AS vehicules_capacite_tonne, vehicules.capacite_volume AS vehicules_capacite_volume, vehicules.etat AS vehicules_etat 
+FROM vehicules 
+WHERE vehicules.etat = %(etat_1)s
+2025-04-14 19:04:32,897 - sqlalchemy.engine.Engine - INFO - [generated in 0.00204s] {'etat_1': 'Disponible'}
+2025-04-14 19:04:32,900 - vehicle_assignment - INFO - Recherche des équipements pour la semaine 11 (colonne: onze_semaines_avant)
+2025-04-14 19:04:32,906 - sqlalchemy.engine.Engine - INFO - SELECT transferer_equipement.id AS transferer_equipement_id, transferer_equipement.volet AS transferer_equipement_volet, transferer_equipement.designation_equipement AS transferer_equipement_designation_equipement, transferer_equipement.modalite_transport AS transferer_equipement_modalite_transport, transferer_equipement.total_equipements AS transferer_equipement_total_equipements, transferer_equipement.id_client AS transferer_equipement_id_client, transferer_equipement.`12_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_12_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_11_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`10_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_10_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`9_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_9_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`8_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_8_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`7_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_7_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`6_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_6_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`5_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_5_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`4_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_4_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`3_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_3_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`2_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_2_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`1_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_1_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`0_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_0_semaines_avant_la_fin_de_l'ancien_projet` 
+FROM transferer_equipement 
+WHERE transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` IS NOT NULL AND transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` > %(11_semaines_avant_la_fin_de_l'ancien_projet_1)s
+2025-04-14 19:04:32,908 - sqlalchemy.engine.Engine - INFO - [generated in 0.00232s] {"11_semaines_avant_la_fin_de_l'ancien_projet_1": 0}
+2025-04-14 19:04:32,909 - vehicle_assignment - INFO - Nombre d'équipements trouvés: 42
+2025-04-14 19:04:33,280 - vehicle_assignment - INFO - Solution optimale trouvée
+2025-04-14 19:04:33,280 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2025-04-14 19:36:45,483 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2025-04-14 19:36:45,513 - sqlalchemy.engine.Engine - INFO - SELECT chantiers.id_client AS chantiers_id_client, chantiers.localisation AS chantiers_localisation, chantiers.latitude AS chantiers_latitude, chantiers.longitude AS chantiers_longitude, chantiers.nature_terrain AS chantiers_nature_terrain, chantiers.`distanceAllerGoudron` AS `chantiers_distanceAllerGoudron`, chantiers.`distanceAllerPiste` AS `chantiers_distanceAllerPiste`, chantiers.temps_aller AS chantiers_temps_aller 
+FROM chantiers
+2025-04-14 19:36:45,515 - sqlalchemy.engine.Engine - INFO - [generated in 0.00346s] {}
+2025-04-14 19:36:45,582 - sqlalchemy.engine.Engine - INFO - SELECT vehicules.immatriculation AS vehicules_immatriculation, vehicules.numero_chassis AS vehicules_numero_chassis, vehicules.numero_interne AS vehicules_numero_interne, vehicules.marque_modele AS vehicules_marque_modele, vehicules.type_vehicule AS vehicules_type_vehicule, vehicules.capacite_tonne AS vehicules_capacite_tonne, vehicules.capacite_volume AS vehicules_capacite_volume, vehicules.etat AS vehicules_etat 
+FROM vehicules 
+WHERE vehicules.etat = %(etat_1)s
+2025-04-14 19:36:45,597 - sqlalchemy.engine.Engine - INFO - [generated in 0.01533s] {'etat_1': 'Disponible'}
+2025-04-14 19:36:45,613 - vehicle_assignment - INFO - Recherche des équipements pour la semaine 11 (colonne: onze_semaines_avant)
+2025-04-14 19:36:45,613 - sqlalchemy.engine.Engine - INFO - SELECT transferer_equipement.id AS transferer_equipement_id, transferer_equipement.volet AS transferer_equipement_volet, transferer_equipement.designation_equipement AS transferer_equipement_designation_equipement, transferer_equipement.modalite_transport AS transferer_equipement_modalite_transport, transferer_equipement.total_equipements AS transferer_equipement_total_equipements, transferer_equipement.id_client AS transferer_equipement_id_client, transferer_equipement.`12_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_12_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_11_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`10_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_10_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`9_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_9_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`8_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_8_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`7_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_7_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`6_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_6_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`5_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_5_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`4_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_4_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`3_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_3_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`2_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_2_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`1_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_1_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`0_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_0_semaines_avant_la_fin_de_l'ancien_projet` 
+FROM transferer_equipement 
+WHERE transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` IS NOT NULL AND transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` > %(11_semaines_avant_la_fin_de_l'ancien_projet_1)s
+2025-04-14 19:36:45,633 - sqlalchemy.engine.Engine - INFO - [generated in 0.01702s] {"11_semaines_avant_la_fin_de_l'ancien_projet_1": 0}
+2025-04-14 19:36:45,646 - vehicle_assignment - INFO - Nombre d'équipements trouvés: 42
+2025-04-14 19:36:46,132 - vehicle_assignment - INFO - Solution optimale trouvée
+2025-04-14 19:36:46,132 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2025-04-14 19:41:14,149 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2025-04-14 19:41:14,149 - sqlalchemy.engine.Engine - INFO - SELECT chantiers.id_client AS chantiers_id_client, chantiers.localisation AS chantiers_localisation, chantiers.latitude AS chantiers_latitude, chantiers.longitude AS chantiers_longitude, chantiers.nature_terrain AS chantiers_nature_terrain, chantiers.`distanceAllerGoudron` AS `chantiers_distanceAllerGoudron`, chantiers.`distanceAllerPiste` AS `chantiers_distanceAllerPiste`, chantiers.temps_aller AS chantiers_temps_aller 
+FROM chantiers
+2025-04-14 19:41:14,149 - sqlalchemy.engine.Engine - INFO - [generated in 0.00085s] {}
+2025-04-14 19:41:14,149 - sqlalchemy.engine.Engine - INFO - SELECT vehicules.immatriculation AS vehicules_immatriculation, vehicules.numero_chassis AS vehicules_numero_chassis, vehicules.numero_interne AS vehicules_numero_interne, vehicules.marque_modele AS vehicules_marque_modele, vehicules.type_vehicule AS vehicules_type_vehicule, vehicules.capacite_tonne AS vehicules_capacite_tonne, vehicules.capacite_volume AS vehicules_capacite_volume, vehicules.etat AS vehicules_etat 
+FROM vehicules 
+WHERE vehicules.etat = %(etat_1)s
+2025-04-14 19:41:14,149 - sqlalchemy.engine.Engine - INFO - [generated in 0.00084s] {'etat_1': 'Disponible'}
+2025-04-14 19:41:14,163 - vehicle_assignment - INFO - Recherche des équipements pour la semaine 11 (colonne: onze_semaines_avant)
+2025-04-14 19:41:14,168 - sqlalchemy.engine.Engine - INFO - SELECT transferer_equipement.id AS transferer_equipement_id, transferer_equipement.volet AS transferer_equipement_volet, transferer_equipement.designation_equipement AS transferer_equipement_designation_equipement, transferer_equipement.modalite_transport AS transferer_equipement_modalite_transport, transferer_equipement.total_equipements AS transferer_equipement_total_equipements, transferer_equipement.id_client AS transferer_equipement_id_client, transferer_equipement.`12_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_12_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_11_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`10_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_10_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`9_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_9_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`8_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_8_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`7_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_7_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`6_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_6_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`5_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_5_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`4_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_4_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`3_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_3_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`2_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_2_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`1_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_1_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`0_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_0_semaines_avant_la_fin_de_l'ancien_projet` 
+FROM transferer_equipement 
+WHERE transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` IS NOT NULL AND transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` > %(11_semaines_avant_la_fin_de_l'ancien_projet_1)s
+2025-04-14 19:41:14,172 - sqlalchemy.engine.Engine - INFO - [generated in 0.00448s] {"11_semaines_avant_la_fin_de_l'ancien_projet_1": 0}
+2025-04-14 19:41:14,177 - vehicle_assignment - INFO - Nombre d'équipements trouvés: 42
+2025-04-14 19:41:14,500 - vehicle_assignment - INFO - Solution optimale trouvée
+2025-04-14 19:41:14,516 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2025-04-14 19:42:07,714 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2025-04-14 19:42:07,714 - sqlalchemy.engine.Engine - INFO - SELECT chantiers.id_client AS chantiers_id_client, chantiers.localisation AS chantiers_localisation, chantiers.latitude AS chantiers_latitude, chantiers.longitude AS chantiers_longitude, chantiers.nature_terrain AS chantiers_nature_terrain, chantiers.`distanceAllerGoudron` AS `chantiers_distanceAllerGoudron`, chantiers.`distanceAllerPiste` AS `chantiers_distanceAllerPiste`, chantiers.temps_aller AS chantiers_temps_aller 
+FROM chantiers
+2025-04-14 19:42:07,714 - sqlalchemy.engine.Engine - INFO - [generated in 0.00082s] {}
+2025-04-14 19:42:07,729 - sqlalchemy.engine.Engine - INFO - SELECT vehicules.immatriculation AS vehicules_immatriculation, vehicules.numero_chassis AS vehicules_numero_chassis, vehicules.numero_interne AS vehicules_numero_interne, vehicules.marque_modele AS vehicules_marque_modele, vehicules.type_vehicule AS vehicules_type_vehicule, vehicules.capacite_tonne AS vehicules_capacite_tonne, vehicules.capacite_volume AS vehicules_capacite_volume, vehicules.etat AS vehicules_etat 
+FROM vehicules 
+WHERE vehicules.etat = %(etat_1)s
+2025-04-14 19:42:07,732 - sqlalchemy.engine.Engine - INFO - [generated in 0.00313s] {'etat_1': 'Disponible'}
+2025-04-14 19:42:07,735 - vehicle_assignment - INFO - Recherche des équipements pour la semaine 11 (colonne: onze_semaines_avant)
+2025-04-14 19:42:07,738 - sqlalchemy.engine.Engine - INFO - SELECT transferer_equipement.id AS transferer_equipement_id, transferer_equipement.volet AS transferer_equipement_volet, transferer_equipement.designation_equipement AS transferer_equipement_designation_equipement, transferer_equipement.modalite_transport AS transferer_equipement_modalite_transport, transferer_equipement.total_equipements AS transferer_equipement_total_equipements, transferer_equipement.id_client AS transferer_equipement_id_client, transferer_equipement.`12_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_12_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_11_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`10_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_10_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`9_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_9_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`8_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_8_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`7_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_7_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`6_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_6_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`5_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_5_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`4_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_4_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`3_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_3_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`2_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_2_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`1_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_1_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`0_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_0_semaines_avant_la_fin_de_l'ancien_projet` 
+FROM transferer_equipement 
+WHERE transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` IS NOT NULL AND transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` > %(11_semaines_avant_la_fin_de_l'ancien_projet_1)s
+2025-04-14 19:42:07,742 - sqlalchemy.engine.Engine - INFO - [generated in 0.00363s] {"11_semaines_avant_la_fin_de_l'ancien_projet_1": 0}
+2025-04-14 19:42:07,744 - vehicle_assignment - INFO - Nombre d'équipements trouvés: 42
+2025-04-14 19:42:08,047 - vehicle_assignment - INFO - Solution optimale trouvée
+2025-04-14 19:42:08,047 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2025-04-14 19:47:00,166 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2025-04-14 19:47:00,166 - sqlalchemy.engine.Engine - INFO - SELECT chantiers.id_client AS chantiers_id_client, chantiers.localisation AS chantiers_localisation, chantiers.latitude AS chantiers_latitude, chantiers.longitude AS chantiers_longitude, chantiers.nature_terrain AS chantiers_nature_terrain, chantiers.`distanceAllerGoudron` AS `chantiers_distanceAllerGoudron`, chantiers.`distanceAllerPiste` AS `chantiers_distanceAllerPiste`, chantiers.temps_aller AS chantiers_temps_aller 
+FROM chantiers
+2025-04-14 19:47:00,166 - sqlalchemy.engine.Engine - INFO - [generated in 0.00100s] {}
+2025-04-14 19:47:00,166 - sqlalchemy.engine.Engine - INFO - SELECT vehicules.immatriculation AS vehicules_immatriculation, vehicules.numero_chassis AS vehicules_numero_chassis, vehicules.numero_interne AS vehicules_numero_interne, vehicules.marque_modele AS vehicules_marque_modele, vehicules.type_vehicule AS vehicules_type_vehicule, vehicules.capacite_tonne AS vehicules_capacite_tonne, vehicules.capacite_volume AS vehicules_capacite_volume, vehicules.etat AS vehicules_etat 
+FROM vehicules 
+WHERE vehicules.etat = %(etat_1)s
+2025-04-14 19:47:00,166 - sqlalchemy.engine.Engine - INFO - [generated in 0.00086s] {'etat_1': 'Disponible'}
+2025-04-14 19:47:00,186 - vehicle_assignment - INFO - Recherche des équipements pour la semaine 11 (colonne: onze_semaines_avant)
+2025-04-14 19:47:00,192 - sqlalchemy.engine.Engine - INFO - SELECT transferer_equipement.id AS transferer_equipement_id, transferer_equipement.volet AS transferer_equipement_volet, transferer_equipement.designation_equipement AS transferer_equipement_designation_equipement, transferer_equipement.modalite_transport AS transferer_equipement_modalite_transport, transferer_equipement.total_equipements AS transferer_equipement_total_equipements, transferer_equipement.id_client AS transferer_equipement_id_client, transferer_equipement.`12_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_12_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_11_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`10_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_10_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`9_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_9_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`8_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_8_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`7_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_7_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`6_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_6_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`5_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_5_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`4_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_4_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`3_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_3_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`2_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_2_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`1_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_1_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`0_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_0_semaines_avant_la_fin_de_l'ancien_projet` 
+FROM transferer_equipement 
+WHERE transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` IS NOT NULL AND transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` > %(11_semaines_avant_la_fin_de_l'ancien_projet_1)s
+2025-04-14 19:47:00,200 - sqlalchemy.engine.Engine - INFO - [generated in 0.00754s] {"11_semaines_avant_la_fin_de_l'ancien_projet_1": 0}
+2025-04-14 19:47:00,203 - vehicle_assignment - INFO - Nombre d'équipements trouvés: 42
+2025-04-14 19:47:00,620 - vehicle_assignment - INFO - Solution optimale trouvée
+2025-04-14 19:47:00,622 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2025-04-14 19:47:40,098 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2025-04-14 19:47:40,115 - sqlalchemy.engine.Engine - INFO - SELECT chantiers.id_client AS chantiers_id_client, chantiers.localisation AS chantiers_localisation, chantiers.latitude AS chantiers_latitude, chantiers.longitude AS chantiers_longitude, chantiers.nature_terrain AS chantiers_nature_terrain, chantiers.`distanceAllerGoudron` AS `chantiers_distanceAllerGoudron`, chantiers.`distanceAllerPiste` AS `chantiers_distanceAllerPiste`, chantiers.temps_aller AS chantiers_temps_aller 
+FROM chantiers
+2025-04-14 19:47:40,117 - sqlalchemy.engine.Engine - INFO - [generated in 0.00155s] {}
+2025-04-14 19:47:40,122 - sqlalchemy.engine.Engine - INFO - SELECT vehicules.immatriculation AS vehicules_immatriculation, vehicules.numero_chassis AS vehicules_numero_chassis, vehicules.numero_interne AS vehicules_numero_interne, vehicules.marque_modele AS vehicules_marque_modele, vehicules.type_vehicule AS vehicules_type_vehicule, vehicules.capacite_tonne AS vehicules_capacite_tonne, vehicules.capacite_volume AS vehicules_capacite_volume, vehicules.etat AS vehicules_etat 
+FROM vehicules 
+WHERE vehicules.etat = %(etat_1)s
+2025-04-14 19:47:40,124 - sqlalchemy.engine.Engine - INFO - [generated in 0.00107s] {'etat_1': 'Disponible'}
+2025-04-14 19:47:40,124 - vehicle_assignment - INFO - Recherche des équipements pour la semaine 11 (colonne: onze_semaines_avant)
+2025-04-14 19:47:40,133 - sqlalchemy.engine.Engine - INFO - SELECT transferer_equipement.id AS transferer_equipement_id, transferer_equipement.volet AS transferer_equipement_volet, transferer_equipement.designation_equipement AS transferer_equipement_designation_equipement, transferer_equipement.modalite_transport AS transferer_equipement_modalite_transport, transferer_equipement.total_equipements AS transferer_equipement_total_equipements, transferer_equipement.id_client AS transferer_equipement_id_client, transferer_equipement.`12_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_12_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_11_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`10_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_10_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`9_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_9_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`8_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_8_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`7_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_7_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`6_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_6_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`5_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_5_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`4_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_4_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`3_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_3_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`2_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_2_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`1_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_1_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`0_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_0_semaines_avant_la_fin_de_l'ancien_projet` 
+FROM transferer_equipement 
+WHERE transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` IS NOT NULL AND transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` > %(11_semaines_avant_la_fin_de_l'ancien_projet_1)s
+2025-04-14 19:47:40,138 - sqlalchemy.engine.Engine - INFO - [generated in 0.00554s] {"11_semaines_avant_la_fin_de_l'ancien_projet_1": 0}
+2025-04-14 19:47:40,145 - vehicle_assignment - INFO - Nombre d'équipements trouvés: 42
+2025-04-14 19:47:40,565 - vehicle_assignment - INFO - Solution optimale trouvée
+2025-04-14 19:47:40,565 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2025-04-14 19:56:12,874 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2025-04-14 19:56:12,874 - sqlalchemy.engine.Engine - INFO - SELECT chantiers.id_client AS chantiers_id_client, chantiers.localisation AS chantiers_localisation, chantiers.latitude AS chantiers_latitude, chantiers.longitude AS chantiers_longitude, chantiers.nature_terrain AS chantiers_nature_terrain, chantiers.`distanceAllerGoudron` AS `chantiers_distanceAllerGoudron`, chantiers.`distanceAllerPiste` AS `chantiers_distanceAllerPiste`, chantiers.temps_aller AS chantiers_temps_aller 
+FROM chantiers
+2025-04-14 19:56:12,874 - sqlalchemy.engine.Engine - INFO - [generated in 0.00095s] {}
+2025-04-14 19:56:12,894 - sqlalchemy.engine.Engine - INFO - SELECT vehicules.immatriculation AS vehicules_immatriculation, vehicules.numero_chassis AS vehicules_numero_chassis, vehicules.numero_interne AS vehicules_numero_interne, vehicules.marque_modele AS vehicules_marque_modele, vehicules.type_vehicule AS vehicules_type_vehicule, vehicules.capacite_tonne AS vehicules_capacite_tonne, vehicules.capacite_volume AS vehicules_capacite_volume, vehicules.etat AS vehicules_etat 
+FROM vehicules 
+WHERE vehicules.etat = %(etat_1)s
+2025-04-14 19:56:12,895 - sqlalchemy.engine.Engine - INFO - [generated in 0.00163s] {'etat_1': 'Disponible'}
+2025-04-14 19:56:12,899 - vehicle_assignment - INFO - Recherche des équipements pour la semaine 11 (colonne: onze_semaines_avant)
+2025-04-14 19:56:12,899 - sqlalchemy.engine.Engine - INFO - SELECT transferer_equipement.id AS transferer_equipement_id, transferer_equipement.volet AS transferer_equipement_volet, transferer_equipement.designation_equipement AS transferer_equipement_designation_equipement, transferer_equipement.modalite_transport AS transferer_equipement_modalite_transport, transferer_equipement.total_equipements AS transferer_equipement_total_equipements, transferer_equipement.id_client AS transferer_equipement_id_client, transferer_equipement.`12_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_12_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_11_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`10_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_10_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`9_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_9_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`8_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_8_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`7_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_7_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`6_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_6_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`5_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_5_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`4_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_4_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`3_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_3_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`2_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_2_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`1_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_1_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`0_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_0_semaines_avant_la_fin_de_l'ancien_projet` 
+FROM transferer_equipement 
+WHERE transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` IS NOT NULL AND transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` > %(11_semaines_avant_la_fin_de_l'ancien_projet_1)s
+2025-04-14 19:56:12,909 - sqlalchemy.engine.Engine - INFO - [generated in 0.00535s] {"11_semaines_avant_la_fin_de_l'ancien_projet_1": 0}
+2025-04-14 19:56:12,913 - vehicle_assignment - INFO - Nombre d'équipements trouvés: 42
+2025-04-14 19:56:12,928 - vehicle_assignment - ERROR - Erreur lors de l'affectation des véhicules: local variable 'j' referenced before assignment
+Traceback (most recent call last):
+  File "c:\Users\BIG-computer\tms_app\application\models\optimiseraffectation.py", line 170, in solve_vehicle_assignment
+    type_vehicule_normalized = vehicules[j].type_vehicule.lower().strip()
+UnboundLocalError: local variable 'j' referenced before assignment
+2025-04-14 19:56:12,930 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2025-04-14 19:58:11,320 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2025-04-14 19:58:11,323 - sqlalchemy.engine.Engine - INFO - SELECT chantiers.id_client AS chantiers_id_client, chantiers.localisation AS chantiers_localisation, chantiers.latitude AS chantiers_latitude, chantiers.longitude AS chantiers_longitude, chantiers.nature_terrain AS chantiers_nature_terrain, chantiers.`distanceAllerGoudron` AS `chantiers_distanceAllerGoudron`, chantiers.`distanceAllerPiste` AS `chantiers_distanceAllerPiste`, chantiers.temps_aller AS chantiers_temps_aller 
+FROM chantiers
+2025-04-14 19:58:11,324 - sqlalchemy.engine.Engine - INFO - [generated in 0.00092s] {}
+2025-04-14 19:58:11,329 - sqlalchemy.engine.Engine - INFO - SELECT vehicules.immatriculation AS vehicules_immatriculation, vehicules.numero_chassis AS vehicules_numero_chassis, vehicules.numero_interne AS vehicules_numero_interne, vehicules.marque_modele AS vehicules_marque_modele, vehicules.type_vehicule AS vehicules_type_vehicule, vehicules.capacite_tonne AS vehicules_capacite_tonne, vehicules.capacite_volume AS vehicules_capacite_volume, vehicules.etat AS vehicules_etat 
+FROM vehicules 
+WHERE vehicules.etat = %(etat_1)s
+2025-04-14 19:58:11,329 - sqlalchemy.engine.Engine - INFO - [generated in 0.00087s] {'etat_1': 'Disponible'}
+2025-04-14 19:58:11,334 - vehicle_assignment - INFO - Recherche des équipements pour la semaine 11 (colonne: onze_semaines_avant)
+2025-04-14 19:58:11,338 - sqlalchemy.engine.Engine - INFO - SELECT transferer_equipement.id AS transferer_equipement_id, transferer_equipement.volet AS transferer_equipement_volet, transferer_equipement.designation_equipement AS transferer_equipement_designation_equipement, transferer_equipement.modalite_transport AS transferer_equipement_modalite_transport, transferer_equipement.total_equipements AS transferer_equipement_total_equipements, transferer_equipement.id_client AS transferer_equipement_id_client, transferer_equipement.`12_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_12_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_11_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`10_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_10_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`9_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_9_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`8_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_8_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`7_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_7_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`6_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_6_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`5_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_5_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`4_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_4_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`3_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_3_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`2_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_2_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`1_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_1_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`0_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_0_semaines_avant_la_fin_de_l'ancien_projet` 
+FROM transferer_equipement 
+WHERE transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` IS NOT NULL AND transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` > %(11_semaines_avant_la_fin_de_l'ancien_projet_1)s
+2025-04-14 19:58:11,342 - sqlalchemy.engine.Engine - INFO - [generated in 0.00449s] {"11_semaines_avant_la_fin_de_l'ancien_projet_1": 0}
+2025-04-14 19:58:11,345 - vehicle_assignment - INFO - Nombre d'équipements trouvés: 42
+2025-04-14 19:58:11,844 - vehicle_assignment - INFO - Solution optimale trouvée
+2025-04-14 19:58:11,846 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2025-04-14 20:05:31,484 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2025-04-14 20:05:31,484 - sqlalchemy.engine.Engine - INFO - SELECT chantiers.id_client AS chantiers_id_client, chantiers.localisation AS chantiers_localisation, chantiers.latitude AS chantiers_latitude, chantiers.longitude AS chantiers_longitude, chantiers.nature_terrain AS chantiers_nature_terrain, chantiers.`distanceAllerGoudron` AS `chantiers_distanceAllerGoudron`, chantiers.`distanceAllerPiste` AS `chantiers_distanceAllerPiste`, chantiers.temps_aller AS chantiers_temps_aller 
+FROM chantiers
+2025-04-14 20:05:31,484 - sqlalchemy.engine.Engine - INFO - [generated in 0.00177s] {}
+2025-04-14 20:05:31,496 - sqlalchemy.engine.Engine - INFO - SELECT vehicules.immatriculation AS vehicules_immatriculation, vehicules.numero_chassis AS vehicules_numero_chassis, vehicules.numero_interne AS vehicules_numero_interne, vehicules.marque_modele AS vehicules_marque_modele, vehicules.type_vehicule AS vehicules_type_vehicule, vehicules.capacite_tonne AS vehicules_capacite_tonne, vehicules.capacite_volume AS vehicules_capacite_volume, vehicules.etat AS vehicules_etat 
+FROM vehicules 
+WHERE vehicules.etat = %(etat_1)s
+2025-04-14 20:05:31,498 - sqlalchemy.engine.Engine - INFO - [generated in 0.00226s] {'etat_1': 'Disponible'}
+2025-04-14 20:05:31,502 - vehicle_assignment - INFO - Recherche des équipements pour la semaine 11 (colonne: onze_semaines_avant)
+2025-04-14 20:05:31,506 - sqlalchemy.engine.Engine - INFO - SELECT transferer_equipement.id AS transferer_equipement_id, transferer_equipement.volet AS transferer_equipement_volet, transferer_equipement.designation_equipement AS transferer_equipement_designation_equipement, transferer_equipement.modalite_transport AS transferer_equipement_modalite_transport, transferer_equipement.total_equipements AS transferer_equipement_total_equipements, transferer_equipement.id_client AS transferer_equipement_id_client, transferer_equipement.`12_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_12_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_11_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`10_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_10_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`9_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_9_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`8_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_8_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`7_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_7_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`6_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_6_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`5_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_5_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`4_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_4_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`3_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_3_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`2_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_2_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`1_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_1_semaines_avant_la_fin_de_l'ancien_projet`, transferer_equipement.`0_semaines_avant_la_fin_de_l'ancien_projet` AS `transferer_equipement_0_semaines_avant_la_fin_de_l'ancien_projet` 
+FROM transferer_equipement 
+WHERE transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` IS NOT NULL AND transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` > %(11_semaines_avant_la_fin_de_l'ancien_projet_1)s
+2025-04-14 20:05:31,516 - sqlalchemy.engine.Engine - INFO - [generated in 0.01017s] {"11_semaines_avant_la_fin_de_l'ancien_projet_1": 0}
+2025-04-14 20:05:31,521 - vehicle_assignment - INFO - Nombre d'équipements trouvés: 42
+2025-04-14 20:05:32,016 - vehicle_assignment - INFO - Solution optimale trouvée
+2025-04-14 20:05:32,019 - sqlalchemy.engine.Engine - INFO - ROLLBACK

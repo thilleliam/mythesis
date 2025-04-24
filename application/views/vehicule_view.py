@@ -130,19 +130,28 @@ class VehiculeApp(ttk.Frame):
 
     def configurer_tab_stats(self):
         """Configure l'onglet des statistiques"""
+        # Import local pour éviter les références circulaires
+        from application.models.vehicule import Vehicule
+        
+        # Nettoyer l'onglet stats avant de le reconfigurer
+        for widget in self.tab_stats.winfo_children():
+            widget.destroy()
+            
         stats_frame = ttk.Frame(self.tab_stats, padding=20)
         stats_frame.pack(fill=BOTH, expand=True)
         
         ttk.Label(stats_frame, text="Statistiques de la Flotte", font=("-size", 16, "-weight", "bold")).pack(pady=10)
-        
-        # Import local pour éviter les références circulaires
-        from application.models.vehicule import Vehicule
         
         # Compter les véhicules par état
         en_panne = session.query(func.count(Vehicule.immatriculation)).filter(Vehicule.etat == "En panne").scalar() or 0
         en_service = session.query(func.count(Vehicule.immatriculation)).filter(Vehicule.etat == "En service").scalar() or 0
         disponible = session.query(func.count(Vehicule.immatriculation)).filter(Vehicule.etat == "Disponible").scalar() or 0
         total = en_panne + en_service + disponible
+        
+        # Éviter la division par zéro
+        panne_pct = (en_panne/total*100) if total > 0 else 0
+        service_pct = (en_service/total*100) if total > 0 else 0
+        dispo_pct = (disponible/total*100) if total > 0 else 0
         
         # Afficher les statistiques
         stats_container = ttk.Frame(stats_frame)
@@ -153,9 +162,12 @@ class VehiculeApp(ttk.Frame):
         etat_frame.pack(side=LEFT, fill=BOTH, expand=True, padx=5)
         
         ttk.Label(etat_frame, text=f"Total de véhicules: {total}").pack(anchor=W, pady=5)
-        ttk.Label(etat_frame, text=f"En service: {en_service} ({en_service/total*100:.1f}% si total > 0)", foreground="#3498db").pack(anchor=W, pady=5)
-        ttk.Label(etat_frame, text=f"En panne: {en_panne} ({en_panne/total*100:.1f}% si total > 0)", foreground="#f39c12").pack(anchor=W, pady=5)
-        ttk.Label(etat_frame, text=f"Disponibles: {disponible} ({disponible/total*100:.1f}% si total > 0)", foreground="#2ecc71").pack(anchor=W, pady=5)
+        ttk.Label(etat_frame, text=f"En service: {en_service} ({service_pct:.1f}%)", 
+                 foreground="#3498db").pack(anchor=W, pady=5)
+        ttk.Label(etat_frame, text=f"En panne: {en_panne} ({panne_pct:.1f}%)", 
+                 foreground="#f39c12").pack(anchor=W, pady=5)
+        ttk.Label(etat_frame, text=f"Disponibles: {disponible} ({dispo_pct:.1f}%)", 
+                 foreground="#2ecc71").pack(anchor=W, pady=5)
         
         # Stats par type
         types_frame = ttk.Labelframe(stats_container, text="Types de véhicules", padding=10)
@@ -366,6 +378,7 @@ class VehiculeApp(ttk.Frame):
             except ValueError:
                 messagebox.showerror("Erreur", "Les capacités doivent être des nombres.")
             except Exception as e:
+                session.rollback()
                 messagebox.showerror("Erreur", f"Une erreur est survenue: {str(e)}")
                 
         ttk.Button(btn_frame, text="Valider", command=valider, bootstyle=SUCCESS).pack(side=LEFT, padx=5)
@@ -393,105 +406,111 @@ class VehiculeApp(ttk.Frame):
         item = self.tree.item(selected[0])
         immatriculation = item["values"][0]
 
-        # Récupérer l'objet véhicule depuis la base
-        vehicule = session.query(Vehicule).filter_by(immatriculation=immatriculation).first()
+        try:
+            # Récupérer le véhicule directement sans créer de nouvelle session
+            vehicule = session.query(Vehicule).filter_by(immatriculation=immatriculation).first()
 
-        if not vehicule:
-            messagebox.showerror("Erreur", "Véhicule introuvable en base de données.")
-            return
-            
-        # Créer une fenêtre de dialogue personnalisée
-        dialog = ttk.Toplevel(self, resizable=False)
-        dialog.title(f"Modifier le véhicule: {immatriculation}")
-        dialog.grab_set()  # Rendre modal
-        
-        # Créer un formulaire
-        form_frame = ttk.Frame(dialog, padding=20)
-        form_frame.pack(fill=BOTH, expand=True)
-        
-        # Variables pour stocker les entrées
-        chassis_var = StringVar(value=vehicule.numero_chassis or "")
-        interne_var = StringVar(value=vehicule.numero_interne or "")
-        marque_var = StringVar(value=vehicule.marque_modele or "")
-        type_var = StringVar(value=vehicule.type_vehicule or "")
-        tonnes_var = StringVar(value=str(vehicule.capacite_tonne) if vehicule.capacite_tonne is not None else "")
-        volume_var = StringVar(value=str(vehicule.capacite_volume) if vehicule.capacite_volume is not None else "")
-        etat_var = StringVar(value=vehicule.etat or "Disponible")
-        
-        # Créer les champs de saisie
-        ttk.Label(form_frame, text="Immatriculation:").grid(row=0, column=0, sticky=W, pady=5, padx=5)
-        ttk.Label(form_frame, text=immatriculation, font=("-weight", "bold")).grid(row=0, column=1, sticky=W, pady=5, padx=5)
-        
-        fields = [
-            ("Numéro de châssis:", chassis_var),
-            ("Numéro interne:", interne_var),
-            ("Marque et modèle*:", marque_var),
-            ("Type de véhicule*:", type_var),
-            ("Capacité (tonnes)*:", tonnes_var),
-            ("Capacité (m³)*:", volume_var),
-        ]
-        
-        for i, (label_text, var) in enumerate(fields):
-            ttk.Label(form_frame, text=label_text).grid(row=i+1, column=0, sticky=W, pady=5, padx=5)
-            ttk.Entry(form_frame, textvariable=var, width=40).grid(row=i+1, column=1, sticky=W, pady=5, padx=5)
-        
-        # Menu déroulant pour l'état
-        ttk.Label(form_frame, text="État*:").grid(row=len(fields)+1, column=0, sticky=W, pady=5, padx=5)
-        ttk.Combobox(form_frame, textvariable=etat_var, values=["En panne", "En service", "Disponible"], 
-                     state="readonly", width=15).grid(row=len(fields)+1, column=1, sticky=W, pady=5, padx=5)
-        
-        # Label pour les champs obligatoires
-        ttk.Label(form_frame, text="* Champs obligatoires", foreground="gray").grid(row=len(fields)+2, column=0, 
-                                                                                   columnspan=2, sticky=W, pady=10)
-        
-        # Boutons
-        btn_frame = ttk.Frame(form_frame)
-        btn_frame.grid(row=len(fields)+3, column=0, columnspan=2, pady=10)
-        
-        def valider():
-            # Vérifier les champs obligatoires
-            if not marque_var.get() or not type_var.get():
-                messagebox.showerror("Erreur", "Veuillez remplir tous les champs obligatoires.")
+            if not vehicule:
+                messagebox.showerror("Erreur", "Véhicule introuvable en base de données.")
                 return
                 
-            try:
-                # Convertir les valeurs numériques
-                capacite_tonne = float(tonnes_var.get()) if tonnes_var.get() else 0
-                capacite_volume = float(volume_var.get()) if volume_var.get() else 0
-                
-                # Mettre à jour le véhicule
-                vehicule.numero_chassis = chassis_var.get()
-                vehicule.numero_interne = interne_var.get()
-                vehicule.marque_modele = marque_var.get()
-                vehicule.type_vehicule = type_var.get()
-                vehicule.capacite_tonne = capacite_tonne
-                vehicule.capacite_volume = capacite_volume
-                vehicule.etat = etat_var.get()
-                
-                session.commit()
-                
-                # Fermer la fenêtre et mise à jour
-                dialog.destroy()
-                self.charger_donnees()
-                messagebox.showinfo("Succès", "Véhicule modifié avec succès !")
-                
-            except ValueError:
-                messagebox.showerror("Erreur", "Les capacités doivent être des nombres.")
-            except Exception as e:
-                session.rollback()
-                messagebox.showerror("Erreur", f"Une erreur est survenue: {str(e)}")
-                
-        ttk.Button(btn_frame, text="Enregistrer", command=valider, bootstyle=SUCCESS).pack(side=LEFT, padx=5)
-        ttk.Button(btn_frame, text="Annuler", command=dialog.destroy, bootstyle=SECONDARY).pack(side=LEFT, padx=5)
-        
-        # Centrer la fenêtre
-        dialog.update_idletasks()
-        width = dialog.winfo_width()
-        height = dialog.winfo_height()
-        x = (dialog.winfo_screenwidth() // 2) - (width // 2)
-        y = (dialog.winfo_screenheight() // 2) - (height // 2)
-        dialog.geometry(f"{width}x{height}+{x}+{y}")
-
+            # Créer une fenêtre de dialogue personnalisée
+            dialog = ttk.Toplevel(self, resizable=False)
+            dialog.title(f"Modifier le véhicule: {immatriculation}")
+            dialog.grab_set()  # Rendre modal
+            
+            # Créer un formulaire
+            form_frame = ttk.Frame(dialog, padding=20)
+            form_frame.pack(fill=BOTH, expand=True)
+            
+            # Variables pour stocker les entrées
+            chassis_var = StringVar(value=vehicule.numero_chassis or "")
+            interne_var = StringVar(value=vehicule.numero_interne or "")
+            marque_var = StringVar(value=vehicule.marque_modele or "")
+            type_var = StringVar(value=vehicule.type_vehicule or "")
+            tonnes_var = StringVar(value=str(vehicule.capacite_tonne) if vehicule.capacite_tonne is not None else "")
+            volume_var = StringVar(value=str(vehicule.capacite_volume) if vehicule.capacite_volume is not None else "")
+            etat_var = StringVar(value=vehicule.etat or "Disponible")
+            
+            # Créer les champs de saisie
+            fields = [
+                ("Immatriculation:", StringVar(value=immatriculation), True),  # Lecture seule
+                ("Numéro de châssis:", chassis_var, False),
+                ("Numéro interne:", interne_var, False),
+                ("Marque et modèle*:", marque_var, False),
+                ("Type de véhicule*:", type_var, False),
+                ("Capacité (tonnes)*:", tonnes_var, False),
+                ("Capacité (m³)*:", volume_var, False),
+            ]
+            
+            for i, (label_text, var, readonly) in enumerate(fields):
+                ttk.Label(form_frame, text=label_text).grid(row=i, column=0, sticky=W, pady=5, padx=5)
+                entry = ttk.Entry(form_frame, textvariable=var, width=40, state="readonly" if readonly else "normal")
+                entry.grid(row=i, column=1, sticky=W, pady=5, padx=5)
+            
+            # Menu déroulant pour l'état
+            ttk.Label(form_frame, text="État*:").grid(row=len(fields), column=0, sticky=W, pady=5, padx=5)
+            ttk.Combobox(form_frame, textvariable=etat_var, values=["En panne", "En service", "Disponible"], 
+                         state="readonly", width=15).grid(row=len(fields), column=1, sticky=W, pady=5, padx=5)
+            
+            # Label pour les champs obligatoires
+            ttk.Label(form_frame, text="* Champs obligatoires", foreground="gray").grid(row=len(fields)+1, column=0, 
+                                                                                       columnspan=2, sticky=W, pady=10)
+            
+            # Boutons
+            btn_frame = ttk.Frame(form_frame)
+            btn_frame.grid(row=len(fields)+2, column=0, columnspan=2, pady=10)
+            
+            def valider():
+                # Vérifier les champs obligatoires
+                if not marque_var.get() or not type_var.get():
+                    messagebox.showerror("Erreur", "Veuillez remplir tous les champs obligatoires.")
+                    return
+                    
+                try:
+                    # Convertir les valeurs numériques
+                    capacite_tonne = float(tonnes_var.get()) if tonnes_var.get() else 0
+                    capacite_volume = float(volume_var.get()) if volume_var.get() else 0
+                    
+                    # Mettre à jour le véhicule (utiliser la session existante)
+                    vehicule.numero_chassis = chassis_var.get()
+                    vehicule.numero_interne = interne_var.get()
+                    vehicule.marque_modele = marque_var.get()
+                    vehicule.type_vehicule = type_var.get()
+                    vehicule.capacite_tonne = capacite_tonne
+                    vehicule.capacite_volume = capacite_volume
+                    vehicule.etat = etat_var.get()
+                    
+                    # Commit les changements
+                    session.commit()
+                    
+                    # Fermer la fenêtre et mettre à jour l'affichage
+                    dialog.destroy()
+                    self.charger_donnees()
+                    messagebox.showinfo("Succès", "Véhicule modifié avec succès !")
+                        
+                except ValueError:
+                    messagebox.showerror("Erreur", "Les capacités doivent être des nombres.")
+                except Exception as e:
+                    session.rollback()
+                    messagebox.showerror("Erreur", f"Une erreur est survenue: {str(e)}")
+                    print(f"Erreur détaillée lors de la modification: {e}")
+            
+            ttk.Button(btn_frame, text="Valider", command=valider, bootstyle=SUCCESS).pack(side=LEFT, padx=5)
+            ttk.Button(btn_frame, text="Annuler", command=dialog.destroy, bootstyle=SECONDARY).pack(side=LEFT, padx=5)
+            
+            # Centrer la fenêtre
+            dialog.update_idletasks()
+            width = dialog.winfo_width()
+            height = dialog.winfo_height()
+            x = (dialog.winfo_screenwidth() // 2) - (width // 2)
+            y = (dialog.winfo_screenheight() // 2) - (height // 2)
+            dialog.geometry(f"{width}x{height}+{x}+{y}")
+    
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Impossible de modifier le véhicule: {str(e)}")
+            print(f"Erreur détaillée: {e}")
+            
     def supprimer_vehicule(self):
         """ Supprime un véhicule sélectionné """
         # Import local pour éviter les références circulaires
@@ -511,7 +530,12 @@ class VehiculeApp(ttk.Frame):
 
         # Supprimer de la BDD
         try:
-            session.query(Vehicule).filter_by(immatriculation=immatriculation).delete()
+            vehicule = session.query(Vehicule).filter_by(immatriculation=immatriculation).first()
+            if not vehicule:
+                messagebox.showerror("Erreur", "Véhicule introuvable en base de données.")
+                return
+                
+            session.delete(vehicule)  # Méthode plus propre que .delete()
             session.commit()
             
             # Rafraîchir l'affichage
