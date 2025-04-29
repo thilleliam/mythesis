@@ -8,9 +8,10 @@ class TransfererEquipement(Base):
     __tablename__ = "transferer_equipement"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    volet = Column(String(255), nullable=True)  # Changé en nullable=True
-    designation_equipement = Column(String(255), nullable=False)
-    modalite_transport = Column(String(255), nullable=True)  # Ajouté cette colonne
+    volet = Column(String(255), nullable=True)  
+    nom_equipement = Column(String(255), nullable=False)  # Renommé pour correspondre à nomEquipement
+    id_equipement = Column(Integer, ForeignKey("equipements.ID_equipement"), nullable=False)
+    modalite_transport = Column(String(255), nullable=True)  
     total_equipements = Column(Integer, nullable=False)
     id_client = Column(String(255), ForeignKey("chantiers.id_client"), nullable=False) 
     douze_semaines_avant = Column("12_semaines_avant_la_fin_de_l'ancien_projet", Integer, nullable=True)

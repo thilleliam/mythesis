@@ -22,22 +22,25 @@ class TransfererEquipementApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Gestion des Transferts d'Équipements")
-        self.root.geometry("1200x700")  # Augmenté la hauteur pour plus d'espace
+        self.root.geometry("1200x700")
         
         # Import local pour éviter les imports circulaires
         from application.models.transferer_equipement import TransfererEquipement
         from application.models.chantiers import Chantier
+        from application.models.equipements import Equipement
         self.TransfererEquipement = TransfererEquipement
         self.Chantier = Chantier
+        self.Equipement = Equipement
 
         # Variables
         self.id_var = IntVar()
         self.volet_var = StringVar()
-        self.designation_equipement_var = StringVar()
+        self.nom_equipement_var = StringVar()  # Pour saisir le nom de l'équipement
+        self.equipement_id_var = IntVar()  # Pour stocker l'ID de l'équipement correspondant
         self.modalite_transport_var = StringVar()
         self.total_equipements_var = IntVar(value=1)  # Valeur par défaut à 1
         self.id_client_var = StringVar()
-        self.localisation_client_var = StringVar()  # Nouvelle variable pour afficher la localisation
+        self.localisation_client_var = StringVar()  # Pour afficher la localisation
         self.recherche_var = StringVar()  # Variable pour la recherche
         
         # Variables pour les semaines
@@ -60,11 +63,15 @@ class TransfererEquipementApp:
         # Filtre client
         self.filtre_client_var = StringVar()
         
+        # Cache pour les équipements
+        self.equipements_cache = {}
+        
         # Création de l'interface
         self.creer_interface()
         
         # Charger les données
         self.charger_clients()
+        self.charger_equipements()
         self.charger_donnees()
 
     def creer_interface(self):
@@ -123,9 +130,11 @@ class TransfererEquipementApp:
                   bootstyle=DANGER).pack(side=LEFT, padx=5)
         ttk.Button(btn_frame, text="Rafraîchir", command=self.charger_donnees, 
                   bootstyle=INFO).pack(side=LEFT, padx=5)
+        ttk.Button(btn_frame, text="Exporter PDF", command=self.generer_rapport, 
+                  bootstyle=SECONDARY).pack(side=LEFT, padx=5)
         
         # Configuration du tableau
-        columns = ("id", "id_client", "localisation", "volet", "designation_equipement", "modalite_transport", 
+        columns = ("id", "id_client", "localisation", "volet", "nom_equipement", "modalite_transport", 
                   "total_equipements", "12_semaines", "11_semaines", "10_semaines", "9_semaines", 
                   "8_semaines", "7_semaines", "6_semaines", "5_semaines", "4_semaines", 
                   "3_semaines", "2_semaines", "1_semaines", "0_semaines")
@@ -138,22 +147,21 @@ class TransfererEquipementApp:
         self.tree.heading("id_client", text="Client", command=lambda: self.trier_tableau("id_client"))
         self.tree.heading("localisation", text="Localisation", command=lambda: self.trier_tableau("localisation"))
         self.tree.heading("volet", text="Volet", command=lambda: self.trier_tableau("volet"))
-        self.tree.heading("designation_equipement", text="Désignation Équipement", command=lambda: self.trier_tableau("designation_equipement"))
+        self.tree.heading("nom_equipement", text="Nom Équipement", command=lambda: self.trier_tableau("nom_equipement"))
         self.tree.heading("modalite_transport", text="Modalité Transport", command=lambda: self.trier_tableau("modalite_transport"))
         self.tree.heading("total_equipements", text="Total", command=lambda: self.trier_tableau("total_equipements"))
         
         # Configuration des en-têtes pour les semaines
-        # Configuration des en-têtes pour les semaines
-        # Configuration des en-têtes pour les semaines
         for i in range(12, -1, -1):
-            col_name = f"{i}_semaines"  # Toujours au pluriel pour toutes les semaines
+            col_name = f"{i}_semaines"
             self.tree.heading(col_name, text=f"{i} sem.", command=lambda i=i: self.trier_tableau(f"{i}_semaines"))
+        
         # Configuration des largeurs de colonnes
         self.tree.column("id", width=50)
         self.tree.column("id_client", width=120)
         self.tree.column("localisation", width=120)
         self.tree.column("volet", width=80)
-        self.tree.column("designation_equipement", width=200)
+        self.tree.column("nom_equipement", width=200)
         self.tree.column("modalite_transport", width=120)
         self.tree.column("total_equipements", width=60)
         
@@ -199,9 +207,11 @@ class TransfererEquipementApp:
         transport_cb = ttk.Combobox(info_frame, textvariable=self.modalite_transport_var, values=["Camion", "Train", "Bateau", "Avion"], width=15)
         transport_cb.grid(row=1, column=4, padx=5, pady=5, sticky="w")
         
-        # Troisième ligne: Désignation et Total
-        ttk.Label(info_frame, text="Désignation Équipement:").grid(row=2, column=0, padx=5, pady=5, sticky="e")
-        ttk.Entry(info_frame, textvariable=self.designation_equipement_var, width=30).grid(row=2, column=1, padx=5, pady=5, sticky="w", columnspan=3)
+        # Troisième ligne: Nom équipement et Total
+        ttk.Label(info_frame, text="Nom Équipement:").grid(row=2, column=0, padx=5, pady=5, sticky="e")
+        self.equipement_cb = ttk.Combobox(info_frame, textvariable=self.nom_equipement_var, width=30)
+        self.equipement_cb.grid(row=2, column=1, padx=5, pady=5, sticky="w", columnspan=3)
+        self.equipement_cb.bind("<<ComboboxSelected>>", self.actualiser_id_equipement)
         
         ttk.Label(info_frame, text="Total Équipements:").grid(row=2, column=4, padx=5, pady=5, sticky="e")
         ttk.Spinbox(info_frame, textvariable=self.total_equipements_var, from_=1, to=1000, width=5).grid(row=2, column=5, padx=5, pady=5, sticky="w")
@@ -231,6 +241,27 @@ class TransfererEquipementApp:
         ttk.Button(btn_frame, text="Enregistrer", command=self.enregistrer, bootstyle=SUCCESS).pack(side=LEFT, padx=5)
         ttk.Button(btn_frame, text="Vider formulaire", command=self.vider_formulaire, bootstyle=SECONDARY).pack(side=LEFT, padx=5)
         ttk.Button(btn_frame, text="Annuler", command=lambda: self.root.children['!notebook'].select(0), bootstyle=DANGER).pack(side=LEFT, padx=5)
+
+    def charger_equipements(self):
+        """Charge la liste des équipements pour le combobox"""
+        try:
+            equipements = session.query(self.Equipement).order_by(self.Equipement.nomEquipement).all()
+            self.equipement_cb['values'] = [e.nomEquipement for e in equipements]
+            
+            # Mettre en cache les équipements pour une recherche rapide
+            self.equipements_cache = {e.nomEquipement: e.ID_equipement for e in equipements}
+            
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Impossible de charger les équipements: {str(e)}")
+            print(f"Erreur lors du chargement des équipements: {str(e)}")
+
+    def actualiser_id_equipement(self, event=None):
+        """Met à jour l'ID d'équipement en fonction du nom sélectionné"""
+        nom_equipement = self.nom_equipement_var.get()
+        if nom_equipement in self.equipements_cache:
+            self.equipement_id_var.set(self.equipements_cache[nom_equipement])
+        else:
+            self.equipement_id_var.set(0)
 
     def actualiser_localisation_client(self, event=None):
         """Met à jour la localisation du client sélectionné"""
@@ -270,52 +301,53 @@ class TransfererEquipementApp:
             return
 
         try:
+            # Vérifier si le nom d'équipement existe
+            nom_equipement = self.nom_equipement_var.get()
+            id_equipement = self.equipements_cache.get(nom_equipement)
+            
+            if not id_equipement:
+                messagebox.showerror("Erreur", f"L'équipement '{nom_equipement}' n'existe pas dans la base de données")
+                return
+            
+            # Préparation des données pour le modèle
+            transfert_data = {
+                "volet": self.volet_var.get() or None,
+                "nom_equipement": nom_equipement,
+                "id_equipement": id_equipement,
+                "modalite_transport": self.modalite_transport_var.get() or None,
+                "total_equipements": self.total_equipements_var.get(),
+                "id_client": self.id_client_var.get(),
+                "douze_semaines_avant": self.semaines_vars['douze'].get() or None,
+                "onze_semaines_avant": self.semaines_vars['onze'].get() or None,
+                "dix_semaines_avant": self.semaines_vars['dix'].get() or None,
+                "neuf_semaines_avant": self.semaines_vars['neuf'].get() or None,
+                "huit_semaines_avant": self.semaines_vars['huit'].get() or None,
+                "sept_semaines_avant": self.semaines_vars['sept'].get() or None,
+                "six_semaines_avant": self.semaines_vars['six'].get() or None,
+                "cinq_semaines_avant": self.semaines_vars['cinq'].get() or None,
+                "quatre_semaines_avant": self.semaines_vars['quatre'].get() or None,
+                "trois_semaines_avant": self.semaines_vars['trois'].get() or None,
+                "deux_semaines_avant": self.semaines_vars['deux'].get() or None,
+                "un_semaines_avant": self.semaines_vars['un'].get() or None,
+                "zero_semaines_avant": self.semaines_vars['zero'].get() or None
+            }
+            
             # Vérifier s'il s'agit d'un ajout ou d'une modification
             if self.id_var.get() == 0:  # Ajout
-                transfert = self.TransfererEquipement(
-                    volet=self.volet_var.get() or None,
-                    designation_equipement=self.designation_equipement_var.get(),
-                    modalite_transport=self.modalite_transport_var.get() or None,
-                    total_equipements=self.total_equipements_var.get(),
-                    id_client=self.id_client_var.get(),
-                    douze_semaines_avant=self.semaines_vars['douze'].get() or None,
-                    onze_semaines_avant=self.semaines_vars['onze'].get() or None,
-                    dix_semaines_avant=self.semaines_vars['dix'].get() or None,
-                    neuf_semaines_avant=self.semaines_vars['neuf'].get() or None,
-                    huit_semaines_avant=self.semaines_vars['huit'].get() or None,
-                    sept_semaines_avant=self.semaines_vars['sept'].get() or None,
-                    six_semaines_avant=self.semaines_vars['six'].get() or None,
-                    cinq_semaines_avant=self.semaines_vars['cinq'].get() or None,
-                    quatre_semaines_avant=self.semaines_vars['quatre'].get() or None,
-                    trois_semaines_avant=self.semaines_vars['trois'].get() or None,
-                    deux_semaines_avant=self.semaines_vars['deux'].get() or None,
-                    un_semaines_avant=self.semaines_vars['un'].get() or None,
-                    zero_semaines_avant=self.semaines_vars['zero'].get() or None
-                )
+                # Créer un nouveau transfert en utilisant le constructeur avec les bons noms d'attributs
+                transfert = self.TransfererEquipement(**transfert_data)
                 session.add(transfert)
                 message_succes = "Transfert d'équipement ajouté avec succès"
             else:  # Modification
                 transfert = session.query(self.TransfererEquipement).filter_by(id=self.id_var.get()).first()
                 if transfert:
-                    transfert.volet = self.volet_var.get() or None
-                    transfert.designation_equipement = self.designation_equipement_var.get()
-                    transfert.modalite_transport = self.modalite_transport_var.get() or None
-                    transfert.total_equipements = self.total_equipements_var.get()
-                    transfert.id_client = self.id_client_var.get()
-                    transfert.douze_semaines_avant = self.semaines_vars['douze'].get() or None
-                    transfert.onze_semaines_avant = self.semaines_vars['onze'].get() or None
-                    transfert.dix_semaines_avant = self.semaines_vars['dix'].get() or None
-                    transfert.neuf_semaines_avant = self.semaines_vars['neuf'].get() or None
-                    transfert.huit_semaines_avant = self.semaines_vars['huit'].get() or None
-                    transfert.sept_semaines_avant = self.semaines_vars['sept'].get() or None
-                    transfert.six_semaines_avant = self.semaines_vars['six'].get() or None
-                    transfert.cinq_semaines_avant = self.semaines_vars['cinq'].get() or None
-                    transfert.quatre_semaines_avant = self.semaines_vars['quatre'].get() or None
-                    transfert.trois_semaines_avant = self.semaines_vars['trois'].get() or None
-                    transfert.deux_semaines_avant = self.semaines_vars['deux'].get() or None
-                    transfert.un_semaines_avant = self.semaines_vars['un'].get() or None
-                    transfert.zero_semaines_avant = self.semaines_vars['zero'].get() or None
-                message_succes = "Transfert d'équipement modifié avec succès"
+                    # Mettre à jour les attributs individuellement
+                    for key, value in transfert_data.items():
+                        setattr(transfert, key, value)
+                    message_succes = "Transfert d'équipement modifié avec succès"
+                else:
+                    messagebox.showerror("Erreur", f"Transfert avec ID {self.id_var.get()} non trouvé")
+                    return
             
             session.commit()
             messagebox.showinfo("Succès", message_succes)
@@ -337,36 +369,45 @@ class TransfererEquipementApp:
             
         item_id = self.tree.item(selection[0], "values")[0]
         try:
-            transfert = session.query(self.TransfererEquipement).filter_by(id=item_id).first()
+            # Jointure avec la table des équipements pour obtenir le nom
+            transfert = session.query(self.TransfererEquipement, self.Equipement.nomEquipement)\
+                .join(self.Equipement, self.TransfererEquipement.id_equipement == self.Equipement.ID_equipement)\
+                .filter(self.TransfererEquipement.id == item_id).first()
+                
             if transfert:
+                transfert_obj, nom_equipement = transfert
+                
                 # Remplir le formulaire avec les données
-                self.id_var.set(transfert.id)
-                self.id_client_var.set(transfert.id_client)
-                self.volet_var.set(transfert.volet or "")
-                self.designation_equipement_var.set(transfert.designation_equipement)
-                self.modalite_transport_var.set(transfert.modalite_transport or "")
-                self.total_equipements_var.set(transfert.total_equipements)
+                self.id_var.set(transfert_obj.id)
+                self.id_client_var.set(transfert_obj.id_client)
+                self.volet_var.set(transfert_obj.volet or "")
+                self.nom_equipement_var.set(nom_equipement)
+                self.equipement_id_var.set(transfert_obj.id_equipement)
+                self.modalite_transport_var.set(transfert_obj.modalite_transport or "")
+                self.total_equipements_var.set(transfert_obj.total_equipements)
                 
                 # Mise à jour des variables pour les semaines
-                self.semaines_vars['douze'].set(transfert.douze_semaines_avant or 0)
-                self.semaines_vars['onze'].set(transfert.onze_semaines_avant or 0)
-                self.semaines_vars['dix'].set(transfert.dix_semaines_avant or 0)
-                self.semaines_vars['neuf'].set(transfert.neuf_semaines_avant or 0)
-                self.semaines_vars['huit'].set(transfert.huit_semaines_avant or 0)
-                self.semaines_vars['sept'].set(transfert.sept_semaines_avant or 0)
-                self.semaines_vars['six'].set(transfert.six_semaines_avant or 0)
-                self.semaines_vars['cinq'].set(transfert.cinq_semaines_avant or 0)
-                self.semaines_vars['quatre'].set(transfert.quatre_semaines_avant or 0)
-                self.semaines_vars['trois'].set(transfert.trois_semaines_avant or 0)
-                self.semaines_vars['deux'].set(transfert.deux_semaines_avant or 0)
-                self.semaines_vars['un'].set(transfert.un_semaines_avant or 0)
-                self.semaines_vars['zero'].set(transfert.zero_semaines_avant or 0)
+                self.semaines_vars['douze'].set(transfert_obj.douze_semaines_avant or 0)
+                self.semaines_vars['onze'].set(transfert_obj.onze_semaines_avant or 0)
+                self.semaines_vars['dix'].set(transfert_obj.dix_semaines_avant or 0)
+                self.semaines_vars['neuf'].set(transfert_obj.neuf_semaines_avant or 0)
+                self.semaines_vars['huit'].set(transfert_obj.huit_semaines_avant or 0)
+                self.semaines_vars['sept'].set(transfert_obj.sept_semaines_avant or 0)
+                self.semaines_vars['six'].set(transfert_obj.six_semaines_avant or 0)
+                self.semaines_vars['cinq'].set(transfert_obj.cinq_semaines_avant or 0)
+                self.semaines_vars['quatre'].set(transfert_obj.quatre_semaines_avant or 0)
+                self.semaines_vars['trois'].set(transfert_obj.trois_semaines_avant or 0)
+                self.semaines_vars['deux'].set(transfert_obj.deux_semaines_avant or 0)
+                self.semaines_vars['un'].set(transfert_obj.un_semaines_avant or 0)
+                self.semaines_vars['zero'].set(transfert_obj.zero_semaines_avant or 0)
                 
                 # Mise à jour de la localisation
                 self.actualiser_localisation_client()
                 
                 # Basculer vers l'onglet formulaire
                 self.basculer_vers_formulaire()
+            else:
+                messagebox.showerror("Erreur", f"Transfert avec ID {item_id} non trouvé")
         except Exception as e:
             messagebox.showerror("Erreur", f"Impossible de charger les données du transfert: {str(e)}")
             print(f"Erreur lors du chargement du transfert {item_id}: {str(e)}")
@@ -398,13 +439,18 @@ class TransfererEquipementApp:
         self.tree.delete(*self.tree.get_children())
         
         try:
-            # Préparer la requête avec jointure pour obtenir les informations du chantier
+            # Préparer la requête avec jointures pour obtenir à la fois la localisation et le nom de l'équipement
             query = session.query(
                 self.TransfererEquipement, 
-                self.Chantier.localisation
+                self.Chantier.localisation,
+                self.Equipement.nomEquipement
             ).join(
                 self.Chantier, 
                 self.TransfererEquipement.id_client == self.Chantier.id_client, 
+                isouter=True
+            ).join(
+                self.Equipement,
+                self.TransfererEquipement.id_equipement == self.Equipement.ID_equipement,
                 isouter=True
             )
             
@@ -419,24 +465,24 @@ class TransfererEquipementApp:
                     or_(
                         self.TransfererEquipement.id_client.like(recherche),
                         self.TransfererEquipement.volet.like(recherche),
-                        self.TransfererEquipement.designation_equipement.like(recherche),
+                        self.Equipement.nomEquipement.like(recherche),
                         self.TransfererEquipement.modalite_transport.like(recherche),
                         self.Chantier.localisation.like(recherche)
                     )
                 )
             
-            # Exécuter la requête
-            resultats = query.all()
+            transferts = query.order_by(self.TransfererEquipement.id).all()
             
-            # Remplir le tableau
-            for transfert, localisation in resultats:
-                self.tree.insert("", "end", values=(
-                    transfert.id, 
+            # Remplir le tableau avec les données
+            for transfert, localisation, nom_equipement in transferts:
+                self.tree.insert("", "end", 
+                values = (
+                    transfert.id,
                     transfert.id_client,
                     localisation or "Non spécifiée",
-                    transfert.volet or "-",
-                    transfert.designation_equipement,
-                    transfert.modalite_transport or "-",
+                    transfert.volet or "",
+                    nom_equipement or "Inconnu",
+                    transfert.modalite_transport or "",
                     transfert.total_equipements,
                     transfert.douze_semaines_avant or 0,
                     transfert.onze_semaines_avant or 0,
@@ -451,349 +497,196 @@ class TransfererEquipementApp:
                     transfert.deux_semaines_avant or 0,
                     transfert.un_semaines_avant or 0,
                     transfert.zero_semaines_avant or 0
-                ))
+                )
+                )
+                
         except Exception as e:
             messagebox.showerror("Erreur", f"Impossible de charger les données: {str(e)}")
             print(f"Erreur lors du chargement des données: {str(e)}")
 
     def vider_formulaire(self):
-        """Réinitialise les champs du formulaire"""
+        """Réinitialise le formulaire pour un nouvel ajout"""
         self.id_var.set(0)
+        self.volet_var.set("")
+        self.nom_equipement_var.set("")
+        self.equipement_id_var.set(0)
+        self.modalite_transport_var.set("")
+        self.total_equipements_var.set(1)
         self.id_client_var.set("")
         self.localisation_client_var.set("")
-        self.volet_var.set("")
-        self.designation_equipement_var.set("")
-        self.modalite_transport_var.set("")
-        self.total_equipements_var.set(1)  # Valeur par défaut à 1
         
-        # Réinitialisation des semaines
+        # Réinitialiser les semaines
         for semaine in self.semaines_vars:
             self.semaines_vars[semaine].set(0)
 
     def validation_formulaire(self):
-        """Valide les champs du formulaire avant ajout/modification"""
-        # Vérifier que les champs obligatoires sont remplis
-        if not self.designation_equipement_var.get():
-            messagebox.showerror("Erreur", "La désignation de l'équipement est obligatoire")
-            return False
-            
+        """Valide le formulaire avant enregistrement"""
+        # Vérifier les champs obligatoires
         if not self.id_client_var.get():
-            messagebox.showerror("Erreur", "Le client est obligatoire")
+            messagebox.showwarning("Validation", "Veuillez sélectionner un client")
             return False
             
-        # Vérifier que les valeurs numériques sont valides
-        try:
-            if self.total_equipements_var.get() <= 0:
-                messagebox.showerror("Erreur", "Le total des équipements doit être supérieur à 0")
-                return False
-        except:
-            messagebox.showerror("Erreur", "Le total des équipements doit être un nombre valide")
+        if not self.nom_equipement_var.get():
+            messagebox.showwarning("Validation", "Veuillez sélectionner un équipement")
             return False
             
-        # Vérifier que les valeurs des semaines sont valides
-        for semaine, var in self.semaines_vars.items():
-            try:
-                if var.get() < 0:
-                    messagebox.showerror("Erreur", f"La valeur pour {semaine} semaines doit être positive ou nulle")
-                    return False
-            except:
-                messagebox.showerror("Erreur", f"La valeur pour {semaine} semaines doit être un nombre valide")
-                return False
+        if not self.total_equipements_var.get() or self.total_equipements_var.get() <= 0:
+            messagebox.showwarning("Validation", "Le nombre total d'équipements doit être supérieur à 0")
+            return False
             
         return True
 
-    def appliquer_filtre(self):
-        """Applique le filtre client sélectionné"""
-        self.charger_donnees()
-
-    def reinitialiser_filtre(self):
-        """Réinitialise le filtre client"""
-        self.filtre_client_var.set("Tous")
-        self.recherche_var.set("")
-        self.charger_donnees()
-        
     def rechercher(self):
         """Effectue une recherche dans les données"""
-        self.charger_donnees()
-        
+        self.charger_donnees()  # Recharge les données avec le filtre de recherche
+
+    def appliquer_filtre(self):
+        """Applique le filtre par client"""
+        self.charger_donnees()  # Recharge les données avec le filtre client
+
+    def reinitialiser_filtre(self):
+        """Réinitialise les filtres"""
+        self.recherche_var.set("")
+        self.filtre_client_var.set("Tous")
+        self.charger_donnees()  # Recharge toutes les données
+
     def trier_tableau(self, colonne):
         """Trie le tableau selon la colonne spécifiée"""
-        # Récupérer toutes les lignes avec leurs valeurs
+        # Obtenir les données actuelles du tableau
         data = [(self.tree.set(child, colonne), child) for child in self.tree.get_children('')]
         
-        # Déterminer l'ordre de tri (croissant par défaut)
-        # Si la colonne est numérique, convertir en entier pour le tri
-        if colonne in ["id", "total_equipements"] or "_semaines" in colonne:
+        # Tenter de trier les données numériquement, sinon trier alphabétiquement
+        try:
             # Pour les colonnes numériques
-            try:
-                # Vérifier si nous trions déjà par cette colonne
-                last_sort = getattr(self, "_last_sort", None)
-                if last_sort == (colonne, "asc"):
-                    # Inverser l'ordre
-                    data.sort(key=lambda x: int(x[0]) if x[0].isdigit() else 0, reverse=True)
-                    self._last_sort = (colonne, "desc")
-                else:
-                    # Tri croissant
-                    data.sort(key=lambda x: int(x[0]) if x[0].isdigit() else 0)
-                    self._last_sort = (colonne, "asc")
-            except ValueError:
-                # En cas d'erreur, tri en tant que chaîne
-                data.sort(reverse=(getattr(self, "_last_sort", None) == (colonne, "asc")))
-                self._last_sort = (colonne, "desc" if getattr(self, "_last_sort", None) == (colonne, "asc") else "asc")
+            data.sort(key=lambda x: float(x[0]) if x[0].strip() else 0)
+        except ValueError:
+            # Pour les colonnes textuelles
+            data.sort(key=lambda x: x[0].lower())
+        
+        # Réorganiser les éléments dans le tableau selon le tri
+        for index, (val, child) in enumerate(data):
+            self.tree.move(child, '', index)
+        
+        # Inverser l'ordre pour le prochain clic
+        if hasattr(self, 'last_sort') and self.last_sort == colonne:
+            data.reverse()
+            for index, (val, child) in enumerate(data):
+                self.tree.move(child, '', index)
+            self.last_sort = None
         else:
-            # Pour les colonnes de texte
-            last_sort = getattr(self, "_last_sort", None)
-            if last_sort == (colonne, "asc"):
-                data.sort(reverse=True)
-                self._last_sort = (colonne, "desc")
-            else:
-                data.sort()
-                self._last_sort = (colonne, "asc")
-                
-        # Réorganiser les éléments dans l'ordre trié
-        for index, (val, item) in enumerate(data):
-            self.tree.move(item, '', index)
-    
-    def exporter_donnees(self):
-        """Exporte les données actuelles vers un fichier CSV"""
-        from tkinter import filedialog
-        import csv
-        
-        filename = filedialog.asksaveasfilename(
-            defaultextension=".csv",
-            filetypes=[("Fichiers CSV", "*.csv"), ("Tous les fichiers", "*.*")],
-            title="Exporter les données"
-        )
-        
-        if not filename:
-            return
-            
-        try:
-            with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
-                writer = csv.writer(csvfile)
-                
-                # Écrire les en-têtes
-                headers = []
-                for col in self.tree["columns"]:
-                    headers.append(self.tree.heading(col)["text"])
-                writer.writerow(headers)
-                
-                # Écrire les données
-                for item_id in self.tree.get_children():
-                    values = self.tree.item(item_id, "values")
-                    writer.writerow(values)
-                    
-            messagebox.showinfo("Succès", f"Données exportées avec succès vers {filename}")
-        except Exception as e:
-            messagebox.showerror("Erreur", f"Erreur lors de l'exportation: {str(e)}")
-    
-    def importer_donnees(self):
-        """Importe des données depuis un fichier CSV"""
-        from tkinter import filedialog
-        import csv
-        
-        filename = filedialog.askopenfilename(
-            filetypes=[("Fichiers CSV", "*.csv"), ("Tous les fichiers", "*.*")],
-            title="Importer des données"
-        )
-        
-        if not filename:
-            return
-            
-        try:
-            with open(filename, 'r', encoding='utf-8') as csvfile:
-                reader = csv.reader(csvfile)
-                
-                # Sauter l'en-tête
-                next(reader)
-                
-                # Pour chaque ligne, ajouter un nouvel enregistrement
-                for row in reader:
-                    if len(row) < 7:  # Vérifier qu'il y a au moins les colonnes essentielles
-                        continue
-                        
-                    # Créer un nouveau transfert
-                    transfert = self.TransfererEquipement(
-                        id_client=row[1],
-                        volet=row[3] if row[3] != "-" else None,
-                        designation_equipement=row[4],
-                        modalite_transport=row[5] if row[5] != "-" else None,
-                        total_equipements=int(row[6]) if row[6].isdigit() else 0
-                    )
-                    
-                    # Ajouter les semaines si disponibles
-                    if len(row) > 7:
-                        transfert.douze_semaines_avant = int(row[7]) if row[7].isdigit() else None
-                    if len(row) > 8:
-                        transfert.onze_semaines_avant = int(row[8]) if row[8].isdigit() else None
-                    if len(row) > 9:
-                        transfert.dix_semaines_avant = int(row[9]) if row[9].isdigit() else None
-                    if len(row) > 10:
-                        transfert.neuf_semaines_avant = int(row[10]) if row[10].isdigit() else None
-                    if len(row) > 11:
-                        transfert.huit_semaines_avant = int(row[11]) if row[11].isdigit() else None
-                    if len(row) > 12:
-                        transfert.sept_semaines_avant = int(row[12]) if row[12].isdigit() else None
-                    if len(row) > 13:
-                        transfert.six_semaines_avant = int(row[13]) if row[13].isdigit() else None
-                    if len(row) > 14:
-                        transfert.cinq_semaines_avant = int(row[14]) if row[14].isdigit() else None
-                    if len(row) > 15:
-                        transfert.quatre_semaines_avant = int(row[15]) if row[15].isdigit() else None
-                    if len(row) > 16:
-                        transfert.trois_semaines_avant = int(row[16]) if row[16].isdigit() else None
-                    if len(row) > 17:
-                        transfert.deux_semaines_avant = int(row[17]) if row[17].isdigit() else None
-                    if len(row) > 18:
-                        transfert.un_semaines_avant = int(row[18]) if row[18].isdigit() else None
-                    if len(row) > 19:
-                        transfert.zero_semaines_avant = int(row[19]) if row[19].isdigit() else None
-                    
-                    # Ajouter à la session
-                    session.add(transfert)
-                
-                # Committer toutes les modifications
-                session.commit()
-                messagebox.showinfo("Succès", "Données importées avec succès")
-                self.charger_donnees()
-        except Exception as e:
-            session.rollback()
-            messagebox.showerror("Erreur", f"Erreur lors de l'importation: {str(e)}")
-            
+            self.last_sort = colonne
+
     def generer_rapport(self):
         """Génère un rapport PDF des transferts d'équipements"""
         try:
-            
-            
             # Demander où enregistrer le fichier
-            filename = filedialog.asksaveasfilename(
+            fichier = filedialog.asksaveasfilename(
                 defaultextension=".pdf",
-                filetypes=[("Fichiers PDF", "*.pdf"), ("Tous les fichiers", "*.*")],
+                filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")],
                 title="Enregistrer le rapport"
             )
             
-            if not filename:
+            if not fichier:  # Si l'utilisateur annule
                 return
-                
-            # Créer le document
-            doc = SimpleDocTemplate(filename, pagesize=landscape(A4))
+            
+            # Création du document PDF
+            doc = SimpleDocTemplate(
+                fichier,
+                pagesize=landscape(A4),
+                title="Rapport des transferts d'équipements"
+            )
+            
+            # Styles pour les textes
             styles = getSampleStyleSheet()
-            elements = []
+            titre_style = styles['Heading1']
+            sous_titre_style = styles['Heading2']
+            normal_style = styles['Normal']
             
-            # Titre
-            title_style = styles["Heading1"]
-            title_style.alignment = 1  # Centre
-            elements.append(Paragraph("Rapport des Transferts d'Équipements", title_style))
-            elements.append(Spacer(1, 20))
+            # Construction du contenu
+            contenu = []
             
-            # Sous-titre avec date
-            date_str = datetime.datetime.now().strftime("%d/%m/%Y à %H:%M")
-            subtitle_style = styles["Heading3"]
-            subtitle_style.alignment = 1  # Centre
-            elements.append(Paragraph(f"Généré le {date_str}", subtitle_style))
-            elements.append(Spacer(1, 20))
+            # Titre du rapport
+            titre = Paragraph("Rapport des transferts d'équipements", titre_style)
+            contenu.append(titre)
+            contenu.append(Spacer(1, 12))
             
-            # Filtres appliqués
+            # Date de génération
+            date_rapport = Paragraph(f"Généré le : {datetime.datetime.now().strftime('%d/%m/%Y à %H:%M')}", normal_style)
+            contenu.append(date_rapport)
+            contenu.append(Spacer(1, 12))
+            
+            # Sous-titre avec filtres appliqués
+            filtre_texte = "Tous les clients"
             if self.filtre_client_var.get() != "Tous":
-                elements.append(Paragraph(f"Filtre par client: {self.filtre_client_var.get()}", styles["Normal"]))
-                elements.append(Spacer(1, 10))
-            
+                filtre_texte = f"Client: {self.filtre_client_var.get()}"
+                
             if self.recherche_var.get():
-                elements.append(Paragraph(f"Recherche: {self.recherche_var.get()}", styles["Normal"]))
-                elements.append(Spacer(1, 10))
+                filtre_texte += f" | Recherche: {self.recherche_var.get()}"
+                
+            sous_titre = Paragraph(f"Filtres: {filtre_texte}", sous_titre_style)
+            contenu.append(sous_titre)
+            contenu.append(Spacer(1, 20))
             
-            # Préparation des données
-            data = []
+            # Préparation des données pour le tableau
+            donnees = []
             
             # En-têtes du tableau
-            headers = ["ID", "Client", "Volet", "Désignation", "Transport", "Total"]
-            for i in range(12, -1, -1):
-                headers.append(f"{i} sem.")
-            data.append(headers)
+            en_tetes = [
+                "ID", "Client", "Localisation", "Volet", "Équipement", 
+                "Transport", "Total", "12 sem", "11 sem", "10 sem", "9 sem", 
+                "8 sem", "7 sem", "6 sem", "5 sem", "4 sem", "3 sem", 
+                "2 sem", "1 sem", "0 sem"
+            ]
+            donnees.append(en_tetes)
             
-            # Contenu du tableau
+            # Récupération des données du tableau affiché
             for item in self.tree.get_children():
-                values = list(self.tree.item(item, "values"))
-                # Supprimer la colonne "localisation" pour le PDF
-                values.pop(2)
-                data.append(values)
+                ligne = list(self.tree.item(item, "values"))
+                donnees.append(ligne)
             
-            # Création du tableau
-            table = Table(data)
+            # Création du tableau PDF
+            if len(donnees) > 1:  # S'il y a des données à afficher
+                tableau = Table(donnees)
+                
+                # Style du tableau
+                style = TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 10),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                    ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+                    ('ALIGN', (0, 1), (-1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                    ('FONTSIZE', (0, 1), (-1, -1), 9),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ])
+                
+                # Application du style alterné pour les lignes
+                for i in range(1, len(donnees)):
+                    if i % 2 == 0:
+                        style.add('BACKGROUND', (0, i), (-1, i), colors.lightgrey)
+                
+                tableau.setStyle(style)
+                contenu.append(tableau)
+            else:
+                # Message si aucune donnée
+                contenu.append(Paragraph("Aucune donnée à afficher", normal_style))
             
-            # Style du tableau
-            table_style = TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('ALIGN', (5, 1), (-1, -1), 'CENTER'),  # Centrer les colonnes numériques
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ])
+            # Génération du PDF
+            doc.build(contenu)
             
-            # Alternance de couleurs pour les lignes
-            for i in range(1, len(data)):
-                if i % 2 == 0:
-                    table_style.add('BACKGROUND', (0, i), (-1, i), colors.lightgrey)
+            # Message de confirmation
+            messagebox.showinfo("Succès", f"Rapport PDF généré avec succès : {fichier}")
             
-            table.setStyle(table_style)
-            elements.append(table)
-            
-            # Générer le PDF
-            doc.build(elements)
-            
-            messagebox.showinfo("Succès", f"Rapport généré avec succès: {filename}")
-            
-            # Ouvrir le fichier PDF
-            import os, subprocess
-            if os.name == 'nt':  # Windows
-                os.startfile(filename)
-            elif os.name == 'posix':  # macOS et Linux
-                subprocess.run(['xdg-open', filename])
-        except ImportError:
-            messagebox.showerror("Erreur", "Le module ReportLab est nécessaire pour cette fonction. Installez-le avec 'pip install reportlab'.")
         except Exception as e:
-            messagebox.showerror("Erreur", f"Erreur lors de la génération du rapport: {str(e)}")
-
-
-def main():
-    """Point d'entrée principal"""
-    try:
-        # Créer une fenêtre avec le thème darkly
-        root = ttk.Window(themename="darkly")
-        
-        # Ajouter le menu principal
-        menu_bar = ttk.Menu(root)
-        root.config(menu=menu_bar)
-        
-        # Menu Fichier
-        file_menu = ttk.Menu(menu_bar, tearoff=0)
-        menu_bar.add_cascade(label="Fichier", menu=file_menu)
-        
-        # Création de l'application et ajout des options de menu
-        app = TransfererEquipementApp(root)
-        
-        file_menu.add_command(label="Exporter les données", command=app.exporter_donnees)
-        file_menu.add_command(label="Importer des données", command=app.importer_donnees)
-        file_menu.add_separator()
-        file_menu.add_command(label="Générer un rapport", command=app.generer_rapport)
-        file_menu.add_separator()
-        file_menu.add_command(label="Quitter", command=root.quit)
-        
-        # Définir la taille minimale de la fenêtre
-        root.update()
-        root.minsize(root.winfo_width(), root.winfo_height())
-        
-        # Démarrer l'application
-        root.mainloop()
-    finally:
-        # Fermer la session SQLAlchemy à la fin
-        if session:
-            session.close()
-
+            messagebox.showerror("Erreur", f"Impossible de générer le rapport PDF: {str(e)}")
+            print(f"Erreur lors de la génération du rapport: {str(e)}")
 
 if __name__ == "__main__":
-    main()
+    root = ttk.Window(themename="cosmo")
+    app = TransfererEquipementApp(root)
+    root.mainloop()
