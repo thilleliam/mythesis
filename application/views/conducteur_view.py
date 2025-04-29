@@ -5,6 +5,7 @@ from sqlalchemy.orm import sessionmaker, configure_mappers
 from application.database import engine
 from sqlalchemy import func
 from datetime import date, datetime
+import uuid
 
 configure_mappers()
 
@@ -35,7 +36,9 @@ class ConducteurApp:
         frame.pack(fill=X)
 
         ttk.Label(frame, text="ID Conducteur").grid(row=0, column=0, padx=5, pady=5)
-        ttk.Entry(frame, textvariable=self.id_var).grid(row=0, column=1, padx=5, pady=5)
+        id_entry = ttk.Entry(frame, textvariable=self.id_var)
+        id_entry.grid(row=0, column=1, padx=5, pady=5)
+        id_entry.config(state='readonly')  # Rendre l'ID en lecture seule
 
         ttk.Label(frame, text="Nom").grid(row=0, column=2, padx=5, pady=5)
         ttk.Entry(frame, textvariable=self.nom_var).grid(row=0, column=3, padx=5, pady=5)
@@ -90,47 +93,92 @@ class ConducteurApp:
             self.commentaire_entry.config(state=DISABLED)
             self.commentaire_var.set("")
 
+    def generer_id(self):
+        """Génère un identifiant unique pour un nouveau conducteur"""
+        return f"COND-{str(uuid.uuid4())[:8]}"
+
+    def valider_formulaire(self):
+        """Valide que les champs obligatoires sont remplis"""
+        if not self.nom_var.get() or not self.prenom_var.get() or not self.tel_var.get():
+            messagebox.showerror("Erreur", "Les champs Nom, Prénom et Téléphone sont obligatoires")
+            return False
+        return True
+
     def ajouter(self):
-        conducteur = self.Conducteur(
-            id_conducteur=self.id_var.get(),
-            nom=self.nom_var.get(),
-            prenom=self.prenom_var.get(),
-            numero_telephone=self.tel_var.get(),
-            categorie=self.categorie_var.get(),
-            disponibilite=self.dispo_var.get(),
-            commentaire_disponibilite=self.commentaire_var.get() if self.dispo_var.get() == "autres" else None
-        )
-        session.add(conducteur)
-        session.commit()
-        self.charger_donnees()
-        self.vider_formulaire()
+        # Vérifier les champs obligatoires
+        if not self.valider_formulaire():
+            return
+            
+        try:
+            # Générer un nouvel ID pour un nouveau conducteur
+            nouveau_id = self.generer_id()
+            
+            conducteur = self.Conducteur(
+                id_conducteur=nouveau_id,
+                nom=self.nom_var.get(),
+                prenom=self.prenom_var.get(),
+                numero_telephone=self.tel_var.get(),
+                categorie=self.categorie_var.get(),
+                disponibilite=self.dispo_var.get(),
+                commentaire_disponibilite=self.commentaire_var.get() if self.dispo_var.get() == "autres" else None
+            )
+            session.add(conducteur)
+            session.commit()
+            messagebox.showinfo("Succès", f"Conducteur ajouté avec l'ID: {nouveau_id}")
+            self.charger_donnees()
+            self.vider_formulaire()
+        except Exception as e:
+            session.rollback()  # Important : annuler la transaction en cas d'erreur
+            messagebox.showerror("Erreur", f"Erreur lors de l'ajout du conducteur: {str(e)}")
 
     def modifier(self):
         item = self.tree.selection()
         if not item:
             messagebox.showwarning("Attention", "Sélectionnez un conducteur à modifier")
             return
-        id_conducteur = self.tree.item(item, "values")[0]
-        conducteur = session.query(self.Conducteur).filter_by(id_conducteur=id_conducteur).first()
-        if conducteur:
-            conducteur.nom = self.nom_var.get()
-            conducteur.prenom = self.prenom_var.get()
-            conducteur.numero_telephone = self.tel_var.get()
-            conducteur.categorie = self.categorie_var.get()
-            conducteur.disponibilite = self.dispo_var.get()
-            conducteur.commentaire_disponibilite = self.commentaire_var.get() if self.dispo_var.get() == "autres" else None
-            session.commit()
-            self.charger_donnees()
+            
+        # Vérifier les champs obligatoires
+        if not self.valider_formulaire():
+            return
+            
+        try:
+            id_conducteur = self.tree.item(item, "values")[0]
+            conducteur = session.query(self.Conducteur).filter_by(id_conducteur=id_conducteur).first()
+            if conducteur:
+                conducteur.nom = self.nom_var.get()
+                conducteur.prenom = self.prenom_var.get()
+                conducteur.numero_telephone = self.tel_var.get()
+                conducteur.categorie = self.categorie_var.get()
+                conducteur.disponibilite = self.dispo_var.get()
+                conducteur.commentaire_disponibilite = self.commentaire_var.get() if self.dispo_var.get() == "autres" else None
+                session.commit()
+                messagebox.showinfo("Succès", "Conducteur modifié avec succès")
+                self.charger_donnees()
+            else:
+                messagebox.showerror("Erreur", "Conducteur non trouvé")
+        except Exception as e:
+            session.rollback()
+            messagebox.showerror("Erreur", f"Erreur lors de la modification: {str(e)}")
 
     def supprimer(self):
         item = self.tree.selection()
         if not item:
             messagebox.showwarning("Attention", "Sélectionnez un conducteur à supprimer")
             return
-        id_conducteur = self.tree.item(item, "values")[0]
-        session.query(self.Conducteur).filter_by(id_conducteur=id_conducteur).delete()
-        session.commit()
-        self.charger_donnees()
+            
+        if not messagebox.askyesno("Confirmation", "Êtes-vous sûr de vouloir supprimer ce conducteur?"):
+            return
+            
+        try:
+            id_conducteur = self.tree.item(item, "values")[0]
+            session.query(self.Conducteur).filter_by(id_conducteur=id_conducteur).delete()
+            session.commit()
+            messagebox.showinfo("Succès", "Conducteur supprimé avec succès")
+            self.charger_donnees()
+            self.vider_formulaire()
+        except Exception as e:
+            session.rollback()
+            messagebox.showerror("Erreur", f"Erreur lors de la suppression: {str(e)}")
 
     def selectionner(self, event):
         item = self.tree.selection()
@@ -143,16 +191,24 @@ class ConducteurApp:
             self.categorie_var.set(values[4])
             self.dispo_var.set(values[5])
             self.commentaire_var.set(values[6] if values[6] else "")
-            self.toggle_commentaire(None)
+            
+            # Activer/désactiver le champ commentaire selon la disponibilité
+            if self.dispo_var.get() == "autres":
+                self.commentaire_entry.config(state=NORMAL)
+            else:
+                self.commentaire_entry.config(state=DISABLED)
 
     def charger_donnees(self):
-        self.tree.delete(*self.tree.get_children())
-        for conducteur in session.query(self.Conducteur).all():
-            self.tree.insert("", END, values=(
-                conducteur.id_conducteur, conducteur.nom, conducteur.prenom,
-                conducteur.numero_telephone, conducteur.categorie, conducteur.disponibilite,
-                conducteur.commentaire_disponibilite or ""
-            ))
+        try:
+            self.tree.delete(*self.tree.get_children())
+            for conducteur in session.query(self.Conducteur).all():
+                self.tree.insert("", END, values=(
+                    conducteur.id_conducteur, conducteur.nom, conducteur.prenom,
+                    conducteur.numero_telephone, conducteur.categorie, conducteur.disponibilite,
+                    conducteur.commentaire_disponibilite or ""
+                ))
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur lors du chargement des données: {str(e)}")
 
     def vider_formulaire(self):
         self.id_var.set("")
@@ -162,15 +218,20 @@ class ConducteurApp:
         self.categorie_var.set("")
         self.dispo_var.set("disponible")
         self.commentaire_var.set("")
-        self.toggle_commentaire(None)
+        self.commentaire_entry.config(state=DISABLED)
         
     def total_parcouru(self, id_conducteur):
-        from application.models.tournee import Tournee
-        from application.database import SessionLocal
-        session = SessionLocal()
-        """ Calcule le total des kilomètres parcourus par le conducteur """
-        total = session.query(func.sum(Tournee.km_parcouru)).filter(Tournee.id_conducteur == id_conducteur).scalar()
-        return total or 0  # Retourne 0 si aucune donnée n'existe
+        try:
+            from application.models.tournee import Tournee
+            from application.database import SessionLocal
+            local_session = SessionLocal()
+            """ Calcule le total des kilomètres parcourus par le conducteur """
+            total = local_session.query(func.sum(Tournee.km_parcouru)).filter(Tournee.id_conducteur == id_conducteur).scalar()
+            local_session.close()  # Fermer la session après utilisation
+            return total or 0  # Retourne 0 si aucune donnée n'existe
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur lors du calcul du kilométrage: {str(e)}")
+            return 0
     
     def afficher_total_parcouru(self):
         item = self.tree.selection()

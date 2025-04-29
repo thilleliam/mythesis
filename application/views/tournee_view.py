@@ -985,92 +985,102 @@ class TourneeApp:
         vehicule_filter = self.search_frame.filter_vehicule_var.get()
         date_filter_active = self.search_frame.filter_date_active.get()
             
-            # Effacer les données existantes
+        # Effacer les données existantes
         for item in self.tree.get_children():
-                self.tree.delete(item)
+            self.tree.delete(item)
             
-            # Charger les nouvelles données filtrées
+        # Charger les nouvelles données filtrées
         tournees = session.query(self.Tournee).all()
         for tournee in tournees:
-                # Appliquer les filtres
-                if conducteur_filter and not tournee.id_conducteur == conducteur_filter.split(" - ")[0]:
-                    continue
-                if vehicule_filter and not tournee.immatriculation_vehicule == vehicule_filter.split(" - ")[0]:
-                    continue
-                
-                # Filtre par date
-                if date_filter_active:
-                    try:
-                        date_debut = datetime.strptime(self.search_frame.date_debut_var.get(), "%d/%m/%Y")
-                        date_fin = datetime.strptime(self.search_frame.date_fin_var.get(), "%d/%m/%Y")
-                        
-                        if tournee.date_heure_depart and not (date_debut <= tournee.date_heure_depart.date() <= date_fin):
-                            continue
-                    except ValueError:
-                        pass
-                
-                # Filtre par terme de recherche
-                if search_term:
-                    search_fields = [
-                        str(tournee.id_tournee),
-                        tournee.conducteur.nom if tournee.conducteur else "",
-                        tournee.conducteur.prenom if tournee.conducteur else "",
-                        tournee.vehicule.marque_modele if tournee.vehicule else "",
-                        tournee.commande.nature_service if tournee.commande else "",
-                        tournee.objectif,
-                        tournee.lieu_depart,
-                        tournee.destination,
-                        str(tournee.km_parcouru),
-                        tournee.date_heure_depart.strftime("%d/%m/%Y %H:%M") if tournee.date_heure_depart else "",
-                        tournee.date_heure_arrivee.strftime("%d/%m/%Y %H:%M") if tournee.date_heure_arrivee else "",
-                    ]
-                    if not any(search_term in str(field).lower() for field in search_fields):
+            # Appliquer les filtres
+            if conducteur_filter and not tournee.id_conducteur == conducteur_filter.split(" - ")[0]:
+                continue
+            if vehicule_filter and not tournee.immatriculation_vehicule == vehicule_filter.split(" - ")[0]:
+                continue
+            
+            # Filtre par date
+            if date_filter_active:
+                try:
+                    date_debut = datetime.strptime(self.search_frame.date_debut_var.get(), "%d/%m/%Y")
+                    date_fin = datetime.strptime(self.search_frame.date_fin_var.get(), "%d/%m/%Y")
+                    
+                    if tournee.date_heure_depart and not (date_debut <= tournee.date_heure_depart.date() <= date_fin):
                         continue
-                
-                # Calcul de la durée
-                duree = ""
-                if tournee.date_heure_depart and tournee.date_heure_arrivee:
-                    delta = tournee.date_heure_arrivee - tournee.date_heure_depart
-                    heures = delta.total_seconds() // 3600
-                    minutes = (delta.total_seconds() % 3600) // 60
-                    duree = f"{int(heures)}h {int(minutes)}min"
-                
-                # Formatage des dates
-                date_depart = tournee.date_heure_depart.strftime("%d/%m/%Y %H:%M") if tournee.date_heure_depart else ""
-                date_arrivee = tournee.date_heure_arrivee.strftime("%d/%m/%Y %H:%M") if tournee.date_heure_arrivee else ""
-                
-                # Insertion dans le tableau
-                self.tree.insert("", "end", values=(
-                    tournee.id_tournee,
-                    f"{tournee.conducteur.nom} {tournee.conducteur.prenom}" if tournee.conducteur else "",
-                    f"{tournee.vehicule.marque_modele}" if tournee.vehicule else "",
-                    f"{tournee.commande.nature_service}" if tournee.commande else "",
+                except ValueError:
+                    pass
+            
+            # Filtre par terme de recherche
+            if search_term:
+                search_fields = [
+                    str(tournee.id_tournee),
+                    tournee.conducteur.nom if tournee.conducteur else "",
+                    tournee.conducteur.prenom if tournee.conducteur else "",
+                    tournee.vehicule.marque_modele if tournee.vehicule else "",
+                    tournee.commande.nature_service if tournee.commande else "",
                     tournee.objectif,
                     tournee.lieu_depart,
                     tournee.destination,
-                    tournee.km_parcouru,
-                    date_depart,
-                    date_arrivee,
-                    duree
-                ))
+                    str(tournee.km_parcouru),
+                    tournee.date_heure_depart.strftime("%d/%m/%Y %H:%M") if tournee.date_heure_depart else "",
+                    tournee.date_heure_arrivee.strftime("%d/%m/%Y %H:%M") if tournee.date_heure_arrivee else "",
+                ]
+                if not any(search_term in str(field).lower() for field in search_fields):
+                    continue
+            
+            # Calcul de la durée
+            duree = ""
+            if tournee.date_heure_depart and tournee.date_heure_arrivee:
+                delta = tournee.date_heure_arrivee - tournee.date_heure_depart
+                heures = delta.total_seconds() // 3600
+                minutes = (delta.total_seconds() % 3600) // 60
+                duree = f"{int(heures)}h {int(minutes)}min"
+            
+            # Formatage des dates
+            date_depart = tournee.date_heure_depart.strftime("%d/%m/%Y %H:%M") if tournee.date_heure_depart else ""
+            date_arrivee = tournee.date_heure_arrivee.strftime("%d/%m/%Y %H:%M") if tournee.date_heure_arrivee else ""
+            
+            # Insertion dans le tableau
+            self.tree.insert("", "end", values=(
+                tournee.id_tournee,
+                f"{tournee.conducteur.nom} {tournee.conducteur.prenom}" if tournee.conducteur else "",
+                f"{tournee.vehicule.marque_modele}" if tournee.vehicule else "",
+                f"{tournee.commande.nature_service}" if tournee.commande else "",
+                tournee.objectif,
+                tournee.lieu_depart,
+                tournee.destination,
+                tournee.km_parcouru,
+                date_depart,
+                date_arrivee,
+                duree
+            ))
 
-        def exporter_donnees(self):
-            """Exporte les données du tableau vers un fichier CSV"""
-            file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")])
-            if not file_path:
+    def exporter_donnees(self):
+        """Exporte les données du tableau vers un fichier CSV"""
+        try:
+            # Demander à l'utilisateur où enregistrer le fichier
+            file_path = filedialog.asksaveasfilename(
+                defaultextension=".csv",
+                filetypes=[("Fichiers CSV", "*.csv")],
+                title="Enregistrer les données"
+            )
+            if not file_path:  # Si l'utilisateur annule
                 return
             
-            try:
-                data = []
-                for item in self.tree.get_children():
-                    values = self.tree.item(item, 'values')
-                    data.append(values)
-                
-                df = pd.DataFrame(data, columns=[self.tree.heading(col)['text'] for col in self.tree['columns']])
-                df.to_csv(file_path, index=False, encoding='utf-8')
-                messagebox.showinfo("Succès", "Données exportées avec succès")
-            except Exception as e:
-                messagebox.showerror("Erreur", f"Impossible d'exporter les données: {str(e)}")
+            # Récupérer les données du tableau
+            data = []
+            for item in self.tree.get_children():
+                values = self.tree.item(item, 'values')
+                data.append(values)
+            
+            # Créer un DataFrame pandas avec les données
+            columns = [self.tree.heading(col)['text'] for col in self.tree['columns']]
+            df = pd.DataFrame(data, columns=columns)
+            
+            # Exporter le DataFrame en CSV
+            df.to_csv(file_path, index=False, encoding='utf-8')
+            messagebox.showinfo("Succès", f"Les données ont été exportées avec succès vers {file_path}")
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Impossible d'exporter les données : {str(e)}")
 
     def update_stats(self):
         """Met à jour les statistiques affichées"""
@@ -1175,6 +1185,7 @@ class TourneeApp:
         canvas = FigureCanvasTkAgg(fig, master=self.km_par_vehicule_frame)
         canvas.draw()
         canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
     def supprimer(self):
         """Supprime la tournée sélectionnée"""
         try:
@@ -1225,33 +1236,6 @@ class TourneeApp:
         canvas = FigureCanvasTkAgg(fig, master=self.tournees_par_mois_frame)
         canvas.draw()
         canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-    def exporter_donnees(self):
-        """Exporte les données du tableau vers un fichier CSV"""
-        try:
-            # Demander à l'utilisateur où enregistrer le fichier
-            file_path = filedialog.asksaveasfilename(
-                defaultextension=".csv",
-                filetypes=[("Fichiers CSV", "*.csv")],
-                title="Enregistrer les données"
-            )
-            if not file_path:  # Si l'utilisateur annule
-                return
-            
-            # Récupérer les données du tableau
-            data = []
-            for item in self.tree.get_children():
-                values = self.tree.item(item, 'values')
-                data.append(values)
-            
-            # Créer un DataFrame pandas avec les données
-            columns = [self.tree.heading(col)['text'] for col in self.tree['columns']]
-            df = pd.DataFrame(data, columns=columns)
-            
-            # Exporter le DataFrame en CSV
-            df.to_csv(file_path, index=False, encoding='utf-8')
-            messagebox.showinfo("Succès", f"Les données ont été exportées avec succès vers {file_path}")
-        except Exception as e:
-            messagebox.showerror("Erreur", f"Impossible d'exporter les données : {str(e)}")
 
     def update_duree_moyenne_chart(self, data):
         """Met à jour le graphique de la durée moyenne des tournées"""
@@ -1272,6 +1256,7 @@ class TourneeApp:
         canvas = FigureCanvasTkAgg(fig, master=self.duree_moyenne_frame)
         canvas.draw()
         canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
     def charger_donnees(self):
         """Charge les données des tournées dans le tableau"""
         try:
@@ -1334,6 +1319,7 @@ class TourneeApp:
             messagebox.showinfo("Succès", "Statistiques exportées avec succès")
         except Exception as e:
             messagebox.showerror("Erreur", f"Impossible d'exporter les statistiques: {str(e)}")
+
     def enregistrer(self):
         """Enregistre les données du formulaire dans la base de données"""
         try:
@@ -1410,6 +1396,7 @@ class TourneeApp:
         except Exception as e:
             session.rollback()  # Annuler la transaction en cas d'erreur
             messagebox.showerror("Erreur", f"Impossible d'enregistrer la tournée : {str(e)}")
+
     def get_datetime(self, jour_var, mois_var, annee_var, heure_var, minute_var):
         """Convertit les variables de date et heure en objet datetime"""
         try:
@@ -1422,6 +1409,7 @@ class TourneeApp:
             return datetime(annee, mois, jour, heure, minute)
         except (ValueError, TypeError):
             return None
+
     def vider_formulaire(self):
         """Réinitialise les champs du formulaire"""
         self.id_tournee_var.set("")
