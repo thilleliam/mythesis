@@ -12,6 +12,7 @@ import os
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QWidget, QPushButton, 
                             QMessageBox, QProgressDialog, QInputDialog, QCheckBox)
 from PyQt5.QtWebEngineWidgets import QWebEngineView
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QListWidget, QComboBox
 from PyQt5.QtCore import QUrl, Qt
 import time
 import math
@@ -19,6 +20,493 @@ import math
 # Import de votre modèle Chantier
 from application.models.chantiers import Chantier
 from application.config import Base, engine
+
+
+import pandas as pd
+import os
+import json
+import ttkbootstrap as ttk
+from ttkbootstrap.constants import *
+from ttkbootstrap.scrolled import ScrolledFrame
+from tkinter import messagebox, simpledialog
+import tkinter as tk
+
+
+class Segment:
+    """Classe représentant un segment entre deux points"""
+    def __init__(self, from_idx, to_idx, distance, road_type="Goudron"):
+        self.from_idx = from_idx
+        self.to_idx = to_idx
+        self.distance = distance
+        self.road_type = road_type
+
+    def __str__(self):
+        return f"Segment: {self.from_idx} → {self.to_idx}, {self.distance} km ({self.road_type})"
+
+
+import os
+import json
+import ttkbootstrap as ttk
+from ttkbootstrap.constants import *
+from ttkbootstrap.scrolled import ScrolledFrame
+from tkinter import messagebox, simpledialog
+import tkinter as tk
+
+
+class Segment:
+    """Classe représentant un segment entre deux points"""
+    def __init__(self, from_idx, to_idx, distance, road_type="Goudron"):
+        self.from_idx = from_idx
+        self.to_idx = to_idx
+        self.distance = distance
+        self.road_type = road_type
+
+    def __str__(self):
+        return f"Segment: {self.from_idx} → {self.to_idx}, {self.distance} km ({self.road_type})"
+
+
+class ManageRoutesDialog(ttk.Toplevel):
+    """Interface pour gérer les itinéraires et trajets"""
+
+    def __init__(self, parent, callback_update_map=None):
+        super().__init__(parent)
+        self.parent = parent
+        self.callback_update_map = callback_update_map
+
+        # Configuration de la fenêtre
+        self.title("Gestionnaire d'itinéraires")
+        self.geometry("800x600")
+
+        # Données
+        self.points = []  # Liste des points (nom, lat, lon, description)
+        self.segments = []  # Liste des segments (Segment objects)
+        self.current_plan_name = "Nouveau Plan"
+        self.plans_directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), "plans")
+
+        # Créer le répertoire des plans s'il n'existe pas
+        if not os.path.exists(self.plans_directory):
+            os.makedirs(self.plans_directory)
+
+        # Interface
+        self.create_widgets()
+        self.load_saved_plans()
+    def mettre_a_jour_carte(self):
+        """Met à jour la carte avec les points et segments actuels"""
+        # Exemple de logique pour mettre à jour la carte
+        if self.callback_update_map:
+            self.callback_update_map(self.points, self.segments)
+            messagebox.showinfo("Succès", "La carte a été mise à jour avec succès.")
+        else:
+            messagebox.showerror("Erreur", "Aucune fonction de mise à jour de la carte n'est définie.")
+    def create_widgets(self):
+        """Création de l'interface utilisateur"""
+        # Style
+        style = ttk.Style()
+        style.configure('TButton', font=('Helvetica', 10))
+        style.configure('TLabel', font=('Helvetica', 11))
+        style.configure('Heading.TLabel', font=('Helvetica', 14, 'bold'))
+
+        # Notebook principal
+        self.notebook = ttk.Notebook(self)
+        self.notebook.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
+
+        # Onglet 1: Gestion des points
+        self.tab_points = ttk.Frame(self.notebook)
+        self.notebook.add(self.tab_points, text="Points")
+
+        # Onglet 2: Gestion des segments
+        self.tab_segments = ttk.Frame(self.notebook)
+        self.notebook.add(self.tab_segments, text="Segments")
+
+        # Onglet 3: Gestion des plans
+        self.tab_plans = ttk.Frame(self.notebook)
+        self.notebook.add(self.tab_plans, text="Plans")
+
+        # Configurer les onglets
+        self.setup_points_tab()
+        self.setup_segments_tab()
+        self.setup_plans_tab()
+
+        # Barre de boutons commune
+        self.btn_frame = ttk.Frame(self)
+        self.btn_frame.pack(pady=10, padx=10, fill=tk.X)
+
+        self.btn_apply = ttk.Button(self.btn_frame, text="Appliquer à la carte",
+                                    bootstyle=SUCCESS, command=self.apply_to_map)
+        self.btn_apply.pack(side=tk.RIGHT, padx=5)
+
+        self.btn_close = ttk.Button(self.btn_frame, text="Fermer",
+                                    bootstyle=SECONDARY, command=self.destroy)
+        self.btn_close.pack(side=tk.RIGHT, padx=5)
+
+    def setup_points_tab(self):
+        """Configuration de l'onglet des points"""
+        main_frame = ttk.Frame(self.tab_points)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        ttk.Label(main_frame, text="Gestion des points", style='Heading.TLabel').pack(pady=(0, 10))
+
+        action_frame = ttk.Frame(main_frame)
+        action_frame.pack(fill=tk.X, pady=5)
+
+        self.btn_add_point = ttk.Button(action_frame, text="Ajouter un point",
+                                        bootstyle=PRIMARY, command=self.add_point)
+        self.btn_add_point.pack(side=tk.LEFT, padx=5)
+
+        self.btn_remove_point = ttk.Button(action_frame, text="Supprimer le point sélectionné",
+                                           bootstyle=DANGER, command=self.remove_point)
+        self.btn_remove_point.pack(side=tk.LEFT, padx=5)
+
+        self.points_frame = ScrolledFrame(main_frame, autohide=True)
+        self.points_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+
+        self.points_rows = []  # Pour stocker les références aux widgets
+
+    def setup_segments_tab(self):
+        """Configuration de l'onglet des segments"""
+        main_frame = ttk.Frame(self.tab_segments)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        ttk.Label(main_frame, text="Gestion des segments", style='Heading.TLabel').pack(pady=(0, 10))
+
+        action_frame = ttk.Frame(main_frame)
+        action_frame.pack(fill=tk.X, pady=5)
+
+        self.btn_add_segment = ttk.Button(action_frame, text="Ajouter un segment",
+                                          bootstyle=PRIMARY, command=self.add_segment)
+        self.btn_add_segment.pack(side=tk.LEFT, padx=5)
+
+        self.btn_remove_segment = ttk.Button(action_frame, text="Supprimer le segment sélectionné",
+                                             bootstyle=DANGER, command=self.remove_segment)
+        self.btn_remove_segment.pack(side=tk.LEFT, padx=5)
+
+        self.segments_frame = ScrolledFrame(main_frame, autohide=True)
+        self.segments_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+
+        self.segments_rows = []  # Pour stocker les références aux widgets
+
+    def setup_plans_tab(self):
+        """Configuration de l'onglet des plans"""
+        main_frame = ttk.Frame(self.tab_plans)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        ttk.Label(main_frame, text="Gestion des plans", style='Heading.TLabel').pack(pady=(0, 10))
+
+        action_frame = ttk.Frame(main_frame)
+        action_frame.pack(fill=tk.X, pady=10)
+
+        self.btn_save_plan = ttk.Button(action_frame, text="Enregistrer le plan actuel",
+                                        bootstyle=PRIMARY, command=self.save_current_plan)
+        self.btn_save_plan.pack(side=tk.LEFT, padx=5)
+
+        self.btn_load_plan = ttk.Button(action_frame, text="Charger le plan sélectionné",
+                                        bootstyle=INFO, command=self.load_selected_plan)
+        self.btn_load_plan.pack(side=tk.LEFT, padx=5)
+
+        self.btn_delete_plan = ttk.Button(action_frame, text="Supprimer le plan sélectionné",
+                                          bootstyle=DANGER, command=self.delete_selected_plan)
+        self.btn_delete_plan.pack(side=tk.LEFT, padx=5)
+
+        self.plans_listbox = ttk.Treeview(main_frame, columns=("name", "description"),
+                                          show="headings", selectmode="browse")
+        self.plans_listbox.heading("name", text="Nom du plan")
+        self.plans_listbox.heading("description", text="Description")
+        self.plans_listbox.pack(fill=tk.BOTH, expand=True)
+
+    def add_point(self):
+        """Ajoute un nouveau point"""
+        name = simpledialog.askstring("Ajouter un point", "Nom du point :")
+        if not name:
+            return
+        lat = simpledialog.askfloat("Ajouter un point", "Latitude :")
+        lon = simpledialog.askfloat("Ajouter un point", "Longitude :")
+        desc = simpledialog.askstring("Ajouter un point", "Description :")
+        self.points.append((name, lat, lon, desc))
+        self.update_points_list()
+
+    def add_segment(self):
+        """Ajoute un nouveau segment"""
+        if len(self.points) < 2:
+            messagebox.showinfo("Information", "Vous devez avoir au moins 2 points pour créer un segment")
+            return
+        from_idx = simpledialog.askinteger("Ajouter un segment", "Index du point de départ :")
+        to_idx = simpledialog.askinteger("Ajouter un segment", "Index du point d'arrivée :")
+        distance = simpledialog.askfloat("Ajouter un segment", "Distance (km) :")
+        road_type = simpledialog.askstring("Ajouter un segment", "Type de route :", initialvalue="Goudron")
+        segment = Segment(from_idx, to_idx, distance, road_type)
+        self.segments.append(segment)
+        self.update_segments_list()
+
+    def update_points_list(self):
+        """Met à jour l'affichage de la liste des points"""
+        for widgets in self.points_rows:
+            for widget in widgets:
+                widget.destroy()
+        self.points_rows = []
+        for i, point in enumerate(self.points):
+            row_frame = ttk.Frame(self.points_frame)
+            row_frame.pack(fill=tk.X, padx=5, pady=2)
+            ttk.Label(row_frame, text=f"{i}: {point[0]} ({point[1]}, {point[2]})").pack(side=tk.LEFT)
+
+    def update_segments_list(self):
+        """Met à jour l'affichage de la liste des segments"""
+        for widgets in self.segments_rows:
+            for widget in widgets:
+                widget.destroy()
+        self.segments_rows = []
+        for i, segment in enumerate(self.segments):
+            row_frame = ttk.Frame(self.segments_frame)
+            row_frame.pack(fill=tk.X, padx=5, pady=2)
+            ttk.Label(row_frame, text=f"{i}: {segment}").pack(side=tk.LEFT)
+
+    def save_current_plan(self):
+        """Enregistre le plan actuel"""
+        name = simpledialog.askstring("Enregistrer le plan", "Nom du plan :")
+        if not name:
+            return
+        plan_data = {
+            "name": name,
+            "points": self.points,
+            "segments": [{"from_idx": s.from_idx, "to_idx": s.to_idx, "distance": s.distance, "road_type": s.road_type}
+                         for s in self.segments]
+        }
+        file_path = os.path.join(self.plans_directory, f"{name}.json")
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(plan_data, f, ensure_ascii=False, indent=2)
+        self.load_saved_plans()
+
+    def load_saved_plans(self):
+        """Charge la liste des plans sauvegardés"""
+        for item in self.plans_listbox.get_children():
+            self.plans_listbox.delete(item)
+        for filename in os.listdir(self.plans_directory):
+            if filename.endswith('.json'):
+                with open(os.path.join(self.plans_directory, filename), 'r', encoding='utf-8') as f:
+                    plan_data = json.load(f)
+                    self.plans_listbox.insert("", "end", values=(plan_data["name"], plan_data.get("description", "")))
+
+    def load_selected_plan(self):
+        """Charge le plan sélectionné"""
+        selected = self.plans_listbox.selection()
+        if not selected:
+            messagebox.showinfo("Information", "Veuillez sélectionner un plan à charger")
+            return
+        filename = self.plans_listbox.item(selected[0], "values")[0]
+        file_path = os.path.join(self.plans_directory, f"{filename}.json")
+        with open(file_path, 'r', encoding='utf-8') as f:
+            plan_data = json.load(f)
+        self.points = plan_data["points"]
+        self.segments = [Segment(**s) for s in plan_data["segments"]]
+        self.update_points_list()
+        self.update_segments_list()
+
+    def delete_selected_plan(self):
+        """Supprime le plan sélectionné"""
+        selected = self.plans_listbox.selection()
+        if not selected:
+            messagebox.showinfo("Information", "Veuillez sélectionner un plan à supprimer")
+            return
+        filename = self.plans_listbox.item(selected[0], "values")[0]
+        file_path = os.path.join(self.plans_directory, f"{filename}.json")
+        os.remove(file_path)
+        self.load_saved_plans()
+    def remove_segment(self):
+        """Supprime le segment sélectionné"""
+        if not self.segments:
+            messagebox.showinfo("Information", "Aucun segment à supprimer.")
+            return
+
+        # Demander à l'utilisateur quel segment supprimer
+        segment_index = simpledialog.askinteger(
+            "Supprimer un segment",
+            f"Entrez l'index du segment à supprimer (0 à {len(self.segments) - 1}):"
+        )
+
+        if segment_index is None:
+            return  # L'utilisateur a annulé
+
+        if 0 <= segment_index < len(self.segments):
+            del self.segments[segment_index]
+            self.update_segments_list()
+            messagebox.showinfo("Succès", "Le segment a été supprimé avec succès.")
+        else:
+            messagebox.showerror("Erreur", "Index invalide. Veuillez réessayer.")
+    def remove_point(self):
+        """Supprime le point sélectionné"""
+        if not self.points:
+            messagebox.showinfo("Information", "Aucun point à supprimer.")
+            return
+
+        # Demander à l'utilisateur quel point supprimer
+        point_index = simpledialog.askinteger(
+            "Supprimer un point",
+            f"Entrez l'index du point à supprimer (0 à {len(self.points) - 1}):"
+        )
+
+        if point_index is None:
+            return  # L'utilisateur a annulé
+
+        if 0 <= point_index < len(self.points):
+            del self.points[point_index]
+            self.update_points_list()
+            messagebox.showinfo("Succès", "Le point a été supprimé avec succès.")
+        else:
+            messagebox.showerror("Erreur", "Index invalide. Veuillez réessayer.")
+    def apply_to_map(self):
+        """Applique les modifications à la carte principale"""
+        if self.callback_update_map:
+            self.callback_update_map(self.points, self.segments)
+        else:
+            messagebox.showerror("Erreur", "Aucune fonction de mise à jour de la carte n'est définie.")
+if __name__ == "__main__":
+    root = tk.Tk()
+    root.withdraw()  # Masquer la fenêtre principale
+    dialog = ManageRoutesDialog(root)
+    dialog.mainloop()
+
+# Adaptation de ImportPlanDialog pour utiliser ttkbootstrap au lieu de PyQt5
+class ImportPlanDialog(ttk.Toplevel):
+    """Boîte de dialogue pour l'import de plans prédéfinis"""
+    def __init__(self, parent=None, callback_import_plan=None):
+        super().__init__(parent)
+        self.title("Import de plans prédéfinis")
+        self.geometry("500x400")
+        
+        self.callback_import_plan = callback_import_plan
+        
+        # Interface
+        self.create_widgets()
+
+    def create_widgets(self):
+        main_frame = ttk.Frame(self)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Liste des plans disponibles
+        ttk.Label(main_frame, text="Sélectionnez un plan à importer :").pack(anchor=tk.W, pady=(0, 5))
+        
+        self.plans_listbox = ttk.Treeview(main_frame, columns=("name",), show="headings", selectmode="browse")
+        self.plans_listbox.heading("name", text="Nom du plan")
+        self.plans_listbox.pack(fill=tk.BOTH, expand=True, pady=5)
+        
+        # Ajouter les plans prédéfinis
+        self.plans_listbox.insert("", "end", values=("Plan de la mission EGS190 (Sahara)",))
+        # Ajouter d'autres plans ici si nécessaire
+        
+        # Options d'affichage
+        options_frame = ttk.Labelframe(main_frame, text="Options d'affichage")
+        options_frame.pack(fill=tk.X, pady=10)
+        
+        # Variables pour les options
+        self.markers_var = tk.BooleanVar(value=True)
+        self.routes_var = tk.BooleanVar(value=True)
+        self.distances_var = tk.BooleanVar(value=True)
+        
+        # Checkboxes pour les options
+        ttk.Checkbutton(options_frame, text="Afficher les marqueurs des villes", 
+                      variable=self.markers_var).pack(anchor=tk.W, padx=10, pady=2)
+        ttk.Checkbutton(options_frame, text="Afficher les routes entre les points", 
+                      variable=self.routes_var).pack(anchor=tk.W, padx=10, pady=2)
+        ttk.Checkbutton(options_frame, text="Afficher les distances sur les routes", 
+                      variable=self.distances_var).pack(anchor=tk.W, padx=10, pady=2)
+        
+        # Couleur des routes
+        color_frame = ttk.Labelframe(main_frame, text="Couleur des routes")
+        color_frame.pack(fill=tk.X, pady=10)
+        
+        self.color_var = tk.StringVar(value="darkgreen")
+        self.color_combo = ttk.Combobox(color_frame, textvariable=self.color_var)
+        self.color_combo['values'] = ["Vert foncé", "Rouge", "Bleu"]
+        self.color_combo['state'] = 'readonly'  # Empêche la saisie directe
+        self.color_combo.pack(fill=tk.X, padx=10, pady=5)
+        
+        # Boutons
+        btn_frame = ttk.Frame(main_frame)
+        btn_frame.pack(fill=tk.X, pady=10)
+        
+        ttk.Button(btn_frame, text="Importer", bootstyle=SUCCESS, 
+                 command=self.import_selected_plan).pack(side=tk.RIGHT, padx=5)
+        ttk.Button(btn_frame, text="Annuler", bootstyle=SECONDARY, 
+                 command=self.destroy).pack(side=tk.RIGHT, padx=5)
+
+    def import_selected_plan(self):
+        """Importe le plan sélectionné"""
+        selected = self.plans_listbox.selection()
+        if not selected:
+            messagebox.showinfo("Information", "Veuillez sélectionner un plan à importer")
+            return
+            
+        plan_name = self.plans_listbox.item(selected[0], "values")[0]
+        
+        # Conversion des couleurs
+        color_map = {
+            "Vert foncé": "darkgreen",
+            "Rouge": "red",
+            "Bleu": "blue"
+        }
+        
+        color = color_map.get(self.color_combo.get(), "darkgreen")
+
+if __name__ == "__main__":
+    root = ttk.Window(themename="darkly")  # Utilisation d'un thème moderne
+    dialog = ManageRoutesDialog(root)
+    dialog.mainloop()
+
+class ImportPlanDialog(QDialog):
+    """Boîte de dialogue pour l'import de plans prédéfinis"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Import de plans prédéfinis")
+        self.setMinimumWidth(500)
+        
+        layout = QVBoxLayout(self)
+        
+        # Liste des plans disponibles
+        layout.addWidget(QLabel("Sélectionnez un plan à importer :"))
+        self.list_plans = QListWidget()
+        self.list_plans.addItem("Plan de la mission EGS190 (Sahara)")
+        # Ajoutez d'autres plans ici si nécessaire
+        layout.addWidget(self.list_plans)
+        
+        # Options d'affichage
+        layout.addWidget(QLabel("Options d'affichage :"))
+        self.check_markers = QCheckBox("Afficher les marqueurs des villes")
+        self.check_markers.setChecked(True)
+        layout.addWidget(self.check_markers)
+        
+        self.check_routes = QCheckBox("Afficher les routes entre les points")
+        self.check_routes.setChecked(True)
+        layout.addWidget(self.check_routes)
+        
+        self.check_distances = QCheckBox("Afficher les distances sur les routes")
+        self.check_distances.setChecked(True)
+        layout.addWidget(self.check_distances)
+        
+        # Couleur des routes
+        layout.addWidget(QLabel("Couleur des routes :"))
+        self.combo_color = QComboBox()
+        for color, name in [
+            ("darkgreen", "Vert foncé"), 
+            ("red", "Rouge"),
+            ("blue", "Bleu"),
+            ("orange", "Orange"),
+            ("purple", "Violet"),
+            ("black", "Noir")
+        ]:
+            self.combo_color.addItem(name, color)
+        layout.addWidget(self.combo_color)
+        
+        # Boutons
+        button_box = QHBoxLayout()
+        self.btn_cancel = QPushButton("Annuler")
+        self.btn_cancel.clicked.connect(self.reject)
+        button_box.addWidget(self.btn_cancel)
+        
+        self.btn_import = QPushButton("Importer")
+        self.btn_import.clicked.connect(self.accept)
+        self.btn_import.setDefault(True)
+        button_box.addWidget(self.btn_import)
+        
+        layout.addLayout(button_box)
 
 class CarteChantiers(QMainWindow):
     def __init__(self):
@@ -45,9 +533,17 @@ class CarteChantiers(QMainWindow):
         self.btn_routes_forcees = QPushButton("Afficher toutes les connexions (avec lignes directes)")
         self.btn_routes_forcees.clicked.connect(self.afficher_toutes_connexions)
         layout.addWidget(self.btn_routes_forcees)
+        
         self.btn_import_topo = QPushButton("Importer un itinéraire topographique")
         self.btn_import_topo.clicked.connect(self.ajouter_itineraire_topographique)
         layout.addWidget(self.btn_import_topo)
+        
+        # Appel à la méthode pour créer le bouton du plan Sahara
+        self.ajouter_bouton_plan_specifique()
+        
+        # Si nous avons un bouton pour le plan du Sahara à ajouter
+        if hasattr(self, 'btn_sahara_to_add'):
+            layout.addWidget(self.btn_sahara_to_add)
         
         # Widget central
         container = QWidget()
@@ -60,7 +556,91 @@ class CarteChantiers(QMainWindow):
         
         # Création de la carte
         self.creer_carte()
-        
+        self.ajouter_menu_plans_predefined()
+    def ouvrir_dialog_routes(self):
+        """Ouvre le gestionnaire d'itinéraires"""
+        dialog = ManageRoutesDialog(parent=self, callback_update_map=self.mettre_a_jour_carte)
+        dialog.mainloop()
+    def mettre_a_jour_carte(self, points, segments):
+        """Met à jour la carte avec les points et segments transmis"""
+        # Recréer la carte pour éviter les doublons
+        self.creer_carte()
+
+        # Ajouter les points
+        for point in points:
+            name, lat, lon, desc = point
+            marker = Marker(
+                location=[lat, lon],
+                popup=Popup(f"<b>{name}</b><br>{desc}" if desc else name, max_width=200),
+                tooltip=name,
+                icon=Icon(color='blue', icon='info-sign')
+            )
+            marker.add_to(self.carte)
+
+        # Ajouter les segments
+        for segment in segments:
+            PolyLine(
+                [[points[segment.from_idx][1], points[segment.from_idx][2]],
+                [points[segment.to_idx][1], points[segment.to_idx][2]]],
+                color='green',
+                weight=3,
+                opacity=0.7,
+                tooltip=f"Segment: {segment.distance} km ({segment.road_type})"
+            ).add_to(self.carte)
+
+        # Sauvegarder et recharger la carte
+        self.carte.save(self.temp_file)
+        self.browser.load(QUrl.fromLocalFile(self.temp_file))
+        QMessageBox.information(self, "Mise à jour", "La carte a été mise à jour avec succès.")
+    def ouvrir_dialog_import_plan(self):
+        dialog = ManageRoutesDialog(self)
+        dialog.exec_()
+    def mettre_a_jour_carte(self):
+        """Met à jour la carte avec les points et segments actuels"""
+        # Recréer la carte pour éviter les doublons
+        self.creer_carte()
+
+        # Ajouter les points actuels
+        for chantier in self.chantiers_valides:
+            id_client = chantier.id_client or "Non spécifié"
+            localisation = chantier.localisation or "Non spécifiée"
+            nature_terrain = chantier.nature_terrain or "Non spécifiée"
+            distance_goudron = f"{chantier.distanceAllerGoudron} km" if chantier.distanceAllerGoudron is not None else "Non spécifiée"
+            distance_piste = f"{chantier.distanceAllerPiste} km" if chantier.distanceAllerPiste is not None else "Non spécifiée"
+            temps_aller = f"{chantier.temps_aller:.2f} h" if chantier.temps_aller is not None else "Non spécifié"
+
+            popup_content = f"""
+            <b>ID Client:</b> {id_client}<br>
+            <b>Localisation:</b> {localisation}<br>
+            <b>Nature du terrain:</b> {nature_terrain}<br>
+            <b>Distance goudron:</b> {distance_goudron}<br>
+            <b>Distance piste:</b> {distance_piste}<br>
+            <b>Temps aller:</b> {temps_aller}
+            """
+
+            popup = Popup(popup_content, max_width=300)
+            marker = Marker(
+                location=[chantier.latitude, chantier.longitude],
+                popup=popup,
+                tooltip=f"Chantier: {id_client}",
+                icon=Icon(color='blue', icon='info-sign')
+            )
+            marker.add_to(self.carte)
+
+        # Ajouter les segments actuels (si vous avez des segments à afficher)
+        for segment in self.segments:
+            PolyLine(
+                [[segment.from_idx, segment.to_idx]],
+                color='green',
+                weight=3,
+                opacity=0.7,
+                tooltip=f"Segment: {segment.distance} km"
+            ).add_to(self.carte)
+
+        # Sauvegarder et recharger la carte
+        self.carte.save(self.temp_file)
+        self.browser.load(QUrl.fromLocalFile(self.temp_file))
+        QMessageBox.information(self, "Mise à jour", "La carte a été mise à jour avec succès.")       
     def creer_carte(self):
         """Crée une carte Folium avec les positions des chantiers depuis la base de données"""
         # Connexion à la base de données
@@ -645,8 +1225,208 @@ class CarteChantiers(QMainWindow):
         
         QMessageBox.information(self, "Connexions affichées", 
                               f"{connections_added} connexions ont été affichées sur la carte.")
+    
 
+    def ajouter_menu_plans_predefined(self):
+        """Ajoute un menu pour gérer les plans d'itinéraires prédéfinis"""
+        from PyQt5.QtWidgets import QMenuBar, QMenu, QAction
+        
+        # Création du menu s'il n'existe pas déjà
+        if not hasattr(self, 'menubar'):
+            self.menubar = QMenuBar(self)
+            self.setMenuBar(self.menubar)
+        
+        # Menu Plans
+        self.menu_plans = QMenu("Plans", self)
+        self.menubar.addMenu(self.menu_plans)
+        
+        # Actions
+        action_import_plan = QAction("Importer un plan prédéfini", self)
+        action_import_plan.triggered.connect(self.ouvrir_dialog_import_plan)
+        self.menu_plans.addAction(action_import_plan)
+        
+        action_clear_plans = QAction("Effacer tous les plans", self)
+        action_clear_plans.triggered.connect(self.reset_carte)
+        self.menu_plans.addAction(action_clear_plans)
+    def importer_kml(self, fichier):
+        """Importe un fichier KML contenant un itinéraire"""
+        try:
+            # Utiliser une bibliothèque pour parser le KML
+            # Par exemple avec fastkml ou pykml
+            # Voici une implémentation basique
+            import xml.etree.ElementTree as ET
+            
+            # Espace de noms KML
+            ns = {'kml': 'http://www.opengis.net/kml/2.2'}
+            
+            # Analyser le fichier KML
+            tree = ET.parse(fichier)
+            root = tree.getroot()
+            
+            # Rechercher les éléments LineString ou Point
+            coords_elements = root.findall('.//kml:LineString/kml:coordinates', ns)
+            
+            if not coords_elements:
+                coords_elements = root.findall('.//kml:Point/kml:coordinates', ns)
+            
+            if not coords_elements:
+                raise Exception("Aucun itinéraire trouvé dans ce fichier KML")
+            
+            for coords_elem in coords_elements:
+                # Format KML: lon,lat,alt lon,lat,alt ...
+                coords_text = coords_elem.text.strip()
+                
+                # Parser les coordonnées
+                points = []
+                for coord in coords_text.split():
+                    if coord.strip():
+                        parts = coord.split(',')
+                        if len(parts) >= 2:
+                            # KML: longitude,latitude[,altitude]
+                            # Folium: [latitude, longitude]
+                            lon, lat = float(parts[0]), float(parts[1])
+                            points.append([lat, lon])
+                
+                if points:
+                    # Ajouter l'itinéraire à la carte
+                    PolyLine(
+                        points,
+                        color='green',
+                        weight=4,
+                        opacity=0.8,
+                        tooltip="Itinéraire topographique importé"
+                    ).add_to(self.carte)
+            
+            # Mettre à jour la carte
+            self.carte.save(self.temp_file)
+            self.browser.load(QUrl.fromLocalFile(self.temp_file))
+            
+            QMessageBox.information(self, "Import réussi", 
+                                f"Le fichier KML a été importé avec succès.")
+        
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur d'importation", 
+                            f"Impossible d'importer le fichier KML: {str(e)}")
 
+    def ouvrir_dialog_import_plan(self):
+        """Ouvre la boîte de dialogue pour importer un plan prédéfini"""
+        dialog = ImportPlanDialog(self)
+        if dialog.exec_() == QDialog.Accepted:
+            # Récupération des options
+            show_markers = dialog.check_markers.isChecked()
+            show_routes = dialog.check_routes.isChecked()
+            show_distances = dialog.check_distances.isChecked()
+            color = dialog.combo_color.currentData()
+            
+            # Import du plan sélectionné
+            selected_plan = dialog.list_plans.currentItem().text()
+            if "EGS190" in selected_plan:
+                self.ajouter_plan_route_specifique(
+                    show_markers=show_markers,
+                    show_routes=show_routes,
+                    show_distances=show_distances,
+                    route_color=color
+                )
+    def reset_carte(self):
+        """Réinitialise la carte en supprimant tous les éléments ajoutés"""
+        # Recréer une carte vide
+        self.creer_carte()
+        QMessageBox.information(self, "Carte réinitialisée", 
+                            "La carte a été réinitialisée. Les plans ont été supprimés.")
+
+    def ajouter_plan_route_specifique(self, show_markers=True, show_routes=True, 
+                                show_distances=True, route_color="darkgreen"):
+        """Ajoute le plan de route du Sahara (EGS190) importé à la carte"""
+        # Données géographiques précises basées sur l'image du plan
+        # Format: (nom, latitude, longitude, description)
+        points = [
+            ("BENI ABBES", 30.1333, -1.0417, "Point de départ"),
+            ("IGLI", 30.4667, -1.2667, ""),
+            ("TAGHIT", 30.9167, -1.0833, ""),
+            ("BECHAR", 31.6333, -2.2167, ""),
+            ("LEBNOUD", 32.0000, -1.5833, ""),
+            ("EL ABIODH SIDI CHEIKH", 32.9000, -0.5500, ""),
+            ("BREZINA", 33.1000, 1.2500, ""),
+            ("METLILI CHAANBA", 32.2667, 3.6500, ""),
+            ("GHARDAIA", 32.4833, 3.6833, ""),
+            ("ZELFANA", 32.4000, 3.8833, ""),
+            ("OUARGLA", 31.9500, 5.3333, ""),
+            ("HASSI MESSAOUD", 31.7000, 5.9667, "Point final du parcours")
+        ]
+        
+        # Segments de route avec distances en km - extraits directement du plan
+        segments = [
+            ((0, 1), 20),   # BENI ABBES - IGLI
+            ((1, 2), 80),   # IGLI - TAGHIT
+            ((2, 3), 130),  # TAGHIT - BECHAR
+            ((3, 4), 185),  # BECHAR - LEBNOUD
+            ((4, 5), 140),  # LEBNOUD - EL ABIODH
+            ((5, 6), 310),  # EL ABIODH - BREZINA
+            ((6, 7), 175),  # BREZINA - METLILI
+            ((7, 8), 80),   # METLILI - GHARDAIA
+            ((8, 9), 70),   # GHARDAIA - ZELFANA
+            ((9, 10), 190), # ZELFANA - OUARGLA
+            ((10, 11), 80)  # OUARGLA - HASSI MESSAOUD
+        ]
+        
+        # Ajout des marqueurs si demandé
+        if show_markers:
+            for nom, lat, lon, desc in points:
+                marker = Marker(
+                    location=[lat, lon],
+                    popup=Popup(f"<b>{nom}</b><br>{desc}" if desc else nom, max_width=200),
+                    tooltip=nom,
+                    icon=Icon(color='green', icon='info-sign')
+                )
+                marker.add_to(self.carte)
+        
+        # Ajout des routes si demandé
+        if show_routes:
+            for (idx1, idx2), distance in segments:
+                point1 = points[idx1]
+                point2 = points[idx2]
+                
+                # Création du tooltip
+                tooltip = f"{point1[0]} → {point2[0]}"
+                if show_distances:
+                    tooltip += f" ({distance} km)"
+                
+                # Tracer la ligne
+                PolyLine(
+                    [[point1[1], point1[2]], [point2[1], point2[2]]],
+                    color=route_color,
+                    weight=3,
+                    opacity=0.7,
+                    tooltip=tooltip
+                ).add_to(self.carte)
+        
+        # Mise à jour de la carte
+        self.carte.save(self.temp_file)
+        self.browser.load(QUrl.fromLocalFile(self.temp_file))
+        
+        # Afficher les informations sur le plan
+        message = "Le plan de route du Sahara a été ajouté à la carte.\n\n"
+        message += "Détails du plan:\n"
+        message += "- Zone géographique: Sahara algérien\n"
+        message += "- Distance totale: environ 970 km\n"
+        message += "- 12 points principaux incluant Bechar, El Abiodh, Ghardaia et Ouargla\n"
+        message += "- Distances: Route goudronnée vers camp EGS190 = 890 km\n"
+        message += "- Distance piste non entretenue = 70 km\n"
+        message += "- Distance de la piste au camp (itinéraire dégradé/rocailleux) = 10 km\n"
+        message += "- Source: Plan d'itinéraire de la mission EGS190"
+        
+        QMessageBox.information(self, "Plan de route ajouté", message)
+    def ajouter_bouton_plan_specifique(self):
+        """Ajoute un bouton spécifique pour afficher le plan du Sahara"""
+        from PyQt5.QtWidgets import QPushButton
+        
+        # Création du bouton
+        self.btn_plan_sahara = QPushButton("Afficher le plan du Sahara (EGS190)")
+        self.btn_plan_sahara.clicked.connect(lambda: self.ajouter_plan_route_specifique())
+        
+        # Le widget central et son layout seront créés plus tard dans creer_carte
+        # On stocke le bouton pour l'ajouter plus tard
+        self.btn_sahara_to_add = self.btn_plan_sahara
 def main():
     app = QApplication(sys.argv)
     fenetre = CarteChantiers()
