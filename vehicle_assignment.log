@@ -581,3 +581,115 @@ WHERE transferer_equipement.`11_semaines_avant_la_fin_de_l'ancien_projet` IS NOT
 2025-04-14 20:05:31,521 - vehicle_assignment - INFO - Nombre d'équipements trouvés: 42
 2025-04-14 20:05:32,016 - vehicle_assignment - INFO - Solution optimale trouvée
 2025-04-14 20:05:32,019 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2025-05-01 17:07:17,927 - vehicle_assignment - ERROR - Erreur lors de l'affectation des véhicules: (pymysql.err.OperationalError) (2003, "Can't connect to MySQL server on 'localhost' ([WinError 10061] Aucune connexion n’a pu être établie car l’ordinateur cible l’a expressément refusée)")
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+Traceback (most recent call last):
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\pymysql\connections.py", line 649, in connect
+    sock = socket.create_connection(
+  File "C:\Users\BIG-computer\AppData\Local\Programs\Python\Python39\lib\socket.py", line 843, in create_connection
+    raise err
+  File "C:\Users\BIG-computer\AppData\Local\Programs\Python\Python39\lib\socket.py", line 831, in create_connection
+    sock.connect(sa)
+ConnectionRefusedError: [WinError 10061] Aucune connexion n’a pu être établie car l’ordinateur cible l’a expressément refusée
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\engine\base.py", line 146, in __init__
+    self._dbapi_connection = engine.raw_connection()
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\engine\base.py", line 3298, in raw_connection
+    return self.pool.connect()
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\pool\base.py", line 449, in connect
+    return _ConnectionFairy._checkout(self)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\pool\base.py", line 1263, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\pool\base.py", line 712, in checkout
+    rec = pool._do_get()
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\pool\impl.py", line 180, in _do_get
+    self._dec_overflow()
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\util\langhelpers.py", line 146, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\pool\impl.py", line 177, in _do_get
+    return self._create_connection()
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\pool\base.py", line 390, in _create_connection
+    return _ConnectionRecord(self)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\pool\base.py", line 674, in __init__
+    self.__connect()
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\pool\base.py", line 901, in __connect
+    pool.logger.debug("Error on connect(): %s", e)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\util\langhelpers.py", line 146, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\pool\base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\engine\create.py", line 646, in connect
+    return dialect.connect(*cargs, **cparams)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\engine\default.py", line 622, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\pymysql\connections.py", line 361, in __init__
+    self.connect()
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\pymysql\connections.py", line 716, in connect
+    raise exc
+pymysql.err.OperationalError: (2003, "Can't connect to MySQL server on 'localhost' ([WinError 10061] Aucune connexion n’a pu être établie car l’ordinateur cible l’a expressément refusée)")
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "c:\Users\BIG-computer\tms_app\application\models\optimiseraffectation.py", line 128, in solve_vehicle_assignment
+    chantiers = session.query(Chantier).all()
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\orm\query.py", line 2699, in all
+    return self._iter().all()  # type: ignore
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\orm\query.py", line 2853, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\orm\session.py", line 2365, in execute
+    return self._execute_internal(
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\orm\session.py", line 2241, in _execute_internal
+    conn = self._connection_for_bind(bind)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\orm\session.py", line 2110, in _connection_for_bind
+    return trans._connection_for_bind(engine, execution_options)
+  File "<string>", line 2, in _connection_for_bind
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\orm\state_changes.py", line 139, in _go
+    ret_value = fn(self, *arg, **kw)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\orm\session.py", line 1189, in _connection_for_bind
+    conn = bind.connect()
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\engine\base.py", line 3274, in connect
+    return self._connection_cls(self)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\engine\base.py", line 148, in __init__
+    Connection._handle_dbapi_exception_noconnection(
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\engine\base.py", line 2439, in _handle_dbapi_exception_noconnection
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\engine\base.py", line 146, in __init__
+    self._dbapi_connection = engine.raw_connection()
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\engine\base.py", line 3298, in raw_connection
+    return self.pool.connect()
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\pool\base.py", line 449, in connect
+    return _ConnectionFairy._checkout(self)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\pool\base.py", line 1263, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\pool\base.py", line 712, in checkout
+    rec = pool._do_get()
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\pool\impl.py", line 180, in _do_get
+    self._dec_overflow()
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\util\langhelpers.py", line 146, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\pool\impl.py", line 177, in _do_get
+    return self._create_connection()
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\pool\base.py", line 390, in _create_connection
+    return _ConnectionRecord(self)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\pool\base.py", line 674, in __init__
+    self.__connect()
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\pool\base.py", line 901, in __connect
+    pool.logger.debug("Error on connect(): %s", e)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\util\langhelpers.py", line 146, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\pool\base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\engine\create.py", line 646, in connect
+    return dialect.connect(*cargs, **cparams)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\sqlalchemy\engine\default.py", line 622, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\pymysql\connections.py", line 361, in __init__
+    self.connect()
+  File "C:\Users\BIG-computer\tms_app\venv\lib\site-packages\pymysql\connections.py", line 716, in connect
+    raise exc
+sqlalchemy.exc.OperationalError: (pymysql.err.OperationalError) (2003, "Can't connect to MySQL server on 'localhost' ([WinError 10061] Aucune connexion n’a pu être établie car l’ordinateur cible l’a expressément refusée)")
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
