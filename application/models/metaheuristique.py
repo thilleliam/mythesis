@@ -22,8 +22,8 @@ class Instance:
         Initialisation d'une instance du problème de transport par navettes entre les sites A et B
         sur un horizon de 12 semaines, avec transport uniquement dans le sens A vers B.
         
-        Les données de véhicules sont maintenant récupérées depuis la base de données
-        via la classe Vehicule.
+        Les données de véhicules sont récupérées depuis la base de données via la classe Vehicule.
+        Les demandes d'équipements sont maintenant récupérées depuis la classe TransfererEquipement.
         """
         # Horizon de planification: 12 semaines
         self.T = list(range(1, 13))
@@ -35,19 +35,8 @@ class Instance:
         # Coût de déplacement entre les sites (indépendant du type de véhicule)
         self.dc = 50
         
-        # Demandes hebdomadaires (poids et volume) uniquement A vers B
-        # Initialiser les demandes pour 12 semaines
-        self.dw_AB = {}  # Demandes en poids de A vers B
-        self.dv_AB = {}  # Demandes en volume de A vers B
-        
-        # Générer des demandes aléatoires mais réalistes
-        for t in self.T:
-            # Variation hebdomadaire pour rendre le problème plus réaliste
-            week_factor_AB = 0.9 + 0.2 * random.random()
-            
-            # Demandes de A vers B
-            self.dw_AB[t] = int(200 * week_factor_AB)  # Demande en poids base 200
-            self.dv_AB[t] = int(80 * week_factor_AB)   # Demande en volume base 80
+        # Charger les demandes depuis la base de données au lieu de les générer aléatoirement
+        self.load_demands_from_database()
         
         # Paramètres liés aux contraintes temporelles
         self.T_start = 7      # Heure de début de la journée de travail (en heures depuis minuit)
@@ -135,6 +124,100 @@ class Instance:
         # Si aucun véhicule n'est disponible, lever une exception
         if not hasattr(self, 'L') or not self.L:
             raise ValueError("Aucun véhicule disponible dans la base de données. Impossible de continuer sans véhicules.")
+    
+    def load_demands_from_database(self):
+        """
+        Récupère les demandes d'équipements depuis la classe TransfererEquipement
+        et calcule le poids et le volume correspondants à partir de la classe Equipement.
+        """
+        from application.models.transferer_equipement import TransfererEquipement
+        from application.models.equipements import Equipement
+        from sqlalchemy import func
+        
+        # Initialiser les dictionnaires pour stocker les demandes en poids et volume
+        self.dw_AB = {t: 0 for t in self.T}  # Demandes en poids de A vers B
+        self.dv_AB = {t: 0 for t in self.T}  # Demandes en volume de A vers B
+        
+        # Créer une session SQLAlchemy
+        session = SessionLocal()
+        
+        try:
+            # Récupérer toutes les entrées de transfert d'équipements
+            transfers = session.query(TransfererEquipement).all()
+            
+            # Pour chaque transfert d'équipement
+            for transfer in transfers:
+                # Récupérer l'équipement correspondant
+                equipement = session.query(Equipement).filter_by(ID_equipement=transfer.id_equipement).first()
+                
+                if equipement:
+                    # Récupérer le poids et le volume unitaires (valeurs par défaut si None)
+                    poids_unitaire = equipement.poids or 0  # en kg
+                    volume_unitaire = equipement.volume or 0  # en m³
+                    
+                    # Mappings des colonnes de semaines
+                    semaines_mapping = {
+                        12: transfer.douze_semaines_avant,
+                        11: transfer.onze_semaines_avant,
+                        10: transfer.dix_semaines_avant,
+                        9: transfer.neuf_semaines_avant,
+                        8: transfer.huit_semaines_avant,
+                        7: transfer.sept_semaines_avant,
+                        6: transfer.six_semaines_avant,
+                        5: transfer.cinq_semaines_avant,
+                        4: transfer.quatre_semaines_avant,
+                        3: transfer.trois_semaines_avant,
+                        2: transfer.deux_semaines_avant,
+                        1: transfer.un_semaines_avant,
+                        0: transfer.zero_semaines_avant
+                    }
+                    
+                    # Pour chaque semaine dans notre horizon (1 à 12)
+                    for semaine in self.T:
+                        # La semaine dans la DB est inversée (12 = première semaine)
+                        db_semaine = 13 - semaine
+                        
+                        # Récupérer la quantité à transférer pour cette semaine
+                        quantite = semaines_mapping.get(db_semaine, 0) or 0
+                        
+                        if quantite > 0:
+                            # Calculer le poids et le volume total pour cette quantité
+                            poids_total = poids_unitaire * quantite
+                            volume_total = volume_unitaire * quantite
+                            
+                            # Ajouter aux demandes totales pour cette semaine
+                            self.dw_AB[semaine] += poids_total
+                            self.dv_AB[semaine] += volume_total
+                
+            # Vérifier si des demandes ont été trouvées
+            if all(self.dw_AB[t] == 0 for t in self.T) and all(self.dv_AB[t] == 0 for t in self.T):
+                print("ATTENTION: Aucune demande de transfert trouvée dans la base de données.")
+                print("Génération de demandes factices pour tester la métaheuristique...")
+                
+                # Générer des demandes fictives si aucune n'est trouvée
+                import random
+                for t in self.T:
+                    week_factor_AB = 0.9 + 0.2 * random.random()
+                    self.dw_AB[t] = int(200 * week_factor_AB)  # Demande en poids base 200
+                    self.dv_AB[t] = int(80 * week_factor_AB)   # Demande en volume base 80
+        
+        except Exception as e:
+            print(f"Erreur lors de la récupération des demandes: {e}")
+            # Fallback: générer des demandes aléatoires
+            import random
+            for t in self.T:
+                week_factor_AB = 0.9 + 0.2 * random.random()
+                self.dw_AB[t] = int(200 * week_factor_AB)
+                self.dv_AB[t] = int(80 * week_factor_AB)
+                
+        finally:
+            session.close()
+        
+        # Afficher les demandes récupérées pour debug
+        print("Demandes récupérées de la base de données:")
+        for t in self.T:
+            print(f"Semaine {t}: {self.dw_AB[t]} kg, {self.dv_AB[t]} m³")
+
     def get_vehicle_plate(self, vtype, idx):
         """
         Récupère l'immatriculation d'un véhicule spécifique
@@ -150,6 +233,7 @@ class Instance:
             if 1 <= idx <= len(self.vehicle_plates[vtype]):
                 return self.vehicle_plates[vtype][idx-1]
         return None
+        
     def get_vehicle_type_name(self, vtype):
         """
         Récupère le nom réel du type de véhicule à partir de l'ID numérique
@@ -1751,7 +1835,15 @@ def visualize_solution(solution, instance):
         fig, ax = plt.subplots(figsize=(15, 10))
         
         # Couleurs pour les différents types de véhicules
-        colors = {1: 'lightblue', 2: 'lightgreen'}
+        # Couleurs pour les différents types de véhicules
+        colors = {
+            1: 'lightblue',
+            2: 'lightgreen',
+            # Ajoutez d'autres types si nécessaire
+        }
+
+        # Couleur par défaut pour les types de véhicules non définis
+        default_vehicle_color = 'gray'
         
         # Pour chaque semaine
         for week in instance.T:
@@ -1785,7 +1877,7 @@ def visualize_solution(solution, instance):
                         (transport.load_start_A, y_pos - 0.3),
                         load_width,
                         0.6,
-                        facecolor=colors[transport.vehicle_type],
+                        facecolor=colors.get(transport.vehicle_type, default_vehicle_color),
                         alpha=0.7,
                         edgecolor='black'
                     )
