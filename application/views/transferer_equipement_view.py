@@ -1,3 +1,4 @@
+import traceback
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 from tkinter import messagebox, simpledialog, StringVar, IntVar, DoubleVar, DISABLED, X, LEFT, BOTH
@@ -6,11 +7,14 @@ from application.database import engine
 from sqlalchemy import func, or_
 from datetime import date, datetime
 import re
+import tkinter as tk
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import landscape, A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 from tkinter import filedialog
+# Importer les classes de la métaheuristique
+from application.models.metaheuristique import Instance, Solution, greedy_initial_solution
 import datetime
 
 configure_mappers()
@@ -130,14 +134,15 @@ class TransfererEquipementApp:
     def creer_interface_optimisation(self, parent):
         """Crée l'interface pour l'onglet d'optimisation"""
         # Frame pour les coordonnées cibles
-        coord_frame = ttk.LabelFrame(parent, text="Coordonnées cibles", padding=10)
+        coord_frame = ttk.LabelFrame(parent, text="Paramètres d'optimisation", padding=10)
         coord_frame.pack(fill=X, pady=5)
         
-        # Variables pour les coordonnées cibles
-        # Variables pour l'optimisation
+        # Variables pour les coordonnées cibles et paramètres additionnels
         self.cible_longitude_var = DoubleVar()
         self.cible_latitude_var = DoubleVar()
-                
+        self.rayon_optimisation_var = DoubleVar(value=100.0)  # Valeur par défaut 100 km
+        self.max_equipements_var = IntVar(value=10)  # Valeur par défaut 10 équipements
+        
         # Champs pour les coordonnées
         ttk.Label(coord_frame, text="Longitude cible:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
         ttk.Entry(coord_frame, textvariable=self.cible_longitude_var, width=15).grid(row=0, column=1, padx=5, pady=5, sticky="w")
@@ -145,50 +150,194 @@ class TransfererEquipementApp:
         ttk.Label(coord_frame, text="Latitude cible:").grid(row=0, column=2, padx=5, pady=5, sticky="e")
         ttk.Entry(coord_frame, textvariable=self.cible_latitude_var, width=15).grid(row=0, column=3, padx=5, pady=5, sticky="w")
         
-        # Frame pour les résultats
-        results_frame = ttk.LabelFrame(parent, text="Résultats d'optimisation", padding=10)
-        results_frame.pack(fill=BOTH, expand=True, pady=10)
+                # Frame pour les résultats de la métaheuristique
+        meta_frame = ttk.LabelFrame(parent, text="Résultats de la métaheuristique", padding=10)
+        meta_frame.pack(fill=BOTH, expand=True, pady=10)
         
-        # Tableau des résultats
-        columns = ("id", "nom_equipement", "client", "localisation", "distance", "total_disponible")
+        # Ajouter un widget Text pour afficher les résultats détaillés
+        self.meta_results_text = tk.Text(meta_frame, wrap="word", height=10)
+        self.meta_results_text.pack(fill=BOTH, expand=True)
         
-        self.results_tree = ttk.Treeview(results_frame, columns=columns, show="headings")
-        self.results_tree.pack(fill=BOTH, expand=True)
-        
-        # Configuration des en-têtes
-        self.results_tree.heading("id", text="ID", command=lambda: self.trier_resultats("id"))
-        self.results_tree.heading("nom_equipement", text="Équipement", command=lambda: self.trier_resultats("nom_equipement"))
-        self.results_tree.heading("client", text="Client", command=lambda: self.trier_resultats("client"))
-        self.results_tree.heading("localisation", text="Localisation", command=lambda: self.trier_resultats("localisation"))
-        self.results_tree.heading("distance", text="Distance (km)", command=lambda: self.trier_resultats("distance"))
-        self.results_tree.heading("total_disponible", text="Quantité", command=lambda: self.trier_resultats("total_disponible"))
-        
-        # Configuration des largeurs de colonnes
-        self.results_tree.column("id", width=50)
-        self.results_tree.column("nom_equipement", width=200)
-        self.results_tree.column("client", width=120)
-        self.results_tree.column("localisation", width=150)
-        self.results_tree.column("distance", width=100)
-        self.results_tree.column("total_disponible", width=80)
-        
-        # Ajout des barres de défilement
-        y_scrollbar = ttk.Scrollbar(results_frame, orient="vertical", command=self.results_tree.yview)
-        y_scrollbar.pack(side="right", fill="y")
-        
-        x_scrollbar = ttk.Scrollbar(results_frame, orient="horizontal", command=self.results_tree.xview)
-        x_scrollbar.pack(side="bottom", fill="x")
-        
-        self.results_tree.configure(yscrollcommand=y_scrollbar.set, xscrollcommand=x_scrollbar.set)
+        # Barre de défilement pour le texte
+        meta_scrollbar = ttk.Scrollbar(meta_frame, orient="vertical", command=self.meta_results_text.yview)
+        meta_scrollbar.pack(side="right", fill="y")
+        self.meta_results_text.configure(yscrollcommand=meta_scrollbar.set)
         
         # Boutons d'action
         btn_frame = ttk.Frame(parent, padding=10)
         btn_frame.pack(fill=X, pady=5)
         
-        ttk.Button(btn_frame, text="Exécuter l'optimisation", command=self.executer_optimisation, bootstyle=SUCCESS).pack(side=LEFT, padx=5)
         ttk.Button(btn_frame, text="Utiliser coordonnées sélectionnées", command=self.utiliser_coordonnees_selection, bootstyle=INFO).pack(side=LEFT, padx=5)
+        ttk.Button(btn_frame, text="Exécuter métaheuristique", command=self.executer_metaheuristique, bootstyle=PRIMARY).pack(side=LEFT, padx=5)
         ttk.Button(btn_frame, text="Effacer résultats", command=self.effacer_resultats_optimisation, bootstyle=SECONDARY).pack(side=LEFT, padx=5)
         ttk.Button(btn_frame, text="Exporter résultats", command=self.exporter_resultats_optimisation, bootstyle=WARNING).pack(side=LEFT, padx=5)
 
+    def executer_metaheuristique(self):
+        """Exécute la métaheuristique pour le problème de transport"""
+        try:
+            # Créer une instance du problème
+            from application.models.metaheuristique import Instance, greedy_initial_solution
+            
+            # Afficher un indicateur de progression
+            self.meta_results_text.delete(1.0, tk.END)
+            self.meta_results_text.insert(tk.END, "Initialisation de la métaheuristique...\n")
+            self.meta_results_text.update()
+            
+            # Initialiser l'instance du problème
+            instance = Instance()
+            
+            # Afficher les informations sur les véhicules disponibles
+            self.meta_results_text.insert(tk.END, "\nVéhicules disponibles:\n")
+            for vtype, count in instance.m.items():
+                type_name = instance.get_vehicle_type_name(vtype)
+                capacity_w = instance.L[vtype]["Qw"]
+                capacity_v = instance.L[vtype]["Qv"]
+                self.meta_results_text.insert(tk.END, f"- {type_name}: {count} véhicules, capacité: {capacity_w/1000} tonnes / {capacity_v} m³\n")
+            
+            # Afficher les demandes par semaine
+            self.meta_results_text.insert(tk.END, "\nDemandes par semaine:\n")
+            for t in instance.T:
+                self.meta_results_text.insert(tk.END, f"- Semaine {t}: {instance.dw_AB[t]/1000:.2f} tonnes, {instance.dv_AB[t]:.2f} m³\n")
+            
+            self.meta_results_text.insert(tk.END, "\nCalcul de la solution initiale...\n")
+            self.meta_results_text.update()
+            
+            # Créer une solution initiale avec l'heuristique gloutonne
+            solution = greedy_initial_solution(instance)
+            
+            # Évaluer la solution
+            fitness = solution.evaluate()
+            
+            # Afficher les résultats
+            self.meta_results_text.insert(tk.END, "\nRésultats de l'optimisation:\n")
+            self.meta_results_text.insert(tk.END, f"- Fonction objectif: {fitness}\n")
+            self.meta_results_text.insert(tk.END, f"- Solution faisable: {solution.feasible}\n")
+            
+            # Afficher le détail de la solution
+            self.meta_results_text.insert(tk.END, "\nDétails de la solution:\n")
+            self.meta_results_text.insert(tk.END, solution.detailed_str())
+            
+            # Proposer d'exporter la solution
+            messagebox.showinfo("Métaheuristique", "Optimisation terminée avec succès. Consultez les résultats dans l'onglet.")
+        
+        except Exception as e:
+            self.meta_results_text.insert(tk.END, f"\nErreur lors de l'exécution de la métaheuristique: {str(e)}\n")
+            traceback.print_exc()  # Afficher la trace complète dans la console
+            messagebox.showerror("Erreur", f"Erreur lors de l'exécution de la métaheuristique: {str(e)}")
+
+    def exporter_resultats_optimisation(self):
+        """Exporte les résultats d'optimisation au format PDF"""
+        # Vérifier qu'il y a des résultats à exporter
+        if not self.results_tree.get_children() and not self.meta_results_text.get("1.0", tk.END).strip():
+            messagebox.showwarning("Attention", "Aucun résultat à exporter")
+            return
+        
+        try:
+            # Demander où enregistrer le fichier
+            fichier = filedialog.asksaveasfilename(
+                defaultextension=".pdf",
+                filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")],
+                title="Exporter les résultats d'optimisation"
+            )
+            
+            if not fichier:
+                # Si l'utilisateur annule
+                return
+            
+            # Création du document PDF
+            from reportlab.lib import colors
+            from reportlab.lib.pagesizes import landscape, A4
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+            from reportlab.lib.styles import getSampleStyleSheet
+            import datetime
+            
+            doc = SimpleDocTemplate(
+                fichier,
+                pagesize=landscape(A4),
+                title="Résultats d'optimisation"
+            )
+            
+            # Styles pour les textes
+            styles = getSampleStyleSheet()
+            titre_style = styles['Heading1']
+            sous_titre_style = styles['Heading2']
+            normal_style = styles['Normal']
+            
+            # Construction du contenu
+            elements = []
+            
+            # Titre du rapport
+            elements.append(Paragraph("Résultats d'optimisation d'équipements", titre_style))
+            elements.append(Spacer(1, 20))
+            
+            # Date du rapport
+            date_rapport = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+            elements.append(Paragraph(f"Généré le: {date_rapport}", normal_style))
+            elements.append(Spacer(1, 10))
+            
+            # Paramètres d'optimisation
+            elements.append(Paragraph(f"Coordonnées cibles: ({self.cible_longitude_var.get()}, {self.cible_latitude_var.get()})", normal_style))
+            elements.append(Paragraph(f"Rayon d'optimisation: {self.rayon_optimisation_var.get()} km", normal_style))
+            elements.append(Spacer(1, 20))
+            
+            # Section 1: Résultats de l'optimisation de localisation
+            if self.results_tree.get_children():
+                elements.append(Paragraph("Résultats de l'optimisation de localisation", sous_titre_style))
+                elements.append(Spacer(1, 10))
+                
+                # Récupération des données
+                data = [["ID", "Équipement", "Client", "Localisation", "Distance (km)", "Quantité"]]
+                
+                for item in self.results_tree.get_children():
+                    values = self.results_tree.item(item, "values")
+                    data.append([values[0], values[1], values[2], values[3], values[4], values[5]])
+                
+                # Création du tableau
+                table = Table(data, repeatRows=1)
+                
+                # Style du tableau
+                style = TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 10),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                    ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+                    ('ALIGN', (0, 1), (-1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                    ('FONTSIZE', (0, 1), (-1, -1), 8),
+                    ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                ])
+                
+                # Appliquer le style au tableau
+                table.setStyle(style)
+                
+                # Ajouter le tableau au document
+                elements.append(table)
+            
+            # Section 2: Résultats de la métaheuristique
+            text_content = self.meta_results_text.get("1.0", tk.END).strip()
+            if text_content:
+                elements.append(Spacer(1, 20))
+                elements.append(Paragraph("Résultats de la métaheuristique", sous_titre_style))
+                elements.append(Spacer(1, 10))
+                
+                # Ajouter le contenu du texte ligne par ligne
+                for line in text_content.split("\n"):
+                    elements.append(Paragraph(line, normal_style))
+                    elements.append(Spacer(1, 3))
+            
+            # Construire le document
+            doc.build(elements)
+            
+            messagebox.showinfo("Succès", f"Résultats d'optimisation exportés avec succès dans {fichier}")
+            
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Impossible d'exporter les résultats: {str(e)}")
+            print(f"Erreur lors de l'exportation des résultats: {str(e)}")
     def trier_resultats(self, colonne):
         """Trie les résultats d'optimisation selon la colonne spécifiée"""
         # Obtenir les données actuelles du tableau
@@ -247,78 +396,7 @@ class TransfererEquipementApp:
         else:
             messagebox.showerror("Erreur", "Données incomplètes dans l'élément sélectionné")
 
-    def executer_optimisation(self):
-        """Exécute l'optimisation en fonction des coordonnées cibles"""
-        # Vider les résultats précédents
-        self.effacer_resultats_optimisation()
-        
-        # Vérifier que les coordonnées sont valides
-        try:
-            longitude_cible = self.cible_longitude_var.get()
-            latitude_cible = self.cible_latitude_var.get()
-            rayon_km = self.rayon_optimisation_var.get()
-            max_equipements = self.max_equipements_var.get()
-            
-            if longitude_cible == 0 and latitude_cible == 0:
-                reponse = messagebox.askyesno("Confirmation", 
-                    "Les coordonnées cibles sont à 0,0 (océan Atlantique). Êtes-vous sûr de vouloir continuer?")
-                if not reponse:
-                    return
-        except:
-            messagebox.showerror("Erreur", "Veuillez entrer des coordonnées valides")
-            return
-        
-        try:
-            # Simuler un calcul d'optimisation (à remplacer par votre algorithme réel)
-            # Ici nous allons simplement afficher les données existantes avec une distance fictive
-            # pour la démonstration
-            
-            # Obtenir les données des transferts existants
-            resultats = []
-            
-            # Dans un vrai cas, vous feriez une requête à la base de données ici
-            # Par exemple, pour simuler des résultats:
-            for item in self.tree.get_children():
-                values = self.tree.item(item, "values")
-                
-                # Simuler une distance (normalement calculée en fonction des coordonnées)
-                # Dans un cas réel, vous utiliseriez une formule comme la distance de Haversine
-                import random
-                distance = round(random.uniform(1.0, rayon_km), 2)  # Distance aléatoire pour la démo
-                
-                if len(values) >= 7:  # S'assurer que nous avons assez de valeurs
-                    resultats.append({
-                        "id": values[0],
-                        "nom_equipement": values[4],
-                        "client": values[1],
-                        "localisation": values[2],
-                        "distance": distance,
-                        "total_disponible": values[6]
-                    })
-            
-            # Trier les résultats par distance
-            resultats.sort(key=lambda x: x["distance"])
-            
-            # Limiter le nombre de résultats
-            resultats = resultats[:max_equipements]
-            
-            # Afficher les résultats
-            for r in resultats:
-                self.results_tree.insert("", "end", values=(
-                    r["id"],
-                    r["nom_equipement"],
-                    r["client"],
-                    r["localisation"],
-                    r["distance"],
-                    r["total_disponible"]
-                ))
-            
-            messagebox.showinfo("Optimisation", f"Optimisation terminée. {len(resultats)} équipements trouvés dans un rayon de {rayon_km} km.")
-        
-        except Exception as e:
-            messagebox.showerror("Erreur", f"Erreur lors de l'optimisation: {str(e)}")
-            print(f"Erreur lors de l'optimisation: {str(e)}")
-
+    
     def effacer_resultats_optimisation(self):
         """Efface les résultats d'optimisation"""
         for item in self.results_tree.get_children():
