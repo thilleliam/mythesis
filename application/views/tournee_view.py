@@ -451,14 +451,35 @@ class TourneeApp:
                                command=self.charger_donnees, bootstyle=DEFAULT)
         refresh_btn.pack(side=tk.RIGHT, padx=2)
         
-        # Tableau
+        # Tableau avec scrollbars
         table_frame = ttk.Frame(self.list_tab)
         table_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
+        # Créer les scrollbars
+        vsb = ttk.Scrollbar(table_frame, orient="vertical")
+        hsb = ttk.Scrollbar(table_frame, orient="horizontal")
+        
+        # Colonnes
         columns = ("id_tournee", "conducteur", "vehicule", "commande", "objectif", 
                   "depart", "destination", "km", "date_depart", "date_arrivee", "duree", "statut")
         
-        self.tree = ttk.Treeview(table_frame, columns=columns, show="headings", bootstyle="primary")
+        # Créer le Treeview avec référence aux scrollbars
+        self.tree = ttk.Treeview(table_frame, columns=columns, show="headings", 
+                                yscrollcommand=vsb.set, xscrollcommand=hsb.set,
+                                bootstyle="primary")
+        
+        # Configurer les scrollbars pour commander le Treeview
+        vsb.config(command=self.tree.yview)
+        hsb.config(command=self.tree.xview)
+        
+        # Placement en utilisant grid pour un meilleur contrôle
+        self.tree.grid(row=0, column=0, sticky="nsew")
+        vsb.grid(row=0, column=1, sticky="ns")
+        hsb.grid(row=1, column=0, sticky="ew")
+        
+        # Configurer grid pour s'adapter correctement
+        table_frame.columnconfigure(0, weight=1)
+        table_frame.rowconfigure(0, weight=1)
         
         # Définir les entêtes
         self.tree.heading("id_tournee", text="ID", command=lambda: self.treeview_sort_column("id_tournee", False))
@@ -487,16 +508,6 @@ class TourneeApp:
         self.tree.column("date_arrivee", width=120, minwidth=100)
         self.tree.column("duree", width=80, minwidth=80)
         self.tree.column("statut", width=80, minwidth=80)
-        
-        # Scrollbars
-        vsb = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)
-        hsb = ttk.Scrollbar(table_frame, orient="horizontal", command=self.tree.xview)
-        self.tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
-        
-        # Placement
-        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        vsb.pack(side=tk.RIGHT, fill=tk.Y)
-        hsb.pack(side=tk.BOTTOM, fill=tk.X)
         
         # Liaison à la sélection
         self.tree.bind("<Double-1>", self.on_tree_double_click)
@@ -1436,6 +1447,6 @@ class TourneeApp:
             var.set("0")
 
 if __name__ == "__main__":
-    root = ttk.Window(themename="darkly")
+    root = ttk.Window(themename="cosmo")
     app = TourneeApp(root)
     root.mainloop()

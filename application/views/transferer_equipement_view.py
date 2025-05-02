@@ -3,7 +3,7 @@ import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 from tkinter import messagebox, simpledialog, StringVar, IntVar, DoubleVar, DISABLED, X, LEFT, BOTH
 from sqlalchemy.orm import sessionmaker, configure_mappers
-from application.database import engine
+from application.database import SessionLocal, engine
 from sqlalchemy import func, or_
 from datetime import date, datetime
 import re
@@ -137,54 +137,238 @@ class TransfererEquipementApp:
         coord_frame = ttk.LabelFrame(parent, text="Paramètres d'optimisation", padding=10)
         coord_frame.pack(fill=X, pady=5)
         
-        # Variables pour les coordonnées cibles et paramètres additionnels
+        # Variables pour les coordonnées cibles
         self.cible_longitude_var = DoubleVar()
         self.cible_latitude_var = DoubleVar()
-        self.rayon_optimisation_var = DoubleVar(value=100.0)  # Valeur par défaut 100 km
-        self.max_equipements_var = IntVar(value=10)  # Valeur par défaut 10 équipements
+        
+        # Stockage des informations du client sélectionné
+        self.selected_client_id = None
+        self.selected_client_name = None
+        
+        # Frame pour la sélection du client (site A)
+        client_frame = ttk.Frame(coord_frame)
+        client_frame.grid(row=0, column=0, columnspan=4, padx=5, pady=5, sticky="ew")
+        
+        ttk.Button(client_frame, text="Sélectionner client (site A)", 
+                command=self.selectionner_client_site_A, 
+                bootstyle=INFO).pack(side=LEFT, padx=5)
+        
+        # Label pour afficher le client sélectionné (sera mis à jour après sélection)
+        self.client_label = ttk.Label(client_frame, text="Aucun client sélectionné")
+        self.client_label.pack(side=LEFT, padx=10)
+        
+        # Ligne pour les coordonnées du site B
+        ttk.Label(coord_frame, text="Coordonnées du site B (destination):").grid(row=1, column=0, padx=5, pady=5, sticky="w")
         
         # Champs pour les coordonnées
-        ttk.Label(coord_frame, text="Longitude cible:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
-        ttk.Entry(coord_frame, textvariable=self.cible_longitude_var, width=15).grid(row=0, column=1, padx=5, pady=5, sticky="w")
+        ttk.Label(coord_frame, text="Longitude:").grid(row=2, column=0, padx=5, pady=5, sticky="e")
+        ttk.Entry(coord_frame, textvariable=self.cible_longitude_var, width=15).grid(row=2, column=1, padx=5, pady=5, sticky="w")
         
-        ttk.Label(coord_frame, text="Latitude cible:").grid(row=0, column=2, padx=5, pady=5, sticky="e")
-        ttk.Entry(coord_frame, textvariable=self.cible_latitude_var, width=15).grid(row=0, column=3, padx=5, pady=5, sticky="w")
+        ttk.Label(coord_frame, text="Latitude:").grid(row=2, column=2, padx=5, pady=5, sticky="e")
+        ttk.Entry(coord_frame, textvariable=self.cible_latitude_var, width=15).grid(row=2, column=3, padx=5, pady=5, sticky="w")
         
-                # Frame pour les résultats de la métaheuristique
+        # Frame pour les résultats de la métaheuristique
         meta_frame = ttk.LabelFrame(parent, text="Résultats de la métaheuristique", padding=10)
         meta_frame.pack(fill=BOTH, expand=True, pady=10)
         
-        # Ajouter un widget Text pour afficher les résultats détaillés
-        self.meta_results_text = tk.Text(meta_frame, wrap="word", height=10)
-        self.meta_results_text.pack(fill=BOTH, expand=True)
+        # Créer un cadre avec une barre de défilement
+        text_frame = ttk.Frame(meta_frame)
+        text_frame.pack(fill=BOTH, expand=True)
         
-        # Barre de défilement pour le texte
-        meta_scrollbar = ttk.Scrollbar(meta_frame, orient="vertical", command=self.meta_results_text.yview)
-        meta_scrollbar.pack(side="right", fill="y")
-        self.meta_results_text.configure(yscrollcommand=meta_scrollbar.set)
+        # Ajouter la barre de défilement avant de configurer le widget Text
+        meta_scrollbar = ttk.Scrollbar(text_frame, orient="vertical")
+        meta_scrollbar.pack(side=RIGHT, fill=Y)
+        
+        # Ajouter un widget Text pour afficher les résultats détaillés
+        self.meta_results_text = tk.Text(text_frame, wrap="word", height=10, yscrollcommand=meta_scrollbar.set)
+        self.meta_results_text.pack(side=LEFT, fill=BOTH, expand=True)
+        
+        # Configurer la barre de défilement pour contrôler le widget Text
+        meta_scrollbar.config(command=self.meta_results_text.yview)
         
         # Boutons d'action
         btn_frame = ttk.Frame(parent, padding=10)
         btn_frame.pack(fill=X, pady=5)
         
-        ttk.Button(btn_frame, text="Utiliser coordonnées sélectionnées", command=self.utiliser_coordonnees_selection, bootstyle=INFO).pack(side=LEFT, padx=5)
-        ttk.Button(btn_frame, text="Exécuter métaheuristique", command=self.executer_metaheuristique, bootstyle=PRIMARY).pack(side=LEFT, padx=5)
-        ttk.Button(btn_frame, text="Effacer résultats", command=self.effacer_resultats_optimisation, bootstyle=SECONDARY).pack(side=LEFT, padx=5)
-        ttk.Button(btn_frame, text="Exporter résultats", command=self.exporter_resultats_optimisation, bootstyle=WARNING).pack(side=LEFT, padx=5)
+        ttk.Button(btn_frame, text="Utiliser coordonnées sélectionnées", 
+                command=self.utiliser_coordonnees_selection, 
+                bootstyle=INFO).pack(side=LEFT, padx=5)
+        
+        ttk.Button(btn_frame, text="Exécuter métaheuristique", 
+                command=self.executer_metaheuristique, 
+                bootstyle=PRIMARY).pack(side=LEFT, padx=5)
+        
+        ttk.Button(btn_frame, text="Effacer résultats", 
+                command=self.effacer_resultats_optimisation, 
+                bootstyle=SECONDARY).pack(side=LEFT, padx=5)
+        
+        ttk.Button(btn_frame, text="Exporter résultats", 
+                command=self.exporter_resultats_optimisation, 
+                bootstyle=WARNING).pack(side=LEFT, padx=5)
 
+    def effacer_resultats_optimisation(self):
+        """Efface les résultats de l'optimisation"""
+        # Effacer le contenu du Text widget
+        self.meta_results_text.delete(1.0, tk.END)
+        # Réinitialiser les variables pour l'instance et la solution
+        if hasattr(self, 'current_instance'):
+            delattr(self, 'current_instance')
+        if hasattr(self, 'current_solution'):
+            delattr(self, 'current_solution')
+        # Afficher un message
+        messagebox.showinfo("Information", "Résultats effacés")
+    def selectionner_client_site_A(self):
+        """Sélectionne un client comme point de départ (site A) pour la métaheuristique"""
+        # Récupérer tous les clients disponibles
+        from application.models.chantiers import Chantier
+        
+        # Créer une session SQLAlchemy
+        session = SessionLocal()
+        
+        try:
+            # Récupérer la liste des chantiers
+            chantiers = session.query(Chantier).all()
+            
+            if not chantiers:
+                messagebox.showwarning("Attention", "Aucun chantier disponible dans la base de données")
+                return
+            
+            # Créer une liste pour le menu déroulant
+            options = [(c.id_client, f"{c.id_client} - {c.localisation}") for c in chantiers]
+            
+            # Créer une fenêtre de dialogue
+            dialog = tk.Toplevel(self.root)
+            dialog.title("Sélection du site A")
+            dialog.geometry("400x150")
+            dialog.transient(self.root)
+            dialog.grab_set()
+            
+            # Centrer la fenêtre
+            dialog.update_idletasks()
+            x = (dialog.winfo_screenwidth() - dialog.winfo_reqwidth()) / 2
+            y = (dialog.winfo_screenheight() - dialog.winfo_reqheight()) / 2
+            dialog.geometry("+%d+%d" % (x, y))
+            
+            # Variable pour stocker la sélection
+            selected_id = tk.StringVar()
+            
+            # Créer les widgets
+            ttk.Label(dialog, text="Sélectionnez le client de départ (site A):").pack(pady=10)
+            
+            # Combobox pour la sélection
+            combo = ttk.Combobox(dialog, textvariable=selected_id, state="readonly", width=40)
+            combo['values'] = [opt[1] for opt in options]
+            combo.pack(pady=10, padx=20, fill=X)
+            combo.current(0)  # Sélectionner le premier par défaut
+            
+            # Fonction pour valider la sélection
+            def valider():
+                idx = combo.current()
+                if idx >= 0:
+                    self.selected_client_id = options[idx][0]
+                    self.selected_client_name = options[idx][1]
+                    
+                    # Mettre à jour le label dans l'interface
+                    if hasattr(self, 'client_label'):
+                        self.client_label.config(text=f"Client sélectionné (site A): {self.selected_client_name}")
+                    else:
+                        # Créer un label dans l'interface d'optimisation si inexistant
+                        self.client_label = ttk.Label(coord_frame, text=f"Client sélectionné (site A): {self.selected_client_name}") # type: ignore
+                        self.client_label.grid(row=1, column=0, columnspan=4, padx=5, pady=5, sticky="w")
+                    
+                    dialog.destroy()
+                else:
+                    messagebox.showwarning("Attention", "Veuillez sélectionner un client")
+            
+            # Boutons
+            btn_frame = ttk.Frame(dialog)
+            btn_frame.pack(fill=X, pady=10)
+            
+            ttk.Button(btn_frame, text="Annuler", command=dialog.destroy).pack(side=RIGHT, padx=5)
+            ttk.Button(btn_frame, text="Valider", command=valider, bootstyle=PRIMARY).pack(side=RIGHT, padx=5)
+            
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Impossible de charger les clients: {str(e)}")
+        finally:
+            session.close()
+    def load_client_coordinates(self):
+        """
+        Récupère les coordonnées GPS du client/chantier (site A) depuis la base de données
+        """
+        from application.models.chantiers import Chantier
+        
+        # Vérifier que l'ID client est fourni
+        if not self.id_client:
+            raise ValueError("ID client non spécifié. Impossible de calculer la distance.")
+        
+        # Créer une session SQLAlchemy
+        session = SessionLocal()
+        
+        try:
+            # Récupérer les informations du chantier
+            chantier = session.query(Chantier).filter_by(id_client=self.id_client).first()
+            
+            if not chantier:
+                raise ValueError(f"Aucun chantier trouvé avec l'ID {self.id_client}")
+            
+            # Stocker les coordonnées du client (site A)
+            self.client_latitude = chantier.latitude
+            self.client_longitude = chantier.longitude
+            
+            # Stocker également d'autres informations utiles
+            self.client_localisation = chantier.localisation
+            self.distance_aller_goudron = chantier.distanceAllerGoudron
+            self.distance_aller_piste = chantier.distanceAllerPiste
+            self.temps_aller = chantier.temps_aller
+            
+        finally:
+            session.close()
     def executer_metaheuristique(self):
         """Exécute la métaheuristique pour le problème de transport"""
         try:
-            # Créer une instance du problème
-            from application.models.metaheuristique import Instance, greedy_initial_solution
+            # Vérifier que les coordonnées cibles sont valides
+            longitude_cible = self.cible_longitude_var.get()
+            latitude_cible = self.cible_latitude_var.get()
+            
+            if not longitude_cible or not latitude_cible:
+                messagebox.showerror("Erreur", "Les coordonnées de destination (site B) sont requises")
+                return
+                
+            # Vérifier qu'un client est sélectionné pour le site A
+            if not hasattr(self, 'selected_client_id') or not self.selected_client_id:
+                # Essayer de récupérer l'ID client depuis la sélection
+                selection = self.tree.selection()
+                if selection:
+                    # Obtenir les valeurs de l'élément sélectionné
+                    item_values = self.tree.item(selection[0], "values")
+                    if len(item_values) >= 2:  # Vérifier que l'ID client est accessible
+                        self.selected_client_id = item_values[1]  # Adapter à l'index correct
+                    else:
+                        messagebox.showerror("Erreur", "Aucun client sélectionné pour le site A")
+                        return
+                else:
+                    messagebox.showerror("Erreur", "Aucun client sélectionné pour le site A")
+                    return
             
             # Afficher un indicateur de progression
             self.meta_results_text.delete(1.0, tk.END)
             self.meta_results_text.insert(tk.END, "Initialisation de la métaheuristique...\n")
+            self.meta_results_text.insert(tk.END, f"Client (site A): {self.selected_client_id}\n")
+            self.meta_results_text.insert(tk.END, f"Destination (site B): Longitude {longitude_cible}, Latitude {latitude_cible}\n")
             self.meta_results_text.update()
             
-            # Initialiser l'instance du problème
-            instance = Instance()
+            # Importer la classe Instance et la fonction d'initialisation
+            from application.models.metaheuristique import Instance, greedy_initial_solution
+            
+            # Initialiser l'instance du problème avec les paramètres appropriés
+            instance = Instance(
+                id_client=self.selected_client_id,
+                cible_longitude=longitude_cible,
+                cible_latitude=latitude_cible
+            )
+            
+            # Afficher la distance calculée
+            self.meta_results_text.insert(tk.END, f"\nDistance calculée: {instance.d_AB} km\n")
             
             # Afficher les informations sur les véhicules disponibles
             self.meta_results_text.insert(tk.END, "\nVéhicules disponibles:\n")
@@ -217,6 +401,10 @@ class TransfererEquipementApp:
             self.meta_results_text.insert(tk.END, "\nDétails de la solution:\n")
             self.meta_results_text.insert(tk.END, solution.detailed_str())
             
+            # Stocker l'instance et la solution pour une utilisation ultérieure
+            self.current_instance = instance
+            self.current_solution = solution
+            
             # Proposer d'exporter la solution
             messagebox.showinfo("Métaheuristique", "Optimisation terminée avec succès. Consultez les résultats dans l'onglet.")
         
@@ -224,7 +412,6 @@ class TransfererEquipementApp:
             self.meta_results_text.insert(tk.END, f"\nErreur lors de l'exécution de la métaheuristique: {str(e)}\n")
             traceback.print_exc()  # Afficher la trace complète dans la console
             messagebox.showerror("Erreur", f"Erreur lors de l'exécution de la métaheuristique: {str(e)}")
-
     def exporter_resultats_optimisation(self):
         """Exporte les résultats d'optimisation au format PDF"""
         # Vérifier qu'il y a des résultats à exporter
