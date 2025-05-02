@@ -17,17 +17,31 @@ from application.database import SessionLocal
 from datetime import date
 
 class Instance:
-    def __init__(self):
+    def __init__(self, id_client=None, cible_longitude=None, cible_latitude=None):
         """
         Initialisation d'une instance du problème de transport par navettes entre les sites A et B
         sur un horizon de 12 semaines, avec transport uniquement dans le sens A vers B.
         
         Les données de véhicules sont récupérées depuis la base de données via la classe Vehicule.
         Les demandes d'équipements sont maintenant récupérées depuis la classe TransfererEquipement.
+        
+        Args:
+            id_client: ID du client/chantier pour le site A
+            cible_longitude: Longitude du site B
+            cible_latitude: Latitude du site B
         """
         # Horizon de planification: 12 semaines
         self.T = list(range(1, 13))
         self.np = 12
+        
+        # Stocker les paramètres de localisation
+        self.id_client = id_client
+        self.cible_longitude = cible_longitude
+        self.cible_latitude = cible_latitude
+        
+        # Récupérer les coordonnées du client et calculer la distance
+        self.load_client_coordinates()
+        self.calculate_distance()
         
         # Récupérer les données des véhicules depuis la base de données
         self.load_vehicles_from_database()
@@ -44,13 +58,74 @@ class Instance:
         self.T_drive = 2      # Durée maximale de conduite continue (en heures)
         self.T_break = 0.25   # Durée d'une pause obligatoire (en heures, soit 15 minutes)
         
-        # Distances entre les sites (en km)
-        self.d_AB = 120  # Distance A vers B
-        self.d_BA = 120  # Distance B vers A (trajet retour)
-        
         # Temps de chargement et déchargement (en heures)
         self.T_load_A = 0.5    # Temps de chargement au site A
         self.T_unload_B = 0.5  # Temps de déchargement au site B
+    
+    def load_client_coordinates(self):
+        """
+        Récupère les coordonnées GPS du client/chantier (site A) depuis la base de données
+        """
+        from application.models.chantiers import Chantier
+        
+        # Vérifier que l'ID client est fourni
+        if not self.id_client:
+            raise ValueError("ID client non spécifié. Impossible de calculer la distance.")
+        
+        # Créer une session SQLAlchemy
+        session = SessionLocal()
+        
+        try:
+            # Récupérer les informations du chantier
+            chantier = session.query(Chantier).filter_by(id_client=self.id_client).first()
+            
+            if not chantier:
+                raise ValueError(f"Aucun chantier trouvé avec l'ID {self.id_client}")
+            
+            # Stocker les coordonnées du client (site A)
+            self.client_latitude = chantier.latitude
+            self.client_longitude = chantier.longitude
+            
+            # Stocker également d'autres informations utiles
+            self.client_localisation = chantier.localisation
+            self.distance_aller_goudron = chantier.distanceAllerGoudron
+            self.distance_aller_piste = chantier.distanceAllerPiste
+            self.temps_aller = chantier.temps_aller
+            
+        finally:
+            session.close()
+    
+    def calculate_distance(self):
+        """
+        Calcule la distance entre le site A (client) et le site B (cible) en utilisant la formule haversine
+        """
+        import math
+        
+        # Vérifier que toutes les coordonnées sont disponibles
+        if None in (self.client_latitude, self.client_longitude, self.cible_latitude, self.cible_longitude):
+            raise ValueError("Coordonnées incomplètes. Impossible de calculer la distance.")
+        
+        # Convertir les degrés en radians
+        lat1, lon1 = math.radians(self.client_latitude), math.radians(self.client_longitude)
+        lat2, lon2 = math.radians(self.cible_latitude), math.radians(self.cible_longitude)
+        
+        # Formule haversine pour calculer la distance entre deux points sur la Terre
+        R = 6371  # Rayon de la Terre en kilomètres
+        
+        dlon = lon2 - lon1
+        dlat = lat2 - lat1
+        
+        a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+        
+        # Distance en kilomètres
+        distance = R * c
+        
+        # Arrondir à l'entier supérieur pour plus de sécurité
+        self.d_AB = math.ceil(distance)
+        self.d_BA = self.d_AB  # Même distance pour le retour
+        
+        print(f"Distance calculée entre {self.client_localisation} et le site cible: {self.d_AB} km")
     
     def load_vehicles_from_database(self):
         """
@@ -129,10 +204,12 @@ class Instance:
         """
         Récupère les demandes d'équipements depuis la classe TransfererEquipement
         et calcule le poids et le volume correspondants à partir de la classe Equipement.
+        Filtre par ID client si spécifié.
         """
         from application.models.transferer_equipement import TransfererEquipement
         from application.models.equipements import Equipement
         from sqlalchemy import func
+        from collections import defaultdict
         
         # Initialiser les dictionnaires pour stocker les demandes en poids et volume
         self.dw_AB = {t: 0 for t in self.T}  # Demandes en poids de A vers B
@@ -142,8 +219,12 @@ class Instance:
         session = SessionLocal()
         
         try:
-            # Récupérer toutes les entrées de transfert d'équipements
-            transfers = session.query(TransfererEquipement).all()
+            # Récupérer les entrées de transfert d'équipements pour ce client spécifique
+            query = session.query(TransfererEquipement)
+            if self.id_client:
+                query = query.filter_by(id_client=self.id_client)
+            
+            transfers = query.all()
             
             # Pour chaque transfert d'équipement
             for transfer in transfers:
