@@ -7,9 +7,12 @@ from sqlalchemy import func
 from datetime import date, datetime
 configure_mappers()
 
-# Configuration de la session SQLAlchemy
+from sqlalchemy.orm import sessionmaker, scoped_session
+from application.database import engine
+
+# Créer une factory de sessions
 Session = sessionmaker(bind=engine)
-session = Session()
+session_factory = scoped_session(Session)
 
 class VehiculeApp(ttk.Frame):
     def __init__(self, master):
@@ -127,91 +130,108 @@ class VehiculeApp(ttk.Frame):
         
         # Charger les données
         self.charger_donnees()
-
+    def get_session(self):
+        """Retourne une nouvelle session SQLAlchemy"""
+        return session_factory()
+    
     def configurer_tab_stats(self):
         """Configure l'onglet des statistiques"""
         # Import local pour éviter les références circulaires
         from application.models.vehicule import Vehicule
-        
+
         # Nettoyer l'onglet stats avant de le reconfigurer
         for widget in self.tab_stats.winfo_children():
             widget.destroy()
-            
+
         stats_frame = ttk.Frame(self.tab_stats, padding=20)
         stats_frame.pack(fill=BOTH, expand=True)
-        
-        ttk.Label(stats_frame, text="Statistiques de la Flotte", font=("-size", 16, "-weight", "bold")).pack(pady=10)
-        
-        # Compter les véhicules par état
-        en_panne = session.query(func.count(Vehicule.immatriculation)).filter(Vehicule.etat == "En panne").scalar() or 0
-        en_service = session.query(func.count(Vehicule.immatriculation)).filter(Vehicule.etat == "En service").scalar() or 0
-        disponible = session.query(func.count(Vehicule.immatriculation)).filter(Vehicule.etat == "Disponible").scalar() or 0
-        total = en_panne + en_service + disponible
-        
-        # Éviter la division par zéro
-        panne_pct = (en_panne/total*100) if total > 0 else 0
-        service_pct = (en_service/total*100) if total > 0 else 0
-        dispo_pct = (disponible/total*100) if total > 0 else 0
-        
-        # Afficher les statistiques
-        stats_container = ttk.Frame(stats_frame)
-        stats_container.pack(fill=BOTH, expand=True, pady=20)
-        
-        # Stats par état
-        etat_frame = ttk.Labelframe(stats_container, text="État des véhicules", padding=10)
-        etat_frame.pack(side=LEFT, fill=BOTH, expand=True, padx=5)
-        
-        ttk.Label(etat_frame, text=f"Total de véhicules: {total}").pack(anchor=W, pady=5)
-        ttk.Label(etat_frame, text=f"En service: {en_service} ({service_pct:.1f}%)", 
-                 foreground="#3498db").pack(anchor=W, pady=5)
-        ttk.Label(etat_frame, text=f"En panne: {en_panne} ({panne_pct:.1f}%)", 
-                 foreground="#f39c12").pack(anchor=W, pady=5)
-        ttk.Label(etat_frame, text=f"Disponibles: {disponible} ({dispo_pct:.1f}%)", 
-                 foreground="#2ecc71").pack(anchor=W, pady=5)
-        
-        # Stats par type
-        types_frame = ttk.Labelframe(stats_container, text="Types de véhicules", padding=10)
-        types_frame.pack(side=LEFT, fill=BOTH, expand=True, padx=5)
-        
-        # Obtenir les types uniques et leur compte
-        types_count = {}
-        for v_type, count in session.query(Vehicule.type_vehicule, func.count(Vehicule.type_vehicule)).group_by(Vehicule.type_vehicule).all():
-            if v_type:  # Éviter les valeurs None
-                types_count[v_type] = count
-        
-        for v_type, count in types_count.items():
-            ttk.Label(types_frame, text=f"{v_type}: {count} véhicules").pack(anchor=W, pady=5)
-            
-        # Raffraîchir les stats
-        ttk.Button(stats_frame, text="Rafraîchir les statistiques", command=self.configurer_tab_stats, bootstyle=INFO).pack(pady=10)
 
+        ttk.Label(stats_frame, text="Statistiques de la Flotte", font=("-size", 16, "-weight", "bold")).pack(pady=10)
+
+        # Obtenir une session
+        session = self.get_session()
+        try:
+            # Compter les véhicules par état
+            en_panne = session.query(func.count(Vehicule.immatriculation)).filter(Vehicule.etat == "En panne").scalar() or 0
+            en_service = session.query(func.count(Vehicule.immatriculation)).filter(Vehicule.etat == "En service").scalar() or 0
+            disponible = session.query(func.count(Vehicule.immatriculation)).filter(Vehicule.etat == "Disponible").scalar() or 0
+            total = en_panne + en_service + disponible
+
+            # Éviter la division par zéro
+            panne_pct = (en_panne / total * 100) if total > 0 else 0
+            service_pct = (en_service / total * 100) if total > 0 else 0
+            dispo_pct = (disponible / total * 100) if total > 0 else 0
+
+            # Afficher les statistiques
+            stats_container = ttk.Frame(stats_frame)
+            stats_container.pack(fill=BOTH, expand=True, pady=20)
+
+            # Stats par état
+            etat_frame = ttk.Labelframe(stats_container, text="État des véhicules", padding=10)
+            etat_frame.pack(side=LEFT, fill=BOTH, expand=True, padx=5)
+
+            ttk.Label(etat_frame, text=f"Total de véhicules: {total}").pack(anchor=W, pady=5)
+            ttk.Label(etat_frame, text=f"En service: {en_service} ({service_pct:.1f}%)",
+                    foreground="#3498db").pack(anchor=W, pady=5)
+            ttk.Label(etat_frame, text=f"En panne: {en_panne} ({panne_pct:.1f}%)",
+                    foreground="#f39c12").pack(anchor=W, pady=5)
+            ttk.Label(etat_frame, text=f"Disponibles: {disponible} ({dispo_pct:.1f}%)",
+                    foreground="#2ecc71").pack(anchor=W, pady=5)
+
+            # Stats par type
+            types_frame = ttk.Labelframe(stats_container, text="Types de véhicules", padding=10)
+            types_frame.pack(side=LEFT, fill=BOTH, expand=True, padx=5)
+
+            # Obtenir les types uniques et leur compte
+            types_count = {}
+            for v_type, count in session.query(Vehicule.type_vehicule, func.count(Vehicule.type_vehicule)).group_by(Vehicule.type_vehicule).all():
+                if v_type:  # Éviter les valeurs None
+                    types_count[v_type] = count
+
+            for v_type, count in types_count.items():
+                ttk.Label(types_frame, text=f"{v_type}: {count} véhicules").pack(anchor=W, pady=5)
+
+            # Rafraîchir les stats
+            ttk.Button(stats_frame, text="Rafraîchir les statistiques", command=self.configurer_tab_stats, bootstyle=INFO).pack(pady=10)
+
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur lors de la configuration des statistiques : {str(e)}")
+        finally:
+            session.close()
+    # Exemple de modification d'une fonction avec gestion de session améliorée
     def charger_donnees(self):
-        """ Charge les véhicules depuis la base et les affiche """
-        # Import local pour éviter les références circulaires
+        """Charge les véhicules depuis la base et les affiche"""
         from application.models.vehicule import Vehicule
         
         self.tree.delete(*self.tree.get_children())  # Vider le tableau avant rechargement
-        vehicules = session.query(Vehicule).all()
         
-        # Remplir le tableau avec alternance de couleurs
-        for idx, v in enumerate(vehicules):
-            row_tags = ['oddrow' if idx % 2 else 'evenrow']
+        session = self.get_session()
+        try:
+            vehicules = session.query(Vehicule).all()
             
-            # Ajouter un tag pour l'état
-            if v.etat == "En panne":
-                row_tags.append('panne')
-            elif v.etat == "En service":
-                row_tags.append('service')
-            elif v.etat == "Disponible":
-                row_tags.append('disponible')
+            # Remplir le tableau avec alternance de couleurs
+            for idx, v in enumerate(vehicules):
+                row_tags = ['oddrow' if idx % 2 else 'evenrow']
                 
-            self.tree.insert("", END, values=(
-                v.immatriculation, v.numero_chassis, v.numero_interne,
-                v.marque_modele, v.type_vehicule, v.capacite_tonne, v.capacite_volume, v.etat
-            ), tags=row_tags)
-            
-        # Mettre à jour la barre d'état
-        self.status_var.set(f"Total: {len(vehicules)} véhicules")
+                # Ajouter un tag pour l'état
+                if v.etat == "En panne":
+                    row_tags.append('panne')
+                elif v.etat == "En service":
+                    row_tags.append('service')
+                elif v.etat == "Disponible":
+                    row_tags.append('disponible')
+                    
+                self.tree.insert("", END, values=(
+                    v.immatriculation, v.numero_chassis, v.numero_interne,
+                    v.marque_modele, v.type_vehicule, v.capacite_tonne, v.capacite_volume, v.etat
+                ), tags=row_tags)
+                
+            # Mettre à jour la barre d'état
+            self.status_var.set(f"Total: {len(vehicules)} véhicules")
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur lors du chargement des données: {str(e)}")
+        finally:
+            session.close()
 
     def trier_par_colonne(self, col):
         """ Trie le tableau par la colonne cliquée """
@@ -393,48 +413,51 @@ class VehiculeApp(ttk.Frame):
         dialog.geometry(f"{width}x{height}+{x}+{y}")
 
     def modifier_vehicule(self):
-        """ Modifie un véhicule sélectionné avec une interface améliorée """
-        # Import local pour éviter les références circulaires
+        """Modifie le véhicule sélectionné avec une interface améliorée"""
         from application.models.vehicule import Vehicule
         
+        # Vérifier la sélection
         selected = self.tree.selection()
         if not selected:
             messagebox.showwarning("Avertissement", "Veuillez sélectionner un véhicule à modifier")
             return
-
-        # Récupérer l'immatriculation
+        
+        # Récupérer les données du véhicule sélectionné
         item = self.tree.item(selected[0])
-        immatriculation = item["values"][0]
-
+        values = item["values"]
+        immatriculation = values[0]
+        
+        # Récupérer l'objet véhicule depuis la base
+        session = self.get_session()
         try:
-            # Récupérer le véhicule directement sans créer de nouvelle session
             vehicule = session.query(Vehicule).filter_by(immatriculation=immatriculation).first()
-
+            
             if not vehicule:
                 messagebox.showerror("Erreur", "Véhicule introuvable en base de données.")
                 return
                 
             # Créer une fenêtre de dialogue personnalisée
-            dialog = ttk.Toplevel(self, resizable=False)
-            dialog.title(f"Modifier le véhicule: {immatriculation}")
+            dialog = ttk.Toplevel(self)
+            dialog.title(f"Modifier le véhicule - {immatriculation}")
             dialog.grab_set()  # Rendre modal
             
             # Créer un formulaire
             form_frame = ttk.Frame(dialog, padding=20)
             form_frame.pack(fill=BOTH, expand=True)
             
-            # Variables pour stocker les entrées
+            # Variables pour les champs de saisie
+            immat_var = StringVar(value=vehicule.immatriculation)
             chassis_var = StringVar(value=vehicule.numero_chassis or "")
             interne_var = StringVar(value=vehicule.numero_interne or "")
             marque_var = StringVar(value=vehicule.marque_modele or "")
             type_var = StringVar(value=vehicule.type_vehicule or "")
-            tonnes_var = StringVar(value=str(vehicule.capacite_tonne) if vehicule.capacite_tonne is not None else "")
-            volume_var = StringVar(value=str(vehicule.capacite_volume) if vehicule.capacite_volume is not None else "")
+            tonnes_var = StringVar(value=str(vehicule.capacite_tonne or 0))
+            volume_var = StringVar(value=str(vehicule.capacite_volume or 0))
             etat_var = StringVar(value=vehicule.etat or "Disponible")
             
             # Créer les champs de saisie
             fields = [
-                ("Immatriculation:", StringVar(value=immatriculation), True),  # Lecture seule
+                ("Immatriculation*:", immat_var, True),  # Immatriculation en lecture seule
                 ("Numéro de châssis:", chassis_var, False),
                 ("Numéro interne:", interne_var, False),
                 ("Marque et modèle*:", marque_var, False),
@@ -451,11 +474,11 @@ class VehiculeApp(ttk.Frame):
             # Menu déroulant pour l'état
             ttk.Label(form_frame, text="État*:").grid(row=len(fields), column=0, sticky=W, pady=5, padx=5)
             ttk.Combobox(form_frame, textvariable=etat_var, values=["En panne", "En service", "Disponible"], 
-                         state="readonly", width=15).grid(row=len(fields), column=1, sticky=W, pady=5, padx=5)
+                        state="readonly", width=15).grid(row=len(fields), column=1, sticky=W, pady=5, padx=5)
             
             # Label pour les champs obligatoires
             ttk.Label(form_frame, text="* Champs obligatoires", foreground="gray").grid(row=len(fields)+1, column=0, 
-                                                                                       columnspan=2, sticky=W, pady=10)
+                                                                                    columnspan=2, sticky=W, pady=10)
             
             # Boutons
             btn_frame = ttk.Frame(form_frame)
@@ -472,7 +495,7 @@ class VehiculeApp(ttk.Frame):
                     capacite_tonne = float(tonnes_var.get()) if tonnes_var.get() else 0
                     capacite_volume = float(volume_var.get()) if volume_var.get() else 0
                     
-                    # Mettre à jour le véhicule (utiliser la session existante)
+                    # Mettre à jour les données du véhicule
                     vehicule.numero_chassis = chassis_var.get()
                     vehicule.numero_interne = interne_var.get()
                     vehicule.marque_modele = marque_var.get()
@@ -481,36 +504,181 @@ class VehiculeApp(ttk.Frame):
                     vehicule.capacite_volume = capacite_volume
                     vehicule.etat = etat_var.get()
                     
-                    # Commit les changements
                     session.commit()
                     
                     # Fermer la fenêtre et mettre à jour l'affichage
                     dialog.destroy()
                     self.charger_donnees()
-                    messagebox.showinfo("Succès", "Véhicule modifié avec succès !")
-                        
+                    messagebox.showinfo("Succès", f"Véhicule {immatriculation} modifié avec succès.")
+                    
                 except ValueError:
-                    messagebox.showerror("Erreur", "Les capacités doivent être des nombres.")
+                    messagebox.showerror("Erreur", "Valeurs numériques invalides pour les capacités.")
                 except Exception as e:
                     session.rollback()
-                    messagebox.showerror("Erreur", f"Une erreur est survenue: {str(e)}")
-                    print(f"Erreur détaillée lors de la modification: {e}")
-            
+                    messagebox.showerror("Erreur", f"Impossible de modifier le véhicule: {str(e)}")
+                    
             ttk.Button(btn_frame, text="Valider", command=valider, bootstyle=SUCCESS).pack(side=LEFT, padx=5)
             ttk.Button(btn_frame, text="Annuler", command=dialog.destroy, bootstyle=SECONDARY).pack(side=LEFT, padx=5)
             
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur lors de la récupération du véhicule: {str(e)}")
+        finally:
+            # La session sera fermée après la fermeture de la boîte de dialogue
+            # car elle est utilisée dans le callback de validation
+            pass
+
+    # --- 3. Amélioration pour la fonction afficher_total_parcouru ---
+
+    def afficher_total_parcouru(self):
+        """Affiche le total des kilomètres parcourus par le véhicule sélectionné avec graphique"""
+        from application.models.vehicule import Vehicule
+        from application.models.tournee import Tournee
+        from datetime import timedelta
+        import matplotlib.pyplot as plt
+        from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+        
+        selected = self.tree.selection()
+        if not selected:
+            messagebox.showwarning("Avertissement", "Veuillez sélectionner un véhicule")
+            return
+
+        # Récupérer l'immatriculation
+        item = self.tree.item(selected[0])
+        immatriculation = item["values"][0]
+
+        session = self.get_session()
+        try:
+            # Récupérer l'objet véhicule depuis la base
+            vehicule = session.query(Vehicule).filter_by(immatriculation=immatriculation).first()
+
+            if not vehicule:
+                messagebox.showerror("Erreur", "Véhicule introuvable en base de données.")
+                return
+
+            # Calculer le total parcouru
+            total_km = vehicule.calculer_total_parcouru(session)
+            
+            # Récupérer les données pour le graphique
+            today = date.today()
+            six_months_ago = today - timedelta(days=180)
+            
+            # Requête pour obtenir les tournées des 6 derniers mois
+            tournees = session.query(Tournee).filter(
+                Tournee.immatriculation_vehicule == immatriculation,
+                Tournee.date_tournee >= six_months_ago
+            ).order_by(Tournee.date_tournee).all()
+            
+            # Créer une fenêtre détaillée
+            dialog = ttk.Toplevel(self)
+            dialog.title(f"Kilométrage - {immatriculation}")
+            dialog.geometry("800x500")
+            dialog.grab_set()  # Rendre modal
+            
+            # Mise en page avec panneaux
+            notebook = ttk.Notebook(dialog)
+            notebook.pack(fill=BOTH, expand=True, padx=10, pady=10)
+            
+            # Onglet résumé
+            tab_resume = ttk.Frame(notebook, padding=20)
+            notebook.add(tab_resume, text="Résumé")
+            
+            ttk.Label(tab_resume, text=f"Véhicule: {immatriculation}", font=("-size", 14, "-weight", "bold")).pack(anchor=W, pady=5)
+            ttk.Label(tab_resume, text=f"Marque/Modèle: {vehicule.marque_modele}", font=("-size", 12)).pack(anchor=W, pady=3)
+            ttk.Label(tab_resume, text=f"Type: {vehicule.type_vehicule}", font=("-size", 12)).pack(anchor=W, pady=3)
+            
+            # Ligne de séparation
+            ttk.Separator(tab_resume, orient=HORIZONTAL).pack(fill=X, pady=10)
+            
+            # Kilométrage
+            ttk.Label(tab_resume, text=f"TOTAL PARCOURU:", font=("-size", 12, "-weight", "bold")).pack(anchor=W, pady=5)
+            ttk.Label(tab_resume, text=f"{total_km:.2f} kilomètres", 
+                    font=("-size", 18, "-weight", "bold"), foreground="#3498db").pack(anchor=CENTER, pady=10)
+                    
+            # Onglet graphique (si matplotlib est disponible)
+            if tournees:
+                try:
+                    tab_graph = ttk.Frame(notebook, padding=10)
+                    notebook.add(tab_graph, text="Graphique")
+                    
+                    # Préparer les données pour le graphique
+                    dates = [t.date_tournee for t in tournees if hasattr(t, 'date_tournee') and t.date_tournee]
+                    distances = [t.distance_parcourue for t in tournees if hasattr(t, 'distance_parcourue') and t.distance_parcourue]
+                    
+                    if dates and distances:
+                        # Créer le graphique
+                        fig, ax = plt.subplots(figsize=(10, 5))
+                        ax.plot(dates, distances, marker='o', linestyle='-', color='#3498db')
+                        ax.set_title(f"Distances parcourues par {immatriculation}")
+                        ax.set_xlabel("Date")
+                        ax.set_ylabel("Distance (km)")
+                        ax.grid(True, linestyle='--', alpha=0.7)
+                        
+                        # Créer un canvas pour afficher le graphique dans Tkinter
+                        canvas = FigureCanvasTkAgg(fig, master=tab_graph)
+                        canvas.draw()
+                        canvas.get_tk_widget().pack(fill=BOTH, expand=True)
+                except ImportError:
+                    pass  # Si matplotlib n'est pas installé
+                
+            # Onglet détails des tournées
+            tab_details = ttk.Frame(notebook, padding=10)
+            notebook.add(tab_details, text="Détails des tournées")
+            
+            # Tableau des tournées
+            tournees_frame = ttk.Frame(tab_details)
+            tournees_frame.pack(fill=BOTH, expand=True)
+            
+            # Scrollbars
+            y_scrollbar = ttk.Scrollbar(tournees_frame, orient=VERTICAL)
+            y_scrollbar.pack(side=RIGHT, fill=Y)
+            
+            # Tableau
+            tournees_tree = ttk.Treeview(
+                tournees_frame,
+                columns=("Date", "Client", "Destination", "Distance"),
+                show="headings",
+                yscrollcommand=y_scrollbar.set
+            )
+            
+            y_scrollbar.config(command=tournees_tree.yview)
+            
+            # Colonnes
+            tournees_tree.heading("Date", text="Date")
+            tournees_tree.heading("Client", text="Client")
+            tournees_tree.heading("Destination", text="Destination")
+            tournees_tree.heading("Distance", text="Distance (km)")
+            
+            tournees_tree.column("Date", width=100)
+            tournees_tree.column("Client", width=200)
+            tournees_tree.column("Destination", width=200)
+            tournees_tree.column("Distance", width=100, anchor=CENTER)
+            
+            tournees_tree.pack(fill=BOTH, expand=True)
+            
+            # Afficher les tournées
+            for t in tournees:
+                date_str = t.date_tournee.strftime("%d/%m/%Y") if hasattr(t, 'date_tournee') and t.date_tournee else "N/A"
+                client = t.client if hasattr(t, 'client') and t.client else "N/A"
+                destination = t.destination if hasattr(t, 'destination') and t.destination else "N/A"
+                distance = t.distance_parcourue if hasattr(t, 'distance_parcourue') and t.distance_parcourue else 0
+                
+                tournees_tree.insert("", END, values=(date_str, client, destination, distance))
+                
+            # Bouton de fermeture
+            ttk.Button(dialog, text="Fermer", command=dialog.destroy, bootstyle=SECONDARY).pack(pady=10)
+            
             # Centrer la fenêtre
             dialog.update_idletasks()
-            width = dialog.winfo_width()
-            height = dialog.winfo_height()
-            x = (dialog.winfo_screenwidth() // 2) - (width // 2)
-            y = (dialog.winfo_screenheight() // 2) - (height // 2)
-            dialog.geometry(f"{width}x{height}+{x}+{y}")
-    
+            dialog.geometry("+%d+%d" % (
+                self.winfo_rootx() + (self.winfo_width() // 2) - (dialog.winfo_width() // 2),
+                self.winfo_rooty() + (self.winfo_height() // 2) - (dialog.winfo_height() // 2)
+            ))
+        
         except Exception as e:
-            messagebox.showerror("Erreur", f"Impossible de modifier le véhicule: {str(e)}")
-            print(f"Erreur détaillée: {e}")
-            
+            messagebox.showerror("Erreur", f"Erreur lors de l'affichage des données: {str(e)}")
+        finally:
+            session.close()
+   
     def supprimer_vehicule(self):
         """ Supprime un véhicule sélectionné """
         # Import local pour éviter les références circulaires
@@ -545,75 +713,7 @@ class VehiculeApp(ttk.Frame):
             session.rollback()
             messagebox.showerror("Erreur", f"Impossible de supprimer le véhicule: {str(e)}")
 
-    def afficher_total_parcouru(self):
-        """ Affiche le total des kilomètres parcourus par le véhicule sélectionné """
-        # Import local pour éviter les références circulaires
-        from application.models.vehicule import Vehicule
-        
-        selected = self.tree.selection()
-        if not selected:
-            messagebox.showwarning("Avertissement", "Veuillez sélectionner un véhicule")
-            return
-
-        # Récupérer l'immatriculation
-        item = self.tree.item(selected[0])
-        immatriculation = item["values"][0]
-
-        # Récupérer l'objet véhicule depuis la base
-        vehicule = session.query(Vehicule).filter_by(immatriculation=immatriculation).first()
-
-        if not vehicule:
-            messagebox.showerror("Erreur", "Véhicule introuvable en base de données.")
-            return
-
-        # Calculer le total parcouru
-        total_km = vehicule.calculer_total_parcouru(session)
-        
-        # Créer une fenêtre détaillée
-        dialog = ttk.Toplevel(self)
-        dialog.title(f"Kilométrage - {immatriculation}")
-        dialog.geometry("400x300")
-        dialog.grab_set()  # Rendre modal
-        
-        # Mise en page
-        content = ttk.Frame(dialog, padding=20)
-        content.pack(fill=BOTH, expand=True)
-        
-        ttk.Label(content, text=f"Véhicule: {immatriculation}", font=("-size", 12, "-weight", "bold")).pack(anchor=W, pady=5)
-        ttk.Label(content, text=f"Marque/Modèle: {vehicule.marque_modele}", font=("-size", 11)).pack(anchor=W, pady=3)
-        ttk.Label(content, text=f"Type: {vehicule.type_vehicule}", font=("-size", 11)).pack(anchor=W, pady=3)
-        
-        # Ligne de séparation
-        ttk.Separator(content, orient=HORIZONTAL).pack(fill=X, pady=10)
-        
-        # Kilométrage
-        ttk.Label(content, text=f"TOTAL PARCOURU:", font=("-size", 12, "-weight", "bold")).pack(anchor=W, pady=5)
-        ttk.Label(content, text=f"{total_km:.2f} kilomètres", 
-                  font=("-size", 16, "-weight", "bold"), foreground="#3498db").pack(anchor=CENTER, pady=10)
-                  
-        # Informations complémentaires (si disponibles)
-        try:
-            # On pourrait ajouter ici des informations sur les dernières tournées
-            from application.models.tournee import Tournee
-            dernieres_tournees = session.query(Tournee).filter_by(immatriculation_vehicule=immatriculation).order_by(Tournee.date_tournee.desc()).limit(3)
-            
-            if dernieres_tournees.count() > 0:
-                ttk.Label(content, text="Dernières tournées:", font=("-size", 11, "-weight", "bold")).pack(anchor=W, pady=5)
-                for tournee in dernieres_tournees:
-                    ttk.Label(content, text=f"• {tournee.date_tournee.strftime('%d/%m/%Y')} - {tournee.distance_parcourue} km").pack(anchor=W, pady=2)
-        except:
-            pass  # Si la table tournée n'existe pas ou n'a pas ces champs
-            
-        # Bouton de fermeture
-        ttk.Button(content, text="Fermer", command=dialog.destroy, bootstyle=SECONDARY).pack(pady=10)
-        
-        # Centrer la fenêtre
-        dialog.update_idletasks()
-        dialog.geometry("+%d+%d" % (
-            self.winfo_rootx() + (self.winfo_width() // 2) - (dialog.winfo_width() // 2),
-            self.winfo_rooty() + (self.winfo_height() // 2) - (dialog.winfo_height() // 2)
-        ))
-        
+    
     def affectation_tournee(self):
         """ Affecte le véhicule sélectionné à une tournée existante avec interface améliorée """
         # Import local pour éviter les références circulaires
