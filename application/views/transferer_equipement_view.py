@@ -1,11 +1,16 @@
+import json
+import os
+import threading
+import time
 import traceback
+import uuid
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 from tkinter import messagebox, simpledialog, StringVar, IntVar, DoubleVar, DISABLED, X, LEFT, BOTH
 from sqlalchemy.orm import sessionmaker, configure_mappers
 from application.database import SessionLocal, engine
 from sqlalchemy import func, or_
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import re
 import tkinter as tk
 from reportlab.lib import colors
@@ -15,13 +20,951 @@ from reportlab.lib.styles import getSampleStyleSheet
 from tkinter import filedialog
 # Importer les classes de la métaheuristique
 from application.models.metaheuristique import Instance, Solution, greedy_initial_solution
-import datetime
+
 
 configure_mappers()
 
 Session = sessionmaker(bind=engine)
 session = Session()
+class NotificationSystem:
+    """Système de gestion des notifications et alertes pour l'application de transfert d'équipements"""
+    
+    def __init__(self, app_instance):
+        """
+        Initialise le système de notifications
+        
+        Args:
+            app_instance: Instance de l'application principale (TransfererEquipementApp)
+        """
+        self.app = app_instance
+        self.root = app_instance.root
+        self.notifications = []
+        self.confirmed_transfers = {}  # Pour stocker les transferts confirmés
+        self.notification_window = None
+        self.notification_badge = None
+        self.badge_count = 0
+        
+        # Chemin pour stocker les confirmations
+        self.data_dir = os.path.join(os.path.dirname(__file__), 'data')
+        self.confirmations_file = os.path.join(self.data_dir, 'confirmed_transfers.json')
+        
+        # Créer le répertoire de données s'il n'existe pas
+        if not os.path.exists(self.data_dir):
+            os.makedirs(self.data_dir)
+        
+        # Charger les confirmations précédentes
+        self.load_confirmed_transfers()
+        
+        # Créer les widgets de notification
+        self.create_notification_widgets()
+        
+        # Démarrer le thread de vérification des alertes hebdomadaires
+        self.should_stop = False
+        self.check_thread = threading.Thread(target=self.check_weekly_confirmation, daemon=True)
+        self.check_thread.start()
+    
+    def create_notification_widgets(self):
+        """Crée les widgets nécessaires pour afficher les notifications"""
+        # Créer un bouton de notification dans la barre d'outils principale
+        toolbar = self.root.children.get('!frame')
+        if toolbar:
+            # Créer un frame pour le bouton et le badge
+            notification_frame = ttk.Frame(toolbar)
+            notification_frame.pack(side=tk.RIGHT, padx=10)
+            
+            # Créer le bouton de notifications
+            self.notification_button = ttk.Button(
+                notification_frame, 
+                text="🔔", 
+                command=self.show_notifications,
+                bootstyle=SECONDARY,
+                width=3
+            )
+            self.notification_button.pack(side=tk.LEFT)
+            
+            # Créer le badge de notifications (cercle rouge avec un nombre)
+            self.notification_badge = ttk.Label(
+                notification_frame, 
+                text="0", 
+                bootstyle="danger",
+                width=2,
+                padding=0
+            )
+            # Positionner le badge sur le coin supérieur droit du bouton
+            self.notification_badge.place(relx=0.8, rely=0.1)
+            
+            # Cacher le badge initialement
+            self.notification_badge.place_forget()
+        else:
+            # Ajouter un nouveau frame en haut de l'application
+            top_bar = ttk.Frame(self.root)
+            top_bar.pack(side=tk.TOP, fill=tk.X)
+            
+            # Ajouter le titre à gauche
+            title_label = ttk.Label(top_bar, text="Gestion des Transferts d'Équipements", font=('Helvetica', 14, 'bold'))
+            title_label.pack(side=tk.LEFT, padx=10, pady=5)
+            
+            # Créer un frame pour le bouton et le badge
+            notification_frame = ttk.Frame(top_bar)
+            notification_frame.pack(side=tk.RIGHT, padx=10, pady=5)
+            
+            # Créer le bouton de notifications
+            self.notification_button = ttk.Button(
+                notification_frame, 
+                text="🔔", 
+                command=self.show_notifications,
+                bootstyle=SECONDARY,
+                width=3
+            )
+            self.notification_button.pack(side=tk.LEFT)
+            
+            # Créer le badge de notifications
+            self.notification_badge = ttk.Label(
+                notification_frame, 
+                text="0", 
+                bootstyle="danger",
+                width=2,
+                padding=0
+            )
+            # Positionner le badge sur le coin supérieur droit du bouton
+            self.notification_badge.place(relx=0.8, rely=0.1)
+            
+            # Cacher le badge initialement
+            self.notification_badge.place_forget()
+    def add_notification(self, title, message, is_weekly_confirmation=False, data=None, action=None):
+        """Ajoute une notification au système"""
+        notification = {
+            'title': title,
+            'message': message,
+            'is_weekly_confirmation': is_weekly_confirmation,
+            'data': data,
+            'action': action,
+            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),  # Convertir en chaîne pour la sauvegarde
+            'read': False  # Ajoutez un champ 'read' pour la gestion des notifications lues/non lues
+        }
+        self.notifications.append(notification)
+        self.save_notifications()
+    import json
 
+    def save_notifications(self):
+        """Sauvegarde les notifications dans un fichier JSON"""
+        try:
+            with open("notifications.json", "w") as file:
+                json.dump(self.notifications, file, indent=4)
+            print("Notifications sauvegardées avec succès.")
+        except Exception as e:
+            print(f"Erreur lors de la sauvegarde des notifications : {str(e)}")
+    def update_badge(self):
+        """Met à jour le badge de notifications avec le nombre de notifications non lues"""
+        unread_count = sum(1 for n in self.notifications if not n['read'])
+        
+        if unread_count > 0:
+            self.badge_count = unread_count
+            self.notification_badge.config(text=str(min(99, unread_count)))
+            
+            # Afficher le badge
+            self.notification_badge.place(relx=0.8, rely=0.1)
+        else:
+            # Cacher le badge s'il n'y a pas de notifications non lues
+            self.notification_badge.place_forget()
+    def save_notifications(self):
+        """Sauvegarde les notifications dans un fichier JSON"""
+        try:
+            with open("notifications.json", "w") as file:
+                json.dump(self.notifications, file, indent=4)
+            print("Notifications sauvegardées avec succès.")
+        except Exception as e:
+            print(f"Erreur lors de la sauvegarde des notifications : {str(e)}")
+    def show_popup_notification(self, notification):
+        """
+        Affiche une notification pop-up en bas à droite de l'écran
+        
+        Args:
+            notification: Dictionnaire contenant les détails de la notification
+        """
+        # Créer une fenêtre pop-up
+        popup = tk.Toplevel(self.root)
+        popup.title("")
+        popup.attributes('-topmost', True)
+        popup.overrideredirect(True)  # Supprimer les bordures de fenêtre
+        
+        # Définir la taille et la position (coin inférieur droit)
+        width, height = 300, 100
+        screen_width = popup.winfo_screenwidth()
+        screen_height = popup.winfo_screenheight()
+        x = screen_width - width - 20
+        y = screen_height - height - 60  # Laisser de l'espace pour la barre des tâches
+        
+        popup.geometry(f"{width}x{height}+{x}+{y}")
+        
+        # Créer un style pour la notification
+        style = "primary" if not notification['is_weekly_confirmation'] else "warning"
+        
+        # Créer un cadre avec style
+        frame = ttk.Frame(popup, bootstyle=style)
+        frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Titre de la notification
+        title_label = ttk.Label(frame, text=notification['title'], font=('Helvetica', 10, 'bold'), bootstyle=style)
+        title_label.pack(anchor=tk.W, padx=10, pady=(10, 0))
+        
+        # Message de la notification
+        message_label = ttk.Label(frame, text=notification['message'], wraplength=280, bootstyle=style)
+        message_label.pack(anchor=tk.W, padx=10, pady=(5, 10))
+        
+        # Boutons d'action
+        btn_frame = ttk.Frame(frame)
+        btn_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=5)
+        
+        if notification['is_weekly_confirmation']:
+            # Pour les confirmations hebdomadaires, ajouter un bouton de confirmation
+            ttk.Button(
+                btn_frame, 
+                text="Confirmer", 
+                command=lambda: [self.open_confirmation_dialog(notification), popup.destroy()],
+                bootstyle=SUCCESS,
+                width=10
+            ).pack(side=tk.RIGHT, padx=5)
+        
+        # Bouton pour fermer la notification
+        ttk.Button(
+            btn_frame, 
+            text="Fermer", 
+            command=popup.destroy,
+            bootstyle=SECONDARY,
+            width=10
+        ).pack(side=tk.RIGHT, padx=5)
+        
+        # Auto-fermeture après 10 secondes sauf pour les confirmations hebdomadaires
+        if not notification['is_weekly_confirmation']:
+            popup.after(10000, popup.destroy)
+    
+    def open_confirmation_dialog(self, notification):
+        """
+        Ouvre une boîte de dialogue pour confirmer les transferts hebdomadaires
+        
+        Args:
+            notification: Dictionnaire contenant les détails de la notification
+        """
+        # Créer une nouvelle fenêtre pour la confirmation
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Confirmation des transferts hebdomadaires")
+        dialog.geometry("600x400")
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        # Récupérer les données des transferts à confirmer
+        transfers_data = notification.get('data', {})
+        week_number = transfers_data.get('week_number', datetime.now().isocalendar()[1])
+        week_year = transfers_data.get('year', datetime.now().year)
+        
+        # Label principal
+        ttk.Label(
+            dialog, 
+            text=f"Confirmation des transferts d'équipements - Semaine {week_number} ({week_year})",
+            font=('Helvetica', 12, 'bold')
+        ).pack(pady=(15, 10))
+        
+        ttk.Label(
+            dialog, 
+            text="Veuillez confirmer les quantités d'équipements effectivement transférées cette semaine:",
+            wraplength=550
+        ).pack(pady=(0, 10), padx=20)
+        
+        # Créer un cadre avec défilement pour les transferts
+        main_frame = ttk.Frame(dialog)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        
+        # Ajouter une barre de défilement
+        canvas = tk.Canvas(main_frame)
+        scrollbar = ttk.Scrollbar(main_frame, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        # Liste pour stocker les variables des spinboxes
+        spinbox_vars = []
+        
+        # En-têtes
+        headers_frame = ttk.Frame(scrollable_frame)
+        headers_frame.pack(fill=tk.X, pady=(0, 5))
+        
+        ttk.Label(headers_frame, text="ID", width=5).grid(row=0, column=0, padx=5)
+        ttk.Label(headers_frame, text="Client", width=15).grid(row=0, column=1, padx=5)
+        ttk.Label(headers_frame, text="Équipement", width=25).grid(row=0, column=2, padx=5)
+        ttk.Label(headers_frame, text="Planifié", width=8).grid(row=0, column=3, padx=5)
+        ttk.Label(headers_frame, text="Réel", width=8).grid(row=0, column=4, padx=5)
+        
+        # Séparateur
+        ttk.Separator(scrollable_frame, orient="horizontal").pack(fill=tk.X, pady=5)
+        
+        # Récupérer les transferts prévus pour cette semaine
+        session = SessionLocal()
+        try:
+            transfers = self.get_weekly_transfers(session, week_number, week_year)
+            
+            if not transfers:
+                ttk.Label(
+                    scrollable_frame, 
+                    text="Aucun transfert planifié pour cette semaine.",
+                    font=('Helvetica', 10, 'italic')
+                ).pack(pady=20)
+            else:
+                # Afficher chaque transfert avec un spinbox pour ajuster la quantité réelle
+                for i, transfer in enumerate(transfers):
+                    row_frame = ttk.Frame(scrollable_frame)
+                    row_frame.pack(fill=tk.X, pady=2)
+                    
+                    ttk.Label(row_frame, text=str(transfer['id']), width=5).grid(row=0, column=0, padx=5)
+                    ttk.Label(row_frame, text=transfer['client'], width=15).grid(row=0, column=1, padx=5)
+                    ttk.Label(row_frame, text=transfer['equipment'], width=25).grid(row=0, column=2, padx=5)
+                    ttk.Label(row_frame, text=str(transfer['planned']), width=8).grid(row=0, column=3, padx=5)
+                    
+                    # Variable pour la quantité réelle (initialement égale à la quantité planifiée)
+                    var = tk.IntVar(value=transfer['planned'])
+                    spinbox_vars.append((transfer['id'], var))
+                    
+                    ttk.Spinbox(
+                        row_frame, 
+                        from_=0, 
+                        to=9999, 
+                        textvariable=var, 
+                        width=6
+                    ).grid(row=0, column=4, padx=5)
+        finally:
+            session.close()
+        
+        # Boutons d'action
+        btn_frame = ttk.Frame(dialog)
+        btn_frame.pack(fill=tk.X, padx=20, pady=15)
+        
+        ttk.Button(
+            btn_frame, 
+            text="Annuler", 
+            command=dialog.destroy,
+            bootstyle=SECONDARY,
+            width=10
+        ).pack(side=tk.RIGHT, padx=5)
+        
+        ttk.Button(
+            btn_frame, 
+            text="Confirmer", 
+            command=lambda: self.save_confirmed_transfers(spinbox_vars, week_number, week_year, dialog),
+            bootstyle=SUCCESS,
+            width=10
+        ).pack(side=tk.RIGHT, padx=5)
+    
+    def save_confirmed_transfers(self, spinbox_vars, week_number, year, dialog):
+        """
+        Enregistre les quantités confirmées de transferts
+        
+        Args:
+            spinbox_vars: Liste de tuples (id_transfert, variable_spinbox)
+            week_number: Numéro de la semaine
+            year: Année
+            dialog: Fenêtre de dialogue à fermer après l'enregistrement
+        """
+        confirmed_data = []
+        week_key = f"{year}-W{week_number}"
+        
+        for transfer_id, var in spinbox_vars:
+            confirmed_data.append({
+                'id': transfer_id,
+                'confirmed_quantity': var.get()
+            })
+        
+        # Stocker les données confirmées
+        self.confirmed_transfers[week_key] = confirmed_data
+        
+        # Enregistrer dans le fichier
+        self.save_confirmed_transfers_to_file()
+        
+        # Marquer la notification correspondante comme lue
+        for notification in self.notifications:
+            if notification.get('is_weekly_confirmation', False) and notification.get('data', {}).get('week_number') == week_number:
+                notification['read'] = True
+        
+        self.update_badge()
+        
+        # Fermer la boîte de dialogue
+        dialog.destroy()
+        
+        # Afficher un message de confirmation
+        messagebox.showinfo(
+            "Confirmation enregistrée", 
+            f"Les quantités de transferts pour la semaine {week_number} ont été confirmées avec succès."
+        )
+        
+        # Lancer la réoptimisation si nécessaire
+        self.run_reoptimization(week_number, year)
+    
+    def run_reoptimization(self, week_number, year):
+        """
+        Lance la réoptimisation basée sur les transferts confirmés
+        
+        Args:
+            week_number: Numéro de la semaine
+            year: Année
+        """
+        # Demander à l'utilisateur s'il souhaite lancer une réoptimisation
+        if messagebox.askyesno(
+            "Réoptimisation", 
+            "Souhaitez-vous lancer une réoptimisation basée sur les quantités confirmées?"
+        ):
+            try:
+                # Rediriger vers l'onglet d'optimisation
+                self.app.root.children['!notebook'].select(2)  # Index 2 pour le 3ème onglet
+                
+                # Afficher les données confirmées dans l'interface d'optimisation
+                self.app.meta_results_text.delete(1.0, tk.END)
+                self.app.meta_results_text.insert(tk.END, f"Préparation de la réoptimisation pour la semaine {week_number} de {year}...\n\n")
+                
+                # Récupérer les données confirmées
+                week_key = f"{year}-W{week_number}"
+                confirmed_data = self.confirmed_transfers.get(week_key, [])
+                
+                if confirmed_data:
+                    self.app.meta_results_text.insert(tk.END, "Transferts confirmés:\n")
+                    
+                    for item in confirmed_data:
+                        transfer_id = item['id']
+                        quantity = item['confirmed_quantity']
+                        
+                        # Récupérer les détails du transfert
+                        session = SessionLocal()
+                        try:
+                            transfer = session.query(self.app.TransfererEquipement).get(transfer_id)
+                            if transfer:
+                                client = transfer.id_client
+                                equipment = transfer.nom_equipement
+                                self.app.meta_results_text.insert(
+                                    tk.END, 
+                                    f"- ID: {transfer_id}, Client: {client}, Équipement: {equipment}, Quantité confirmée: {quantity}\n"
+                                )
+                        finally:
+                            session.close()
+                    
+                    # Ajuster la semaine en cours dans l'optimisation
+                    self.app.meta_results_text.insert(tk.END, f"\nLes données confirmées seront utilisées pour la réoptimisation.\n")
+                    self.app.meta_results_text.insert(tk.END, "Veuillez sélectionner un client pour le site A et définir les coordonnées du site B pour lancer l'optimisation.\n")
+                else:
+                    self.app.meta_results_text.insert(tk.END, "Aucune donnée confirmée disponible pour cette semaine.\n")
+            
+            except Exception as e:
+                messagebox.showerror("Erreur", f"Erreur lors de la préparation de la réoptimisation: {str(e)}")
+    
+    def get_weekly_transfers(self, session, week_number, year):
+        """
+        Récupère les transferts prévus pour une semaine spécifique
+        
+        Args:
+            session: Session SQLAlchemy
+            week_number: Numéro de la semaine
+            year: Année
+            
+        Returns:
+            Liste des transferts prévus pour cette semaine
+        """
+        # Calculer le nombre de semaines depuis le début de l'année
+        current_date = datetime.now()
+        start_of_year = datetime(year, 1, 1)
+        current_week = datetime.strptime(f"{year}-W{week_number}-1", "%Y-W%W-%w").date()
+        
+        # Calculer l'écart entre la semaine actuelle et la semaine cible
+        weeks_difference = (current_date.date() - current_week).days // 7
+        
+        # Déterminer quelle colonne de semaine utiliser en fonction de la différence
+        week_columns = {
+            0: "zero",
+            1: "un",
+            2: "deux",
+            3: "trois",
+            4: "quatre",
+            5: "cinq",
+            6: "six",
+            7: "sept",
+            8: "huit",
+            9: "neuf",
+            10: "dix",
+            11: "onze",
+            12: "douze"
+        }
+        
+        # Si la différence est négative, cela signifie une semaine future
+        if weeks_difference < 0:
+            messagebox.showwarning(
+                "Avertissement", 
+                f"La semaine {week_number} de {year} est dans le futur. Aucun transfert à confirmer pour l'instant."
+            )
+            return []
+        
+        # Si la différence est trop grande, utiliser la semaine la plus éloignée
+        if weeks_difference > 12:
+            weeks_difference = 12
+        
+        # Déterminer la colonne à consulter
+        column_to_check = week_columns.get(weeks_difference)
+        
+        if not column_to_check:
+            return []
+        
+        # Récupérer les transferts pour cette semaine
+        transfers = []
+        
+        try:
+            # Requête pour récupérer les transferts avec une quantité > 0 pour la semaine spécifiée
+            query = session.query(self.app.TransfererEquipement)
+            
+            # Utiliser getattr pour accéder dynamiquement à la colonne
+            for transfer in query.all():
+                planned_quantity = getattr(transfer, column_to_check, 0)
+                
+                if planned_quantity > 0:
+                    transfers.append({
+                        'id': transfer.id,
+                        'client': transfer.id_client,
+                        'equipment': transfer.nom_equipement,
+                        'planned': planned_quantity
+                    })
+        
+        except Exception as e:
+            print(f"Erreur lors de la récupération des transferts: {str(e)}")
+        
+        return transfers
+    
+    def show_notifications(self):
+        """Affiche la fenêtre des notifications"""
+        # Fermer la fenêtre si elle est déjà ouverte
+        if self.notification_window and self.notification_window.winfo_exists():
+            self.notification_window.destroy()
+            self.notification_window = None
+            return
+        
+        # Créer une nouvelle fenêtre
+        self.notification_window = tk.Toplevel(self.root)
+        self.notification_window.title("Notifications")
+        self.notification_window.geometry("400x500")
+        self.notification_window.transient(self.root)
+        
+        # Centrer la fenêtre
+        self.notification_window.update_idletasks()
+        x = self.root.winfo_x() + (self.root.winfo_width() - self.notification_window.winfo_width()) // 2
+        y = self.root.winfo_y() + (self.root.winfo_height() - self.notification_window.winfo_height()) // 2
+        self.notification_window.geometry(f"+{x}+{y}")
+        
+        # En-tête
+        header_frame = ttk.Frame(self.notification_window)
+        header_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        ttk.Label(
+            header_frame, 
+            text="Notifications", 
+            font=('Helvetica', 12, 'bold')
+        ).pack(side=tk.LEFT)
+        
+        ttk.Button(
+            header_frame, 
+            text="Marquer tout comme lu", 
+            command=self.mark_all_as_read,
+            bootstyle=SECONDARY,
+            width=18
+        ).pack(side=tk.RIGHT)
+        
+        # Séparateur
+        ttk.Separator(self.notification_window, orient="horizontal").pack(fill=tk.X, padx=10)
+        
+        # Cadre principal avec défilement
+        main_frame = ttk.Frame(self.notification_window)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Ajouter une barre de défilement
+        canvas = tk.Canvas(main_frame)
+        scrollbar = ttk.Scrollbar(main_frame, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        # Si aucune notification, afficher un message
+        if not self.notifications:
+            ttk.Label(
+                scrollable_frame, 
+                text="Aucune notification pour le moment.",
+                font=('Helvetica', 10, 'italic')
+            ).pack(pady=20)
+        else:
+            # Afficher les notifications par ordre chronologique inverse
+            for notification in sorted(self.notifications, key=lambda x: x['timestamp'], reverse=True):
+                self.create_notification_item(scrollable_frame, notification)
+    
+    def create_notification_item(self, parent, notification):
+        """Crée un élément de notification dans l'interface utilisateur"""
+        try:
+            # Convertir le timestamp en objet datetime si nécessaire
+            timestamp_str = notification['timestamp']
+            timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+            
+            # Formater le timestamp pour l'affichage
+            formatted_timestamp = timestamp.strftime("%d/%m/%Y %H:%M")
+            
+            # Utiliser le timestamp formaté dans l'interface utilisateur
+            ttk.Label(parent, text=f"{notification['title']} - {formatted_timestamp}").pack()
+        except Exception as e:
+            print(f"Erreur lors de la création de l'élément de notification : {str(e)}")
+    def toggle_read_status(self, notification):
+        """
+        Change le statut de lecture d'une notification
+        
+        Args:
+            notification: Dictionnaire contenant les détails de la notification
+        """
+        notification['read'] = not notification['read']
+        self.update_badge()
+        
+        # Rafraîchir la fenêtre des notifications
+        if self.notification_window and self.notification_window.winfo_exists():
+            self.notification_window.destroy()
+            self.show_notifications()
+    
+    def mark_all_as_read(self):
+        """Marque toutes les notifications comme lues"""
+        for notification in self.notifications:
+            notification['read'] = True
+        
+        self.update_badge()
+        
+        # Rafraîchir la fenêtre des notifications
+        if self.notification_window and self.notification_window.winfo_exists():
+            self.notification_window.destroy()
+            self.show_notifications()
+    
+    def check_weekly_confirmation(self):
+        """
+        Fonction exécutée dans un thread séparé pour vérifier si une confirmation hebdomadaire est nécessaire
+        """
+        while not self.should_stop:
+            try:
+                # Vérifier si c'est vendredi (jour 4 de la semaine, où lundi=0)
+                current_date = datetime.now()
+                
+                # Pour tester, vous pouvez forcer un jour spécifique
+                # Décommenter la ligne ci-dessous et ajuster la date pour tester
+                # current_date = datetime(2025, 5, 9, 15, 0)  # Exemple: vendredi 9 mai 2025 à 15h00
+                
+                is_friday = current_date.weekday() == 4
+                is_end_of_day = 14 <= current_date.hour <= 17  # Entre 14h et 17h
+                
+                if is_friday and is_end_of_day:
+                    # Vérifier si une notification de confirmation a déjà été envoyée cette semaine
+                    week_number = current_date.isocalendar()[1]
+                    year = current_date.year
+                    week_key = f"{year}-W{week_number}"
+                    
+                    # Vérifier si une notification pour cette semaine existe déjà
+                    notification_exists = any(
+                        n.get('is_weekly_confirmation', False) and 
+                        n.get('data', {}).get('week_number') == week_number and
+                        n.get('data', {}).get('year') == year
+                        for n in self.notifications
+                    )
+                    
+                    # Vérifier si une confirmation pour cette semaine a déjà été enregistrée
+                    confirmation_exists = week_key in self.confirmed_transfers
+                    
+                    if not notification_exists and not confirmation_exists:
+                        # Créer une notification pour demander la confirmation des transferts
+                        self.add_notification(
+                            title="Confirmation hebdomadaire requise",
+                            message=f"Veuillez confirmer les transferts d'équipements réalisés pour la semaine {week_number}.",
+                            is_weekly_confirmation=True,
+                            data={'week_number': week_number, 'year': year}
+                        )
+                        
+                        # Attendre jusqu'à la fin de la journée avant de vérifier à nouveau
+                        time.sleep(3600 * 3)  # 3 heures
+                    else:
+                        # Attendre 1 heure avant de vérifier à nouveau
+                        time.sleep(3600)
+                else:
+                    # Attendre 1 heure avant de vérifier à nouveau
+                    time.sleep(3600)
+            
+            except Exception as e:
+                print(f"Erreur lors de la vérification des confirmations hebdomadaires: {str(e)}")
+                time.sleep(3600)  # Attendre 1 heure en cas d'erreur
+
+    def load_confirmed_transfers(self):
+        """Charge les confirmations de transferts enregistrées"""
+        if os.path.exists(self.confirmations_file):
+            try:
+                with open(self.confirmations_file, 'r') as file:
+                    self.confirmed_transfers = json.load(file)
+            except Exception as e:
+                print(f"Erreur lors du chargement des confirmations: {str(e)}")
+                self.confirmed_transfers = {}
+        else:
+            self.confirmed_transfers = {}
+
+    def save_confirmed_transfers_to_file(self):
+        """Enregistre les confirmations de transferts dans un fichier"""
+        try:
+            with open(self.confirmations_file, 'w') as file:
+                json.dump(self.confirmed_transfers, file, indent=4)
+        except Exception as e:
+            print(f"Erreur lors de l'enregistrement des confirmations: {str(e)}")
+            messagebox.showerror(
+                "Erreur", 
+                f"Impossible d'enregistrer les confirmations: {str(e)}"
+            )
+
+    def stop(self):
+        """Arrête le thread de vérification des confirmations hebdomadaires"""
+        self.should_stop = True
+        if self.check_thread.is_alive():
+            self.check_thread.join(timeout=1)
+
+    def get_confirmed_transfers_for_optimization(self, week_number=None, year=None):
+        """
+        Récupère les données des transferts confirmés pour l'optimisation
+        
+        Args:
+            week_number: Numéro de la semaine (si None, utilise la semaine actuelle)
+            year: Année (si None, utilise l'année actuelle)
+        
+        Returns:
+            Liste des transferts confirmés pour cette semaine
+        """
+        if week_number is None:
+            week_number = datetime.now().isocalendar()[1]
+        
+        if year is None:
+            year = datetime.now().year
+        
+        week_key = f"{year}-W{week_number}"
+        return self.confirmed_transfers.get(week_key, [])
+
+    def create_weekly_confirmation_reminder(self):
+        """
+        Crée une tâche planifiée pour envoyer une notification de confirmation chaque vendredi
+        """
+        # Cette méthode est une alternative au thread de vérification
+        # Vous pouvez l'utiliser si vous préférez une approche basée sur des tâches planifiées
+        
+        # Calculer la date du prochain vendredi à 15h
+        current_date = datetime.now()
+        days_until_friday = (4 - current_date.weekday()) % 7
+        
+        if days_until_friday == 0 and current_date.hour >= 15:
+            # Si c'est vendredi après 15h, planifier pour le vendredi suivant
+            days_until_friday = 7
+        
+        next_friday = current_date + timedelta(days=days_until_friday)
+        next_reminder = datetime(
+            next_friday.year, 
+            next_friday.month, 
+            next_friday.day, 
+            15, 0, 0  # 15h00
+        )
+        
+        # Calculer le délai en secondes
+        delay = (next_reminder - current_date).total_seconds()
+        
+        # Créer une tâche planifiée
+        self.root.after(int(delay * 1000), self.send_weekly_confirmation_notification)
+
+    def send_weekly_confirmation_notification(self):
+        """
+        Envoie une notification de confirmation hebdomadaire et planifie la prochaine
+        """
+        current_date = datetime.now()
+        week_number = current_date.isocalendar()[1]
+        year = current_date.year
+        
+        # Créer une notification pour demander la confirmation des transferts
+        self.add_notification(
+            title="Confirmation hebdomadaire requise",
+            message=f"Veuillez confirmer les transferts d'équipements réalisés pour la semaine {week_number}.",
+            is_weekly_confirmation=True,
+            data={'week_number': week_number, 'year': year}
+        )
+        
+        # Planifier la prochaine notification (dans 7 jours)
+        self.root.after(7 * 24 * 60 * 60 * 1000, self.send_weekly_confirmation_notification)
+
+    def update_optimization_with_confirmed_data(self, confirmed_data):
+        """
+        Met à jour les données d'optimisation avec les quantités confirmées
+        
+        Args:
+            confirmed_data: Liste des transferts confirmés
+        """
+        if not confirmed_data:
+            return
+        
+        # Cette méthode peut être utilisée pour préparer les données confirmées
+        # pour l'algorithme d'optimisation
+        
+        # Par exemple, vous pourriez mettre à jour une base de données ou un fichier
+        # contenant les quantités confirmées pour qu'elles soient utilisées lors de
+        # la prochaine optimisation
+        
+        # Exemple d'implémentation:
+        session = SessionLocal()
+        try:
+            for item in confirmed_data:
+                transfer_id = item['id']
+                confirmed_quantity = item['confirmed_quantity']
+                
+                # Récupérer le transfert correspondant
+                transfer = session.query(self.app.TransfererEquipement).get(transfer_id)
+                
+                if transfer:
+                    # Mettre à jour la quantité réelle
+                    transfer.quantite_reelle = confirmed_quantity
+                    
+                    # Vous pourriez également mettre à jour d'autres champs
+                    transfer.confirme = True
+                    transfer.date_confirmation = datetime.now()
+            
+            # Enregistrer les modifications
+            session.commit()
+            
+            print(f"Données confirmées mises à jour pour {len(confirmed_data)} transferts")
+        
+        except Exception as e:
+            session.rollback()
+            print(f"Erreur lors de la mise à jour des données confirmées: {str(e)}")
+        
+        finally:
+            session.close()
+
+    # Méthode pour intégrer les données confirmées à l'algorithme d'optimisation
+    def integrate_confirmed_data_with_optimization(self, week_number, year):
+        """
+        Intègre les données confirmées à l'algorithme d'optimisation
+        
+        Args:
+            week_number: Numéro de la semaine
+            year: Année
+        """
+        week_key = f"{year}-W{week_number}"
+        confirmed_data = self.confirmed_transfers.get(week_key, [])
+        
+        if not confirmed_data:
+            messagebox.showinfo(
+                "Information", 
+                f"Aucune donnée confirmée disponible pour la semaine {week_number} de {year}."
+            )
+            return
+        
+        try:
+            # Préparer les données pour l'optimisation
+            optimization_data = []
+            
+            for item in confirmed_data:
+                transfer_id = item['id']
+                confirmed_quantity = item['confirmed_quantity']
+                
+                # Récupérer les détails du transfert
+                session = SessionLocal()
+                try:
+                    transfer = session.query(self.app.TransfererEquipement).get(transfer_id)
+                    
+                    if transfer:
+                        optimization_data.append({
+                            'id': transfer_id,
+                            'client': transfer.id_client,
+                            'equipment': transfer.nom_equipement,
+                            'quantity': confirmed_quantity,
+                            'coords': self.get_client_coordinates(transfer.id_client)
+                        })
+                
+                finally:
+                    session.close()
+            
+            # Lancer l'optimisation avec ces données
+            if optimization_data:
+                # Stocker les données dans l'application principale pour utilisation
+                # par l'algorithme d'optimisation
+                self.app.confirmed_optimization_data = optimization_data
+                
+                # Afficher un message de préparation
+                self.app.meta_results_text.delete(1.0, tk.END)
+                self.app.meta_results_text.insert(
+                    tk.END, 
+                    f"Préparation de l'optimisation avec {len(optimization_data)} transferts confirmés...\n\n"
+                )
+                
+                # Afficher les détails des transferts confirmés
+                for item in optimization_data:
+                    self.app.meta_results_text.insert(
+                        tk.END,
+                        f"• Client: {item['client']}, Équipement: {item['equipment']}, Quantité: {item['quantity']}\n"
+                    )
+                
+                self.app.meta_results_text.insert(
+                    tk.END, 
+                    "\nVeuillez définir les paramètres d'optimisation et cliquer sur 'Lancer l'optimisation'.\n"
+                )
+                
+                # Mettre à jour l'interface d'optimisation pour utiliser ces données
+                # (À implémenter dans la classe d'optimisation)
+            
+            else:
+                messagebox.showinfo(
+                    "Information", 
+                    "Aucun transfert valide trouvé pour l'optimisation."
+                )
+        
+        except Exception as e:
+            messagebox.showerror(
+                "Erreur", 
+                f"Erreur lors de la préparation des données pour l'optimisation: {str(e)}"
+            )
+
+    def get_client_coordinates(self, client_id):
+        """
+        Récupère les coordonnées d'un client
+        
+        Args:
+            client_id: Identifiant du client
+            
+        Returns:
+            Tuple (latitude, longitude) ou None si non trouvé
+        """
+        session = SessionLocal()
+        try:
+            # Adapter cette requête à votre modèle de données
+            client = session.query(self.app.Client).filter_by(id=client_id).first()
+            
+            if client and hasattr(client, 'latitude') and hasattr(client, 'longitude'):
+                return (client.latitude, client.longitude)
+            
+            return None
+        
+        except Exception as e:
+            print(f"Erreur lors de la récupération des coordonnées du client: {str(e)}")
+            return None
+        
+        finally:
+            session.close()
 class TransfererEquipementApp:
     def __init__(self, root):
         self.root = root

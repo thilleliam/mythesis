@@ -1,0 +1,23 @@
+[
+    {
+        "title": "Confirmation hebdomadaire requise",
+        "message": "Veuillez confirmer les transferts d'\u00e9quipements r\u00e9alis\u00e9s pour la semaine 19.",
+        "is_weekly_confirmation": true,
+        "data": {
+            "week_number": 19,
+            "year": 2025
+        },
+        "action": null,
+        "timestamp": "2025-05-05 17:07:30",
+        "read": false
+    },
+    {
+        "title": "Notification de test",
+        "message": "Ceci est une notification de test cr\u00e9\u00e9e le 05/05/2025 \u00e0 17:07:32",
+        "is_weekly_confirmation": false,
+        "data": null,
+        "action": null,
+        "timestamp": "2025-05-05 17:07:32",
+        "read": false
+    }
+]
