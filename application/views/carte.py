@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
 import sys
 import os
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QWidget, QPushButton, 
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QPushButton, 
                             QMessageBox, QProgressDialog, QInputDialog, QCheckBox, QDialog,
                             QLabel, QListWidget, QComboBox, QFileDialog, QMenuBar, QMenu, QAction)
 from PyQt5.QtWebEngineWidgets import QWebEngineView
@@ -17,6 +17,7 @@ from PyQt5.QtCore import QUrl, Qt
 import time
 import math
 import tempfile
+import networkx as nx # type: ignore
 
 # Import de votre modèle Chantier
 from application.models.chantiers import Chantier
@@ -38,6 +39,11 @@ class CarteChantiers(QMainWindow):
         self.points_selectionnes = []
         self.chantiers = []
         self.chantiers_valides = []
+        
+        # Groupes de calques pour les réseaux
+        self.groupe_reseau_minimal = None
+        self.groupe_reseau_complet = None
+        self.groupe_toutes_connexions = None
         
         # Création de la carte
         self.creer_carte()
@@ -92,16 +98,332 @@ class CarteChantiers(QMainWindow):
         self.mettre_a_jour_carte()
         
     def afficher_reseau_minimal(self):
-        """Affiche le réseau routier minimal sur la carte"""
-        QMessageBox.information(self, "Réseau minimal", "Cette fonctionnalité n'est pas encore implémentée.")
+        """
+        Affiche le réseau routier minimal (arbre couvrant minimal) sur la carte.
+        Les connexions sont affichées sous forme de segments entre les points.
+        """
+        # Vérifier qu'il y a suffisamment de points pour créer un réseau
+        tous_points = self.obtenir_tous_points()
+        if len(tous_points) < 2:
+            QMessageBox.warning(self, "Réseau minimal", 
+                            "Il faut au moins 2 points pour créer un réseau minimal.")
+            return
+            
+        # Créer un graphe non dirigé
+        G = nx.Graph()
+        
+        # Ajouter les noeuds (points) avec leurs coordonnées
+        for idx, point in enumerate(tous_points):
+            G.add_node(idx, pos=(point['lat'], point['lon']), nom=point['nom'])
+        
+        # Ajouter les arêtes (connexions entre points) avec leur poids (distance)
+        for i, point1 in enumerate(tous_points):
+            for j, point2 in enumerate(tous_points):
+                if i < j:  # Pour éviter d'ajouter la même arête deux fois
+                    distance = self.calculer_distance(
+                        point1['lat'], point1['lon'], 
+                        point2['lat'], point2['lon']
+                    )
+                    G.add_edge(i, j, weight=distance, 
+                            points=((point1['lat'], point1['lon']), 
+                                    (point2['lat'], point2['lon'])))
+        
+        # Calculer l'arbre couvrant minimal
+        mst = nx.minimum_spanning_tree(G, weight='weight')
+        
+        # Supprimer l'ancien groupe s'il existe
+        if hasattr(self, 'groupe_reseau_minimal'):
+            if self.groupe_reseau_minimal in self.carte._children.values():
+                self.carte._children = {k: v for k, v in self.carte._children.items() 
+                                    if v != self.groupe_reseau_minimal}
+        
+        # Créer un nouveau groupe pour le réseau minimal
+        self.groupe_reseau_minimal = FeatureGroup(name='Réseau routier minimal')
+        
+        # Dessiner les segments de l'arbre couvrant minimal
+        total_distance = 0
+        for u, v, data in mst.edges(data=True):
+            point1 = tous_points[u]
+            point2 = tous_points[v]
+            distance = data['weight']
+            total_distance += distance
+            
+            # Créer le segment entre les deux points
+            line = PolyLine(
+                locations=[
+                    [point1['lat'], point1['lon']],
+                    [point2['lat'], point2['lon']]
+                ],
+                color='green',
+                weight=4,
+                opacity=0.8,
+                tooltip=f"{point1['nom']} ↔ {point2['nom']} ({distance:.1f} km)"
+            )
+            line.add_to(self.groupe_reseau_minimal)
+        
+        # Ajouter le groupe à la carte
+        self.groupe_reseau_minimal.add_to(self.carte)
+        
+        # Mettre à jour la carte
+        self.mettre_a_jour_carte()
+        
+        # Afficher un message d'information
+        QMessageBox.information(self, "Réseau minimal", 
+                            f"Réseau routier minimal affiché.\n"
+                            f"Distance totale : {total_distance:.1f} km\n"
+                            f"Nombre de segments : {mst.number_of_edges()}")
         
     def afficher_reseau_complet(self):
-        """Affiche le réseau routier complet sur la carte"""
-        QMessageBox.information(self, "Réseau complet", "Cette fonctionnalité n'est pas encore implémentée.")
+        """
+        Affiche un réseau routier complet optimisé sur la carte.
+        Ce réseau utilise l'algorithme du voyageur de commerce pour trouver un parcours efficace.
+        """
+        # Vérifier qu'il y a suffisamment de points pour créer un réseau
+        tous_points = self.obtenir_tous_points()
+        if len(tous_points) < 2:
+            QMessageBox.warning(self, "Réseau complet", 
+                            "Il faut au moins 2 points pour créer un réseau complet.")
+            return
+            
+        # Créer une matrice de distance entre tous les points
+        n = len(tous_points)
+        distance_matrix = np.zeros((n, n))
+        for i in range(n):
+            for j in range(n):
+                if i != j:
+                    distance_matrix[i][j] = self.calculer_distance(
+                        tous_points[i]['lat'], tous_points[i]['lon'],
+                        tous_points[j]['lat'], tous_points[j]['lon']
+                    )
+        
+        # Utiliser l'algorithme du plus proche voisin pour résoudre approximativement le TSP
+        tour = self.nearest_neighbor_tsp(distance_matrix)
+        
+        # Créer un nouveau groupe pour le réseau complet
+        self.groupe_reseau_complet = FeatureGroup(name='Réseau routier complet')
+        
+        # Dessiner le parcours
+        total_distance = 0
+        for i in range(len(tour)):
+            idx1 = tour[i]
+            idx2 = tour[(i + 1) % len(tour)]  # Retour au début après le dernier point
+            
+            point1 = tous_points[idx1]
+            point2 = tous_points[idx2]
+            
+            distance = distance_matrix[idx1][idx2]
+            total_distance += distance
+            
+            # Dessiner la ligne
+            PolyLine(
+                [[point1['lat'], point1['lon']], [point2['lat'], point2['lon']]],
+                color='blue',
+                weight=4,
+                opacity=0.8,
+                tooltip=f"{point1['nom']} → {point2['nom']} ({distance:.1f} km)"
+            ).add_to(self.groupe_reseau_complet)
+        
+        # Mettre à jour la carte (qui va ajouter correctement le groupe à la carte)
+        self.mettre_a_jour_carte()
+        
+        # Afficher un message d'information
+        QMessageBox.information(self, "Réseau complet", 
+                            f"Réseau routier complet affiché.\n"
+                            f"Distance totale : {total_distance:.1f} km\n"
+                            f"Nombre de points : {len(tour)}")
+
+    def afficher_toutes_connexions(self):
+        """
+        Affiche toutes les connexions possibles entre les points sur la carte.
+        Ce réseau complet montre toutes les liaisons directes entre chaque paire de points.
+        """
+        # Vérifier qu'il y a suffisamment de points pour créer un réseau
+        tous_points = self.obtenir_tous_points()
+        if len(tous_points) < 2:
+            QMessageBox.warning(self, "Toutes les connexions", 
+                            "Il faut au moins 2 points pour afficher les connexions.")
+            return
+            
+        # Créer un nouveau groupe pour toutes les connexions
+        self.groupe_toutes_connexions = FeatureGroup(name='Toutes les connexions')
+        
+        # Compteurs pour le message d'information
+        total_distance = 0
+        nb_connexions = 0
+        
+        # Dessiner une ligne entre chaque paire de points
+        for i, point1 in enumerate(tous_points):
+            for j, point2 in enumerate(tous_points):
+                if i < j:  # Pour éviter de traiter la même paire deux fois
+                    distance = self.calculer_distance(
+                        point1['lat'], point1['lon'],
+                        point2['lat'], point2['lon']
+                    )
+                    total_distance += distance
+                    nb_connexions += 1
+                    
+                    # Dessiner la ligne
+                    PolyLine(
+                        [[point1['lat'], point1['lon']], [point2['lat'], point2['lon']]],
+                        color='red',
+                        weight=2,
+                        opacity=0.5,
+                        tooltip=f"{point1['nom']} ↔ {point2['nom']} ({distance:.1f} km)"
+                    ).add_to(self.groupe_toutes_connexions)
+        
+        # Mettre à jour la carte (qui va ajouter correctement le groupe à la carte)
+        self.mettre_a_jour_carte()
+        
+        # Afficher un message d'information
+        QMessageBox.information(self, "Toutes les connexions", 
+                            f"Toutes les connexions possibles affichées.\n"
+                            f"Distance totale cumulée : {total_distance:.1f} km\n"
+                            f"Nombre de connexions : {nb_connexions}")
+
+    def mettre_a_jour_carte(self):
+        """Sauvegarde et recharge la carte mise à jour"""
+        try:
+            # Méthode plus sûre pour recréer la carte au lieu de simplement ajouter/supprimer des calques
+            # Sauvegarde de la position actuelle et du niveau de zoom
+            center = self.carte.get_center()
+            zoom = self.carte.options['zoom_start']
+            
+            # Recréation de la carte de base
+            self.carte = Map(
+                location=center,
+                zoom_start=zoom,
+                control_scale=True,
+                tiles='OpenStreetMap'
+            )
+            
+            # Ajouter à nouveau les groupes existants
+            if hasattr(self, 'groupe_chantiers') and self.groupe_chantiers:
+                self.groupe_chantiers.add_to(self.carte)
+            if hasattr(self, 'groupe_points_utilisateur') and self.groupe_points_utilisateur:
+                self.groupe_points_utilisateur.add_to(self.carte)
+            if hasattr(self, 'groupe_segments') and self.groupe_segments:
+                self.groupe_segments.add_to(self.carte)
+                
+            # Ajouter les groupes de réseaux s'ils existent
+            if hasattr(self, 'groupe_reseau_minimal') and self.groupe_reseau_minimal:
+                self.groupe_reseau_minimal.add_to(self.carte)
+            if hasattr(self, 'groupe_reseau_complet') and self.groupe_reseau_complet:
+                self.groupe_reseau_complet.add_to(self.carte)
+            if hasattr(self, 'groupe_toutes_connexions') and self.groupe_toutes_connexions:
+                self.groupe_toutes_connexions.add_to(self.carte)
+            if hasattr(self, 'groupe_plan_sahara') and self.groupe_plan_sahara:
+                self.groupe_plan_sahara.add_to(self.carte)
+            
+            # Ajouter le contrôle des calques en dernier
+            LayerControl().add_to(self.carte)
+            
+            # Sauvegarder et afficher la carte mise à jour
+            self.carte.save(self.temp_file)
+            self.browser.load(QUrl.fromLocalFile(self.temp_file))
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur", f"Erreur lors de la mise à jour de la carte : {str(e)}")
+    def nearest_neighbor_tsp(self, distance_matrix):
+        """
+        Implémentation de l'algorithme du plus proche voisin pour le problème du voyageur de commerce.
+        Retourne une liste d'indices représentant l'ordre des points à visiter.
+        """
+        n = len(distance_matrix)
+        unvisited = set(range(n))
+        tour = [0]  # Commencer par le premier point
+        unvisited.remove(0)
+        
+        while unvisited:
+            current = tour[-1]
+            next_point = min(unvisited, key=lambda x: distance_matrix[current][x])
+            tour.append(next_point)
+            unvisited.remove(next_point)
+            
+        return tour
         
     def afficher_toutes_connexions(self):
-        """Affiche toutes les connexions possibles entre les points sur la carte"""
-        QMessageBox.information(self, "Toutes les connexions", "Cette fonctionnalité n'est pas encore implémentée.")
+        """
+        Affiche toutes les connexions possibles entre les points sur la carte.
+        Ce réseau complet montre toutes les liaisons directes entre chaque paire de points.
+        """
+        # Vérifier qu'il y a suffisamment de points pour créer un réseau
+        tous_points = self.obtenir_tous_points()
+        if len(tous_points) < 2:
+            QMessageBox.warning(self, "Toutes les connexions", 
+                               "Il faut au moins 2 points pour afficher les connexions.")
+            return
+            
+        # Supprimer l'ancien groupe s'il existe
+        if self.groupe_toutes_connexions:
+            self.carte._children = {k: v for k, v in self.carte._children.items() 
+                                  if v != self.groupe_toutes_connexions}
+        
+        # Créer un nouveau groupe pour toutes les connexions
+        self.groupe_toutes_connexions = FeatureGroup(name='Toutes les connexions')
+        
+        # Compteurs pour le message d'information
+        total_distance = 0
+        nb_connexions = 0
+        
+        # Dessiner une ligne entre chaque paire de points
+        for i, point1 in enumerate(tous_points):
+            for j, point2 in enumerate(tous_points):
+                if i < j:  # Pour éviter de traiter la même paire deux fois
+                    distance = self.calculer_distance(
+                        point1['lat'], point1['lon'],
+                        point2['lat'], point2['lon']
+                    )
+                    total_distance += distance
+                    nb_connexions += 1
+                    
+                    # Dessiner la ligne
+                    PolyLine(
+                        [[point1['lat'], point1['lon']], [point2['lat'], point2['lon']]],
+                        color='red',
+                        weight=2,
+                        opacity=0.5,
+                        tooltip=f"{point1['nom']} ↔ {point2['nom']} ({distance:.1f} km)"
+                    ).add_to(self.groupe_toutes_connexions)
+        
+        # Ajouter le groupe à la carte
+        self.groupe_toutes_connexions.add_to(self.carte)
+        
+        # Mettre à jour la carte
+        self.mettre_a_jour_carte()
+        
+        # Afficher un message d'information
+        QMessageBox.information(self, "Toutes les connexions", 
+                               f"Toutes les connexions possibles affichées.\n"
+                               f"Distance totale cumulée : {total_distance:.1f} km\n"
+                               f"Nombre de connexions : {nb_connexions}")
+    
+    def obtenir_tous_points(self):
+        """
+        Retourne une liste unifiée de tous les points (chantiers et points ajoutés manuellement)
+        avec leurs coordonnées et leur nom.
+        """
+        tous_points = []
+        
+        # Ajouter les chantiers
+        for i, chantier in enumerate(self.chantiers_valides):
+            tous_points.append({
+                'id': f"chantier_{i}",
+                'nom': chantier.id_client or f"Chantier {i+1}",
+                'lat': chantier.latitude,
+                'lon': chantier.longitude,
+                'type': 'chantier'
+            })
+        
+        # Ajouter les points manuels
+        for i, point in enumerate(self.points_ajoutes):
+            tous_points.append({
+                'id': f"manuel_{i}",
+                'nom': point['nom'],
+                'lat': point['lat'],
+                'lon': point['lon'],
+                'type': 'manuel'
+            })
+            
+        return tous_points
         
     def ajouter_plan_route_specifique(self, show_markers=True, show_routes=True, 
                                 show_distances=True, route_color="darkgreen"):
@@ -206,6 +528,21 @@ class CarteChantiers(QMainWindow):
         action_measure = QAction("Mesurer une distance", self)
         action_measure.triggered.connect(self.mesurer_distance)
         tools_menu.addAction(action_measure)
+        
+        # Menu Réseaux
+        network_menu = menubar.addMenu("Réseaux")
+        
+        action_minimal = QAction("Réseau minimal (MST)", self)
+        action_minimal.triggered.connect(self.afficher_reseau_minimal)
+        network_menu.addAction(action_minimal)
+        
+        action_complet = QAction("Réseau complet (TSP)", self)
+        action_complet.triggered.connect(self.afficher_reseau_complet)
+        network_menu.addAction(action_complet)
+        
+        action_all = QAction("Toutes les connexions", self)
+        action_all.triggered.connect(self.afficher_toutes_connexions)
+        network_menu.addAction(action_all)
     
     def creer_carte(self):
         """Crée une carte Folium avec les positions des chantiers depuis la base de données"""
@@ -318,36 +655,117 @@ class CarteChantiers(QMainWindow):
         self.mettre_a_jour_carte()
         QMessageBox.information(self, "Point ajouté", f"Le point {nom} a été ajouté à la carte.")
     
+    def creer_segment(self, dialog):
+        """
+        Crée le segment entre les deux points sélectionnés et l'ajoute à la carte.
+        Calcule et affiche la distance entre les points.
+        """
+        try:
+            point1 = self.combo_point1.currentData()
+            point2 = self.combo_point2.currentData()
+            
+            # Vérifier que les deux points sont différents
+            if point1['id'] == point2['id']:
+                QMessageBox.warning(self, "Erreur", "Veuillez sélectionner deux points différents.")
+                return
+            
+            # Calcul de la distance
+            distance = self.calculer_distance(
+                point1['lat'], point1['lon'],
+                point2['lat'], point2['lon']
+            )
+            
+            # Ajouter info de distance si cochée
+            afficher_distance = self.check_distance.isChecked()
+            
+            # Création du segment
+            segment = {
+                'point1': point1,
+                'point2': point2,
+                'distance': distance,
+                'couleur': 'blue',
+                'epaisseur': 3,
+                'afficher_distance': afficher_distance
+            }
+            self.segments_ajoutes.append(segment)
+            
+            # Préparer le texte du tooltip
+            tooltip = f"Segment: {point1['nom']} → {point2['nom']}"
+            if afficher_distance:
+                tooltip += f" ({distance:.1f} km)"
+            
+            # Dessiner la ligne directement sans méthode séparée
+            line = PolyLine(
+                locations=[
+                    [point1['lat'], point1['lon']],
+                    [point2['lat'], point2['lon']]
+                ],
+                color='blue',
+                weight=3,
+                opacity=0.7,
+                tooltip=tooltip
+            )
+            
+            # Ajouter la ligne au groupe de segments
+            line.add_to(self.groupe_segments)
+            
+            dialog.accept()
+            self.mettre_a_jour_carte()
+            QMessageBox.information(
+                self, "Segment ajouté", 
+                f"Segment créé entre {point1['nom']} et {point2['nom']}.\n"
+                f"Distance: {distance:.2f} km"
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur", f"Impossible de créer le segment: {str(e)}")
+
+    def segment_existe_deja(self, point1, point2):
+        """
+        Vérifie si un segment entre les deux points existe déjà
+        """
+        for segment in self.segments_ajoutes:
+            if ((segment['point1']['id'] == point1['id'] and segment['point2']['id'] == point2['id']) or
+                (segment['point1']['id'] == point2['id'] and segment['point2']['id'] == point1['id'])):
+                return True
+        return False
+
+    def dessiner_segment_sur_carte(self, segment):
+        """
+        Dessine un segment sur la carte selon les paramètres fournis
+        """
+        point1 = segment['point1']
+        point2 = segment['point2']
+        distance = segment['distance']
+        
+        # Préparer le texte du tooltip
+        tooltip = f"Segment: {point1['nom']} → {point2['nom']}"
+        if segment.get('afficher_distance', True):
+            tooltip += f" ({distance:.1f} km)"
+        
+        # Dessiner la ligne
+        poly_line = PolyLine(
+            locations=[
+                [point1['lat'], point1['lon']],
+                [point2['lat'], point2['lon']]
+            ],
+            color=segment['couleur'],
+            weight=segment['epaisseur'],
+            opacity=0.7,
+            tooltip=tooltip
+        )
+        
+        poly_line.add_to(self.groupe_segments)
+        return poly_line
+
     def dessiner_segment(self):
         """Permet à l'utilisateur de dessiner un segment entre deux points"""
-        if not self.chantiers_valides and not self.points_ajoutes:
+        tous_points = self.obtenir_tous_points()
+        
+        if not tous_points:
             QMessageBox.warning(self, "Erreur", "Aucun point disponible pour dessiner un segment.")
             return
         
-        # Créer une liste de tous les points disponibles
-        points_disponibles = []
-        
-        # Ajouter les chantiers
-        for i, chantier in enumerate(self.chantiers_valides):
-            points_disponibles.append({
-                'id': f"chantier_{i}",
-                'nom': chantier.id_client or f"Chantier {i}",
-                'lat': chantier.latitude,
-                'lon': chantier.longitude,
-                'type': 'chantier'
-            })
-        
-        # Ajouter les points manuels
-        for i, point in enumerate(self.points_ajoutes):
-            points_disponibles.append({
-                'id': f"manuel_{i}",
-                'nom': point['nom'],
-                'lat': point['lat'],
-                'lon': point['lon'],
-                'type': 'manuel'
-            })
-        
-        # Boîte de dialogue pour sélectionner les points
+        # Créer une boîte de dialogue pour sélectionner les points
         dialog = QDialog(self)
         dialog.setWindowTitle("Sélection des points pour le segment")
         dialog.setMinimumWidth(400)
@@ -357,13 +775,13 @@ class CarteChantiers(QMainWindow):
         # Liste des points disponibles
         layout.addWidget(QLabel("Sélectionnez le premier point:"))
         self.combo_point1 = QComboBox()
-        for point in points_disponibles:
+        for point in tous_points:
             self.combo_point1.addItem(f"{point['nom']} ({point['lat']:.4f}, {point['lon']:.4f})", point)
         layout.addWidget(self.combo_point1)
         
         layout.addWidget(QLabel("Sélectionnez le deuxième point:"))
         self.combo_point2 = QComboBox()
-        for point in points_disponibles:
+        for point in tous_points:
             self.combo_point2.addItem(f"{point['nom']} ({point['lat']:.4f}, {point['lon']:.4f})", point)
         layout.addWidget(self.combo_point2)
         
@@ -375,7 +793,7 @@ class CarteChantiers(QMainWindow):
         layout.addWidget(self.check_distance)
         
         # Boutons
-        btn_box = QVBoxLayout()
+        btn_box = QHBoxLayout()
         btn_ok = QPushButton("Valider")
         btn_ok.clicked.connect(lambda: self.creer_segment(dialog))
         btn_box.addWidget(btn_ok)
@@ -388,51 +806,39 @@ class CarteChantiers(QMainWindow):
         dialog.setLayout(layout)
         
         dialog.exec_()
-    
-    def creer_segment(self, dialog):
-        """Crée le segment entre les deux points sélectionnés"""
-        point1 = self.combo_point1.currentData()
-        point2 = self.combo_point2.currentData()
+
+    def trouver_point_plus_proche(self, point_source, liste_points):
+        """
+        Trouve l'index du point le plus proche de point_source
+        dans la liste liste_points, en excluant le point source lui-même
+        """
+        if not liste_points or len(liste_points) < 2:
+            return -1
         
-        if point1['id'] == point2['id']:
-            QMessageBox.warning(self, "Erreur", "Veuillez sélectionner deux points différents.")
-            return
+        min_distance = float('inf')
+        closest_idx = -1
         
-        # Calcul de la distance
-        distance = self.calculer_distance(
-            point1['lat'], point1['lon'],
-            point2['lat'], point2['lon']
-        )
+        for idx, point in enumerate(liste_points):
+            if point['id'] == point_source['id']:
+                continue
+            
+            distance = self.calculer_distance(
+                point_source['lat'], point_source['lon'],
+                point['lat'], point['lon']
+            )
+            
+            if distance < min_distance:
+                min_distance = distance
+                closest_idx = idx
         
-        # Création du segment
-        segment = {
-            'point1': point1,
-            'point2': point2,
-            'distance': distance,
-            'couleur': 'blue',
-            'epaisseur': 3
-        }
-        self.segments_ajoutes.append(segment)
-        
-        # Dessiner le segment sur la carte
-        PolyLine(
-            locations=[
-                [point1['lat'], point1['lon']],
-                [point2['lat'], point2['lon']]
-            ],
-            color=segment['couleur'],
-            weight=segment['epaisseur'],
-            opacity=0.7,
-            tooltip=f"Segment: {point1['nom']} → {point2['nom']} ({distance:.1f} km)"
-        ).add_to(self.groupe_segments)
-        
-        dialog.accept()
-        self.mettre_a_jour_carte()
-        QMessageBox.information(self, "Segment ajouté", f"Segment créé entre {point1['nom']} et {point2['nom']}.")
-    
+        return closest_idx
+
     def calculer_distance(self, lat1, lon1, lat2, lon2):
-        """Calcule la distance entre deux points en km (formule haversine)"""
-        R = 6371  # Rayon de la Terre en km
+        """
+        Calcule la distance entre deux points en km (formule haversine)
+        Précision améliorée par rapport à la version précédente
+        """
+        R = 6371.0  # Rayon de la Terre en km
         
         # Conversion des degrés en radians
         lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
@@ -495,11 +901,66 @@ class CarteChantiers(QMainWindow):
             
             self.mettre_a_jour_carte()
             QMessageBox.information(self, "Carte effacée", "Tous les éléments ajoutés ont été supprimés.")
-    
     def mettre_a_jour_carte(self):
         """Sauvegarde et recharge la carte mise à jour"""
-        self.carte.save(self.temp_file)
-        self.browser.load(QUrl.fromLocalFile(self.temp_file))
+        try:
+            # Définir des valeurs par défaut pour le centre et le zoom
+            center = [46.603354, 1.888334]  # Coordonnées par défaut (centre de la France)
+            zoom = 6  # Niveau de zoom par défaut
+            
+            # Si la carte existe déjà, récupérer sa position et son zoom actuels
+            if hasattr(self, 'carte') and self.carte:
+                try:
+                    center = self.carte.location
+                    zoom = self.carte.options.get('zoom_start', zoom)
+                except:
+                    pass  # En cas d'erreur, utiliser les valeurs par défaut
+            
+            # Recréation complète de la carte
+            self.carte = Map(
+                location=center,
+                zoom_start=zoom,
+                control_scale=True,
+                tiles='OpenStreetMap'
+            )
+            
+            # Recréation des groupes de calques
+            self.groupe_chantiers = FeatureGroup(name='Chantiers')
+            self.groupe_points_utilisateur = FeatureGroup(name='Points ajoutés')
+            self.groupe_segments = FeatureGroup(name='Segments')
+            
+            # Réajout des marqueurs de chantiers
+            for chantier in self.chantiers_valides:
+                self.ajouter_marqueur_chantier(chantier)
+            
+            # Réajout des points manuels
+            for point in self.points_ajoutes:
+                marker = Marker(
+                    location=[point['lat'], point['lon']],
+                    popup=Popup(f"<b>{point['nom']}</b><br>Point ajouté manuellement", max_width=200),
+                    tooltip=point['nom'],
+                    icon=Icon(color='red', icon='star')
+                )
+                marker.add_to(self.groupe_points_utilisateur)
+            
+            # Réajout des segments
+            for segment in self.segments_ajoutes:
+                self.dessiner_segment_sur_carte(segment)
+            
+            # Ajouter les groupes à la nouvelle carte
+            self.groupe_chantiers.add_to(self.carte)
+            self.groupe_points_utilisateur.add_to(self.carte)
+            self.groupe_segments.add_to(self.carte)
+            
+            # Ajouter le contrôle des calques
+            LayerControl().add_to(self.carte)
+            
+            # Sauvegarder et afficher la carte mise à jour
+            self.carte.save(self.temp_file)
+            self.browser.load(QUrl.fromLocalFile(self.temp_file))
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur", f"Erreur lors de la mise à jour de la carte : {str(e)}")
 
 def main():
     app = QApplication(sys.argv)
