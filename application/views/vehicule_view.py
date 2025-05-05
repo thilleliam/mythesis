@@ -1,3 +1,4 @@
+from requests import session
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 from tkinter import Canvas, messagebox, simpledialog, StringVar
