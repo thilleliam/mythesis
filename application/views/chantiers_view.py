@@ -48,7 +48,12 @@ class ChantierApp:
         ttk.Entry(frame, textvariable=self.longitude_var).grid(row=1, column=3, padx=5, pady=5)
 
         ttk.Label(frame, text="Nature Terrain").grid(row=2, column=0, padx=5, pady=5)
-        ttk.Entry(frame, textvariable=self.nature_terrain_var).grid(row=2, column=1, padx=5, pady=5)
+        # Remplacer l'Entry par une Combobox pour Nature Terrain
+        self.nature_terrain_combo = ttk.Combobox(frame, textvariable=self.nature_terrain_var, 
+                                              values=["Accès facile", "Accès difficile"],
+                                              state="readonly")
+        self.nature_terrain_combo.grid(row=2, column=1, padx=5, pady=5)
+        self.nature_terrain_combo.current(0)  # Définir la valeur par défaut
 
         ttk.Label(frame, text="Distance Aller Goudron (km)").grid(row=2, column=2, padx=5, pady=5)
         ttk.Entry(frame, textvariable=self.distance_aller_goudron_var).grid(row=2, column=3, padx=5, pady=5)
@@ -127,7 +132,7 @@ class ChantierApp:
                 nature_terrain=self.nature_terrain_var.get(),
                 distanceAllerGoudron=self.distance_aller_goudron_var.get(),
                 distanceAllerPiste=self.distance_aller_piste_var.get(),
-                temps_aller = self.calculer_temps_aller()  # CorrectEnregistrer dans la base
+                temps_aller = self.calculer_temps_aller()
             )
             session.add(chantier)
             session.commit()
@@ -157,7 +162,7 @@ class ChantierApp:
                 chantier.nature_terrain = self.nature_terrain_var.get()
                 chantier.distanceAllerGoudron = self.distance_aller_goudron_var.get()
                 chantier.distanceAllerPiste = self.distance_aller_piste_var.get()
-                chantier.temps_aller = self.calculer_temps_aller()  # Correct Mise à jour du temps d'aller
+                chantier.temps_aller = self.calculer_temps_aller()
                 session.commit()
                 self.charger_donnees()
                 messagebox.showinfo("Succès", "Chantier modifié avec succès!")
@@ -196,7 +201,13 @@ class ChantierApp:
                 # Convertir les valeurs numériques en vérifiant si elles sont None ou vides
                 self.latitude_var.set(float(values[2]) if values[2] and values[2] != 'None' else 0.0)
                 self.longitude_var.set(float(values[3]) if values[3] and values[3] != 'None' else 0.0)
-                self.nature_terrain_var.set(values[4])
+                
+                # Pour la combobox, s'assurer que la valeur est l'une des deux options permises
+                terrain = values[4] if values[4] and values[4] != 'None' else "Accès facile"
+                if terrain not in ["Accès facile", "Accès difficile"]:
+                    terrain = "Accès facile"  # Valeur par défaut si la valeur existante n'est pas valide
+                self.nature_terrain_var.set(terrain)
+                
                 self.distance_aller_goudron_var.set(float(values[5]) if values[5] and values[5] != 'None' else 0.0)
                 self.distance_aller_piste_var.set(float(values[6]) if values[6] and values[6] != 'None' else 0.0)
                 self.temps_aller_var.set(float(values[7]) if values[7] and values[7] != 'None' else 0.0)
@@ -204,29 +215,33 @@ class ChantierApp:
                 messagebox.showerror("Erreur", f"Erreur lors de la sélection: {str(e)}")
 
     def charger_donnees(self):
-
-            # Effacer le tableau actuel
+        # Effacer le tableau actuel
         self.tree.delete(*self.tree.get_children())
         for chantier in session.query(self.Chantier).all():
+            # Vérifier et normaliser la valeur de nature_terrain
+            nature_terrain = chantier.nature_terrain or ""
+            if nature_terrain not in ["Accès facile", "Accès difficile"]:
+                nature_terrain = "Accès facile"  # Valeur par défaut
+                
             self.tree.insert("", "end", values=(
                 chantier.id_client,
                 chantier.localisation or "",
                 chantier.latitude or "",
                 chantier.longitude or "",
-                chantier.nature_terrain or "",
+                nature_terrain,
                 chantier.distanceAllerGoudron or "",
                 chantier.distanceAllerPiste or "",
                 chantier.temps_aller or ""
                 ))
                 
-            print(f"Nombre de lignes affichées dans le tableau: {len(self.tree.get_children())}")
+        print(f"Nombre de lignes affichées dans le tableau: {len(self.tree.get_children())}")
         
     def vider_formulaire(self):
         self.id_client_var.set("")
         self.localisation_var.set("")
         self.latitude_var.set(0.0)
         self.longitude_var.set(0.0)
-        self.nature_terrain_var.set("")
+        self.nature_terrain_var.set("Accès facile")  # Définir la valeur par défaut
         self.distance_aller_goudron_var.set(0.0)
         self.distance_aller_piste_var.set(0.0)
         self.temps_aller_var.set(0.0)
@@ -296,6 +311,6 @@ class ChantierApp:
 
 if __name__ == "__main__":
     # Créer une fenêtre avec le thème darkly directement lors de l'initialisation
-    root = ttk.Window(themename="darkly")
+    root = ttk.Window(themename="cosmo")
     app = ChantierApp(root)
     root.mainloop()
