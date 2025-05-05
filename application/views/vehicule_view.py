@@ -1,6 +1,6 @@
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
-from tkinter import messagebox, simpledialog, StringVar
+from tkinter import Canvas, messagebox, simpledialog, StringVar
 from sqlalchemy.orm import sessionmaker, configure_mappers
 from application.database import engine
 from sqlalchemy import func
@@ -138,16 +138,34 @@ class VehiculeApp(ttk.Frame):
         """Configure l'onglet des statistiques"""
         # Import local pour éviter les références circulaires
         from application.models.vehicule import Vehicule
-
+        
         # Nettoyer l'onglet stats avant de le reconfigurer
         for widget in self.tab_stats.winfo_children():
             widget.destroy()
-
-        stats_frame = ttk.Frame(self.tab_stats, padding=20)
-        stats_frame.pack(fill=BOTH, expand=True)
-
+        
+        # Créer un canvas avec scrollbar
+        canvas_container = ttk.Frame(self.tab_stats)
+        canvas_container.pack(fill=BOTH, expand=True)
+        
+        # Créer la scrollbar
+        scrollbar = ttk.Scrollbar(canvas_container, orient=VERTICAL)
+        scrollbar.pack(side=RIGHT, fill=Y)
+        
+        # Créer le canvas
+        canvas = Canvas(canvas_container, yscrollcommand=scrollbar.set)
+        canvas.pack(side=LEFT, fill=BOTH, expand=True)
+        
+        # Configurer la scrollbar pour qu'elle contrôle le canvas
+        scrollbar.config(command=canvas.yview)
+        
+        # Créer le frame qui contiendra tout le contenu
+        stats_frame = ttk.Frame(canvas, padding=20)
+        
+        # Ajouter le frame au canvas
+        canvas_window = canvas.create_window((0, 0), window=stats_frame, anchor=NW)
+        
         ttk.Label(stats_frame, text="Statistiques de la Flotte", font=("-size", 16, "-weight", "bold")).pack(pady=10)
-
+        
         # Obtenir une session
         session = self.get_session()
         try:
@@ -156,20 +174,20 @@ class VehiculeApp(ttk.Frame):
             en_service = session.query(func.count(Vehicule.immatriculation)).filter(Vehicule.etat == "En service").scalar() or 0
             disponible = session.query(func.count(Vehicule.immatriculation)).filter(Vehicule.etat == "Disponible").scalar() or 0
             total = en_panne + en_service + disponible
-
+            
             # Éviter la division par zéro
             panne_pct = (en_panne / total * 100) if total > 0 else 0
             service_pct = (en_service / total * 100) if total > 0 else 0
             dispo_pct = (disponible / total * 100) if total > 0 else 0
-
+            
             # Afficher les statistiques
             stats_container = ttk.Frame(stats_frame)
             stats_container.pack(fill=BOTH, expand=True, pady=20)
-
+            
             # Stats par état
             etat_frame = ttk.Labelframe(stats_container, text="État des véhicules", padding=10)
             etat_frame.pack(side=LEFT, fill=BOTH, expand=True, padx=5)
-
+            
             ttk.Label(etat_frame, text=f"Total de véhicules: {total}").pack(anchor=W, pady=5)
             ttk.Label(etat_frame, text=f"En service: {en_service} ({service_pct:.1f}%)",
                     foreground="#3498db").pack(anchor=W, pady=5)
@@ -177,23 +195,31 @@ class VehiculeApp(ttk.Frame):
                     foreground="#f39c12").pack(anchor=W, pady=5)
             ttk.Label(etat_frame, text=f"Disponibles: {disponible} ({dispo_pct:.1f}%)",
                     foreground="#2ecc71").pack(anchor=W, pady=5)
-
+            
             # Stats par type
             types_frame = ttk.Labelframe(stats_container, text="Types de véhicules", padding=10)
             types_frame.pack(side=LEFT, fill=BOTH, expand=True, padx=5)
-
+            
             # Obtenir les types uniques et leur compte
             types_count = {}
             for v_type, count in session.query(Vehicule.type_vehicule, func.count(Vehicule.type_vehicule)).group_by(Vehicule.type_vehicule).all():
                 if v_type:  # Éviter les valeurs None
                     types_count[v_type] = count
-
+            
             for v_type, count in types_count.items():
                 ttk.Label(types_frame, text=f"{v_type}: {count} véhicules").pack(anchor=W, pady=5)
-
+            
             # Rafraîchir les stats
             ttk.Button(stats_frame, text="Rafraîchir les statistiques", command=self.configurer_tab_stats, bootstyle=INFO).pack(pady=10)
-
+            
+            # Mettre à jour les dimensions du canvas pour le scrolling
+            def configure_canvas(event):
+                canvas.configure(scrollregion=canvas.bbox("all"), width=event.width)
+            
+            # Lier l'événement de redimensionnement
+            stats_frame.bind("<Configure>", configure_canvas)
+            canvas.bind("<Configure>", lambda e: canvas.itemconfig(canvas_window, width=e.width))
+        
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors de la configuration des statistiques : {str(e)}")
         finally:
