@@ -79,7 +79,13 @@ class MainApp:
 
         canvas.bind_all("<MouseWheel>", on_mousewheel)
 
-        
+        self.style.configure("ModernCard.TFrame",
+            background="white",
+            relief="flat",
+            borderwidth=1
+        )
+        self.style.map("ModernCard.TFrame", background=[("active", "white")])
+
         # Créer les modules sous forme de cartes modernes
         self.create_module_cards()
         
@@ -345,60 +351,61 @@ class MainApp:
         self.create_table_module(right_col, "Dernières commandes", "danger")
     
     def create_kpi_card(self, parent, data):
-        """Crée une carte KPI moderne"""
-        card = ttk.Frame(parent, padding=15, bootstyle=f"{data['color']}-light")
-        card.pack(side=LEFT, fill=X, expand=True, padx=5)
+        """Crée une carte KPI moderne et visible"""
+        bg_color = "white"
+        border_color = self.style.colors.get(data["color"])
         
-        # En-tête de la carte
-        header = ttk.Frame(card, bootstyle=f"{data['color']}-light")
-        header.pack(fill=X)
-        
-        # Titre - utiliser un texte foncé pour un meilleur contraste sur fond clair
+        card = tk.Frame(
+            parent, 
+            bg=bg_color,
+            bd=0,
+            highlightbackground=border_color,
+            highlightthickness=2
+        )
+        card.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=8, ipadx=10, ipady=10)
+
+        # Titre
         ttk.Label(
-            header,
+            card,
             text=data["title"],
-            font=("Roboto", 12),
-            foreground=self.text_color["dark"]
-        ).pack(anchor=W)
-        
-        # Corps de la carte
-        body = ttk.Frame(card, bootstyle=f"{data['color']}-light")
-        body.pack(fill=X, pady=10)
-        
-        # Valeur principale - utiliser la couleur primaire du thème pour le mettre en évidence
+            font=("Roboto", 10),
+            foreground="#000000",
+            background=bg_color
+        ).pack(anchor="w", pady=(0, 5))
+
+        # Valeur + variation
+        content = tk.Frame(card, bg=bg_color)
+        content.pack(anchor="w")
+
         ttk.Label(
-            body,
+            content,
             text=data["value"],
-            font=("Roboto", 24, "bold"),
-            foreground=self.style.colors.get(data["color"])
-        ).pack(side=LEFT)
-        
-        # Variation
-        change_frame = ttk.Frame(body, bootstyle=f"{data['color']}-light")
-        change_frame.pack(side=LEFT, padx=10)
-        
-        # Déterminer la couleur de la variation
+            font=("Roboto", 22, "bold"),
+            foreground=bg_color,
+            background=bg_color
+        ).pack(side="left")
+
         change_color = self.style.colors.success if "+" in data["change"] else self.style.colors.danger
-        
+
         ttk.Label(
-            change_frame,
+            content,
             text=data["change"],
             font=("Roboto", 12),
-            foreground=change_color
-        ).pack()
+            foreground=change_color,
+            background=bg_color,
+            padding=(10, 4)
+        ).pack(side="left")
+
+        # Icône
+        icon_canvas = tk.Canvas(
+            card, width=36, height=36, 
+            bg=bg_color, highlightthickness=0
+        )
+        icon_canvas.pack(side="right", anchor="n", pady=5)
+        icon_canvas.create_oval(2, 2, 34, 34, fill=border_color, outline="")
+        icon_canvas.create_text(18, 18, text=data["icon"][0].upper(), fill="white", font=("Roboto", 14, "bold"))
+
         
-        # Icône (simulée)
-        icon_frame = ttk.Frame(card, bootstyle=f"{data['color']}-light")
-        icon_frame.pack(side=RIGHT)
-        
-        icon_canvas = ttk.Canvas(icon_frame, width=40, height=40, 
-                              background=self.style.lookup(f"{data['color']}-light", "background"))
-        icon_canvas.pack()
-        
-        # Dessiner un cercle avec l'icône à l'intérieur
-        icon_canvas.create_oval(0, 0, 40, 40, fill=self.style.colors.get(data["color"]), outline="")
-        icon_canvas.create_text(20, 20, text=data["icon"][0].upper(), fill=self.text_color["white"], font=("Roboto", 16, "bold"))
-    
     def create_chart_module(self, parent, title, color):
         """Crée un module avec graphique"""
         module = ttk.LabelFrame(parent, text=title, padding=15, bootstyle=color)

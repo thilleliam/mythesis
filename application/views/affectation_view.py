@@ -473,7 +473,7 @@ class AffectationView(ttkb.Frame):
 
 # Pour tester l'interface indépendamment
 if __name__ == "__main__":
-    root = ttkb.Window(themename="superhero")
+    root = ttkb.Window(themename="cosmo")
     root.title("Gestion des Affectations")
     root.geometry("1200x700")
     

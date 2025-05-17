@@ -829,6 +829,6 @@ class EquipementApp:
         return True
 if __name__ == "__main__":
     # Créer une fenêtre avec le thème darkly directement lors de l'initialisation
-    root = ttk.Window(themename="darkly")
+    root = ttk.Window(themename="cosmo")
     app = EquipementApp(root)
     root.mainloop()

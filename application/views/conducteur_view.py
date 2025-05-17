@@ -245,6 +245,6 @@ class ConducteurApp:
 
 if __name__ == "__main__":
     # Créer une fenêtre avec le thème darkly directement lors de l'initialisation
-    root = ttk.Window(themename="darkly")
+    root = ttk.Window(themename="cosmo")
     app = ConducteurApp(root)
     root.mainloop()

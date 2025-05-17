@@ -19,7 +19,7 @@ class CommandeApp:
         self.root.geometry("1200x700")
         
         # Appliquer le thème Darkly
-        style = ttk.Style("darkly")
+        style = ttk.Style("cosmo")
         
         # Import local pour éviter les imports circulaires
         from application.models.commande import Commande
@@ -894,10 +894,9 @@ class CommandeApp:
             messagebox.showerror("Erreur", f"Erreur lors du marquage: {str(e)}")
 # Point d'entrée pour l'application
 def main():
-    root = ttk.Window()
+    root = ttk.Window(themename="cosmo")
     app = CommandeApp(root)
     root.mainloop()
 
 if __name__ == "__main__":
     main()
-    
