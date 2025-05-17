@@ -8,12 +8,400 @@ import sys
 from PIL import Image, ImageTk
 import random
 
+
+class LoginScreen:
+    def __init__(self, root, on_login_success):
+        """
+        Écran d'authentification pour FleetManager
+        
+        Args:
+            root: Fenêtre principale Tkinter
+            on_login_success: Fonction à appeler après authentification réussie
+        """
+        self.root = root
+        self.on_login_success = on_login_success
+        self.root.title("FleetManager - Authentification")
+        
+        # Centrer la fenêtre avec taille fixe pour le login
+        self.root.geometry("600x700")
+        self.root.resizable(False, False)
+        
+        # Définir les couleurs et styles pour l'écran de connexion
+        self.style = ttk.Style()
+        self.primary_color = self.style.colors.primary
+        self.secondary_color = self.style.colors.secondary
+        self.success_color = self.style.colors.success
+        self.danger_color = self.style.colors.danger
+        
+        # Couleurs de texte
+        self.text_color = {
+            "dark": "#212529",    # Texte principal
+            "light": "#f8f9fa",   # Texte clair (sur fond sombre)
+            "muted": "#6c757d",   # Texte atténué/secondaire
+            "white": "#ffffff",   # Blanc pur
+            "black": "#000000"    # Noir pur
+        }
+        
+        # Styles pour les widgets du formulaire de connexion
+        self.style.configure("Login.TLabel", font=("Roboto", 12), foreground=self.text_color["dark"])
+        self.style.configure("Title.TLabel", font=("Roboto", 20, "bold"), foreground=self.primary_color)
+        self.style.configure("LoginBtn.TButton", font=("Roboto", 12, "bold"))
+        
+        # Créer et afficher l'interface de connexion
+        self.create_login_interface()
+    
+    def create_login_interface(self):
+        """Crée l'interface de connexion avec animation"""
+        # Container principal - fond blanc avec ombre
+        # Canvas avec scrollbar pour le contenu scrollable
+        canvas = tk.Canvas(self.root, highlightthickness=0)
+        canvas.pack(fill=BOTH, expand=True, side=LEFT)
+
+        scrollbar = ttk.Scrollbar(self.root, orient=VERTICAL, command=canvas.yview)
+        scrollbar.pack(fill=Y, side=RIGHT)
+
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Frame interne (contenu réel)
+        main_frame = ttk.Frame(canvas, padding=20)
+        canvas.create_window((0, 0), window=main_frame, anchor="nw")
+
+        # Ajustement du scroll quand la taille du contenu change
+        def on_configure(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        main_frame.bind("<Configure>", on_configure)
+
+        
+        # Logo et titre
+        logo_frame = ttk.Frame(main_frame)
+        logo_frame.pack(fill=X, pady=(20, 30))
+        
+        # Essayer de charger le logo ou créer un logo de remplacement
+        try:
+            logo_image = Image.open("C:\\Users\\BIG-computer\\Pictures\\Logo.png")
+            logo_image = logo_image.resize((80, 80), Image.Resampling.LANCZOS)
+            logo_photo = ImageTk.PhotoImage(logo_image)
+            logo_label = ttk.Label(logo_frame, image=logo_photo)
+            logo_label.image = logo_photo
+            logo_label.pack(pady=(0, 10))
+        except Exception:
+            # Canvas pour créer un logo de remplacement
+            logo_canvas = tk.Canvas(logo_frame, width=80, height=80, bg="white", highlightthickness=0)
+            logo_canvas.pack(pady=(0, 10))
+            logo_canvas.create_oval(10, 10, 70, 70, fill=self.primary_color, outline="")
+            logo_canvas.create_text(40, 40, text="FL", font=("Segoe UI", 24, "bold"), fill="white")
+        
+        # Titre de l'application
+        ttk.Label(
+            logo_frame, 
+            text="FleetManager",
+            style="Title.TLabel"
+        ).pack()
+        
+        # Sous-titre
+        ttk.Label(
+            logo_frame,
+            text="Gestion de Flotte et Logistique",
+            font=("Roboto", 12),
+            foreground=self.text_color["muted"]
+        ).pack(pady=(5, 0))
+        
+        # Formulaire de connexion
+        self.login_form = ttk.Frame(main_frame, padding=10)
+        self.login_form.pack(fill=BOTH, expand=True)
+        
+        # Champ nom d'utilisateur
+        ttk.Label(
+            self.login_form, 
+            text="Nom d'utilisateur",
+            style="Login.TLabel"
+        ).pack(anchor=W, pady=(0, 5))
+        
+        self.username_var = tk.StringVar()
+        username_entry = ttk.Entry(
+            self.login_form,
+            textvariable=self.username_var,
+            font=("Roboto", 12),
+            width=30
+        )
+        username_entry.pack(fill=X, pady=(0, 15))
+        username_entry.focus()  # Placer le focus sur le champ username
+        
+        # Champ mot de passe
+        ttk.Label(
+            self.login_form, 
+            text="Mot de passe",
+            style="Login.TLabel"
+        ).pack(anchor=W, pady=(0, 5))
+        
+        self.password_var = tk.StringVar()
+        password_entry = ttk.Entry(
+            self.login_form,
+            textvariable=self.password_var,
+            font=("Roboto", 12),
+            width=30,
+            show="•"  # Masquer le mot de passe
+        )
+        password_entry.pack(fill=X, pady=(0, 5))
+        
+        # Option "Se souvenir de moi"
+        remember_frame = ttk.Frame(self.login_form)
+        remember_frame.pack(fill=X, pady=10)
+        
+        self.remember_var = tk.BooleanVar()
+        remember_check = ttk.Checkbutton(
+            remember_frame,
+            text="Se souvenir de moi",
+            variable=self.remember_var
+        )
+        remember_check.pack(side=LEFT)
+        
+        # Lien "Mot de passe oublié"
+        forgot_label = ttk.Label(
+            remember_frame,
+            text="Mot de passe oublié ?",
+            font=("Roboto", 10),
+            foreground=self.primary_color,
+            cursor="hand2"
+        )
+        forgot_label.pack(side=RIGHT)
+        forgot_label.bind("<Button-1>", self.on_forgot_password)
+        
+        # Bouton de connexion
+        login_button = ttk.Button(
+            self.login_form,
+            text="Se connecter",
+            style="LoginBtn.TButton",
+            command=self.validate_login,
+            bootstyle="primary",
+            width=30
+        )
+        login_button.pack(pady=20)
+        
+        # Ajouter l'event Enter sur les champs pour valider
+        password_entry.bind("<Return>", lambda event: self.validate_login())
+        username_entry.bind("<Return>", lambda event: password_entry.focus())
+        
+        # Section du bas avec texte de copyright
+        footer_frame = ttk.Frame(main_frame)
+        footer_frame.pack(side=BOTTOM, fill=X, pady=20)
+        
+        ttk.Label(
+            footer_frame,
+            text="© 2025 FleetManager Pro - Tous droits réservés",
+            font=("Roboto", 9),
+            foreground=self.text_color["muted"]
+        ).pack()
+        
+        # Animation de démarrage
+        self.animate_login_screen()
+    def on_login_success(self):
+        print("Connexion réussie")
+        # Ici tu peux switcher vers l'interface principale
+
+    def animate_login_screen(self):
+        """Ajouter une simple animation au démarrage de l'écran de connexion"""
+        # Pour une animation simple, on va faire apparaître les éléments progressivement
+        children = self.root.winfo_children()[0].winfo_children()
+        
+        # Cacher tous les widgets initialement
+        for child in children:
+            child.pack_forget()
+        
+        # Les faire réapparaître avec un délai
+        delay = 100  # millisecondes entre chaque widget
+        
+        def show_widget(index):
+            if index < len(children):
+                children[index].pack(fill=X if index > 0 else BOTH, expand=(index == 0), pady=(20 if index == 1 else 0, 30 if index == 1 else 0))
+                self.root.after(delay, lambda: show_widget(index + 1))
+        
+        # Démarrer l'animation
+        self.root.after(50, lambda: show_widget(0))
+    
+    def validate_login(self):
+        """Valide les informations de connexion"""
+        username = self.username_var.get().strip()
+        password = self.password_var.get().strip()
+
+        try:
+            self.error_label.destroy()
+        except:
+            pass
+
+        if username and password:
+            for widget in self.login_form.winfo_children():
+                if isinstance(widget, ttk.Button):
+                    widget.configure(text="Connexion en cours...", state="disabled")
+
+            self.root.after(1000, self.on_login_success)
+        else:
+            self.error_label = ttk.Label(
+                self.login_form,
+                text="Veuillez saisir un nom d'utilisateur et un mot de passe",
+                foreground=self.danger_color,
+                font=("Roboto", 10)
+            )
+            self.error_label.pack(before=self.login_form.winfo_children()[-1], pady=(0, 10))
+            self.shake_window()
+
+    
+    def shake_window(self):
+        """Effet de secousse pour indiquer une erreur"""
+        original_x = self.root.winfo_x()
+        original_y = self.root.winfo_y()
+        
+        # Paramètres de l'animation
+        shake_distance = 10
+        shake_speed = 50
+        shake_cycles = 3
+        
+        def shake_cycle(cycle, direction):
+            if cycle <= 0:
+                self.root.geometry(f"+{original_x}+{original_y}")
+                return
+                
+            new_x = original_x + (shake_distance * direction)
+            self.root.geometry(f"+{new_x}+{original_y}")
+            
+            self.root.after(shake_speed, lambda: shake_cycle(cycle - 0.5, -direction))
+            
+        shake_cycle(shake_cycles, 1)
+    
+    def on_forgot_password(self, event):
+        """Gère le clic sur 'Mot de passe oublié'"""
+        # Crée une fenêtre pop-up simple
+        popup = ttk.Toplevel(self.root)
+        popup.title("Récupération de mot de passe")
+        popup.geometry("350x200")
+        
+        # Centrer la fenêtre
+        popup.geometry(f"+{self.root.winfo_x() + 25}+{self.root.winfo_y() + 150}")
+        
+        # Contenu de la popup
+        content_frame = ttk.Frame(popup, padding=20)
+        content_frame.pack(fill=BOTH, expand=True)
+        
+        ttk.Label(
+            content_frame,
+            text="Récupération de mot de passe",
+            font=("Roboto", 14, "bold"),
+            foreground=self.primary_color
+        ).pack(pady=(0, 15))
+        
+        ttk.Label(
+            content_frame,
+            text="Entrez votre adresse email pour réinitialiser votre mot de passe:",
+            wraplength=300,
+            justify="left"
+        ).pack(fill=X, pady=(0, 10))
+        
+        email_var = tk.StringVar()
+        email_entry = ttk.Entry(content_frame, textvariable=email_var, width=30)
+        email_entry.pack(fill=X, pady=5)
+        email_entry.focus()
+        
+        # Frame pour les boutons
+        button_frame = ttk.Frame(content_frame)
+        button_frame.pack(fill=X, pady=15)
+        
+        # Bouton annuler
+        ttk.Button(
+            button_frame,
+            text="Annuler",
+            bootstyle="secondary-outline",
+            command=popup.destroy,
+            width=15
+        ).pack(side=LEFT, padx=(0, 5))
+        
+        # Bouton envoyer
+        ttk.Button(
+            button_frame,
+            text="Envoyer",
+            bootstyle="primary",
+            command=lambda: self.send_reset_email(email_var.get(), popup),
+            width=15
+        ).pack(side=RIGHT)
+        
+        # Rendre la fenêtre modale
+        popup.transient(self.root)
+        popup.grab_set()
+        
+    def send_reset_email(self, email, popup):
+        """Simule l'envoi d'un e-mail de réinitialisation"""
+        if not email.strip():
+            # Afficher un message d'erreur
+            try:
+                self.reset_error_label.destroy()
+            except:
+                pass
+                
+            self.reset_error_label = ttk.Label(
+                popup.winfo_children()[0],
+                text="Veuillez saisir une adresse e-mail",
+                foreground=self.danger_color,
+                font=("Roboto", 10)
+            )
+            self.reset_error_label.pack(before=popup.winfo_children()[0].winfo_children()[-1])
+            return
+            
+        # Afficher un message de confirmation
+        for widget in popup.winfo_children()[0].winfo_children():
+            widget.destroy()
+            
+        ttk.Label(
+            popup.winfo_children()[0],
+            text="Email envoyé !",
+            font=("Roboto", 14, "bold"),
+            foreground=self.success_color
+        ).pack(pady=(20, 15))
+        
+        ttk.Label(
+            popup.winfo_children()[0],
+            text=f"Un lien de réinitialisation a été envoyé à {email}.\nVeuillez vérifier votre boîte de réception.",
+            wraplength=300,
+            justify="center"
+        ).pack(fill=X, pady=10)
+        
+        ttk.Button(
+            popup.winfo_children()[0],
+            text="Fermer",
+            bootstyle="primary",
+            command=popup.destroy
+        ).pack(pady=15)
+        
+        # Fermer automatiquement après 3 secondes
+        popup.after(3000, popup.destroy)
+
+
 class MainApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Gestion de Flotte et Logistique")
-        self.root.geometry("1200x800")
         
+        # Initialiser l'écran de connexion d'abord
+        self.show_login_screen()
+    
+    def show_login_screen(self):
+        """Affiche l'écran de connexion"""
+        self.login_screen = LoginScreen(self.root, self.initialize_main_app)
+    
+    def initialize_main_app(self):
+        """Initialise l'application principale après connexion réussie"""
+        # Effacer tous les widgets existants
+        for widget in self.root.winfo_children():
+            widget.destroy()
+        
+        # Restaurer la géométrie complète pour l'application principale
+        self.root.geometry("1200x800")
+        self.root.resizable(True, True)
+        
+        # Initialiser l'application principale avec toutes ses fonctionnalités
+        self.initialize_full_app()
+    
+    def initialize_full_app(self):
+        """Initialise l'application complète - votre code existant"""
         # Configurez le style global
         self.style = ttk.Style()
         
