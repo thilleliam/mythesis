@@ -797,7 +797,7 @@ class VehiculeApp(ttk.Frame):
             ttk.Label(warning_frame, text="⚠️ Ce véhicule est actuellement en panne.", 
                       foreground="#f39c12", font=("-weight", "bold")).pack()
                 
-        # Liste des tournées disponibles
+        # Liste  des tournées disponibles
         liste_frame = ttk.Labelframe(content, text="Tournées disponibles", padding=10)
         liste_frame.pack(fill=BOTH, expand=True, pady=10)
         

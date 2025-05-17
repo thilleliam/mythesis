@@ -200,6 +200,114 @@ class Instance:
         if not hasattr(self, 'L') or not self.L:
             raise ValueError("Aucun véhicule disponible dans la base de données. Impossible de continuer sans véhicules.")
     
+    def load_vehicles_from_database(self):
+        """
+        Récupère les informations des véhicules depuis la base de données
+        et les organise dans les structures de données requises par la métaheuristique.
+        Filtre les véhicules en fonction de la nature du terrain du chantier.
+        """
+        from application.models.vehicule import Vehicule  # Import local pour éviter les problèmes circulaires
+        from application.models.chantiers import Chantier
+        
+        # Créer une session SQLAlchemy
+        session = SessionLocal()
+        
+        try:
+            # D'abord, récupérer la nature du terrain du chantier
+            nature_terrain = None
+            if self.id_client:
+                chantier = session.query(Chantier).filter_by(id_client=self.id_client).first()
+                if chantier:
+                    nature_terrain = chantier.nature_terrain
+                    print(f"Nature du terrain pour le chantier {self.id_client}: {nature_terrain}")
+            
+            # Construire la requête de base pour les véhicules disponibles
+            query = session.query(Vehicule).filter(Vehicule.etat == "Disponible")
+            
+            # Filtrer les véhicules selon la nature du terrain
+            if nature_terrain == "Accès difficile":
+                # Pour un accès difficile, on ne garde que les 4x4 ou 6x6
+                query = query.filter(
+                    (Vehicule.type_vehicule.like("%4x4%")) | 
+                    (Vehicule.type_vehicule.like("%4*4%")) |
+                    (Vehicule.type_vehicule.like("%6x6%")) |
+                    (Vehicule.type_vehicule.like("%6*6%"))
+                )
+                print("Terrain difficile: filtrage des véhicules pour ne garder que les 4x4 et 6x6")
+            else:
+                print("Terrain facile ou non spécifié: tous les véhicules disponibles seront considérés")
+            
+            # Récupérer les véhicules filtrés
+            vehicles = query.all()
+            
+            # Afficher les véhicules retenus pour debug
+            print(f"Nombre de véhicules retenus: {len(vehicles)}")
+            for v in vehicles:
+                print(f"  - {v.immatriculation}: {v.type_vehicule}")
+            
+            # Grouper les véhicules par type
+            vehicles_by_type = {}
+            for vehicle in vehicles:
+                vehicle_type = vehicle.type_vehicule
+                if vehicle_type not in vehicles_by_type:
+                    vehicles_by_type[vehicle_type] = []
+                vehicles_by_type[vehicle_type].append(vehicle)
+            
+            # Transformer les données en structures attendues par la métaheuristique
+            # L: Types de véhicules disponibles avec leurs capacités
+            self.L = {}
+            # m: Nombre maximal de véhicules disponibles par type
+            self.m = {}
+            # c: Coût d'utilisation de chaque type de véhicule
+            self.c = {}
+            # V: Vitesse moyenne des véhicules (km/h)
+            self.V = {}
+            
+            # Attribuer un ID numérique à chaque type de véhicule
+            for i, (vehicle_type, vehicle_list) in enumerate(vehicles_by_type.items(), 1):
+                # On utilise le premier véhicule de chaque type comme référence pour les capacités
+                reference_vehicle = vehicle_list[0]
+                
+                # Gérer les cas où les champs sont `None`
+                capacite_tonne = reference_vehicle.capacite_tonne or 0  # Valeur par défaut : 0 tonnes
+                capacite_volume = reference_vehicle.capacite_volume or 0  # Valeur par défaut : 0 m³
+                
+                # Capacités (poids en kg et volume en m³)
+                self.L[i] = {
+                    "Qw": capacite_tonne * 1000,  # Convertir tonnes en kg
+                    "Qv": capacite_volume
+                }
+                
+                # Nombre de véhicules disponibles pour ce type
+                self.m[i] = len(vehicle_list)
+                
+                # Coût d'utilisation (hypothèse : proportionnel à la capacité)
+                self.c[i] = int(50 + capacite_tonne * 20)
+                
+                # Vitesse moyenne (hypothèse : inversement proportionnelle à la taille)
+                # Pour les terrains difficiles, réduire la vitesse de 20%
+                base_speed = int(80 - capacite_tonne * 2)
+                if nature_terrain == "Accès difficile":
+                    self.V[i] = int(base_speed * 0.8)  # Réduction de 20% pour terrain difficile
+                else:
+                    self.V[i] = base_speed
+                
+                # Stocker la correspondance entre ID numérique et type de véhicule pour référence
+                if not hasattr(self, 'type_mapping'):
+                    self.type_mapping = {}
+                self.type_mapping[i] = vehicle_type
+                
+                # Stocker les immatriculations pour chaque type de véhicule
+                if not hasattr(self, 'vehicle_plates'):
+                    self.vehicle_plates = {}
+                self.vehicle_plates[i] = [v.immatriculation for v in vehicle_list]
+        
+        finally:
+            session.close()
+        
+        # Si aucun véhicule n'est disponible, lever une exception
+        if not hasattr(self, 'L') or not self.L:
+            raise ValueError("Aucun véhicule disponible avec les critères fournis. Vérifiez que des véhicules 4x4/6x6 sont disponibles pour les terrains difficiles.")
     def load_demands_from_database(self):
         """
         Récupère les demandes d'équipements depuis la classe TransfererEquipement
@@ -298,6 +406,7 @@ class Instance:
         print("Demandes récupérées de la base de données:")
         for t in self.T:
             print(f"Semaine {t}: {self.dw_AB[t]} kg, {self.dv_AB[t]} m³")
+
 
     def get_vehicle_plate(self, vtype, idx):
         """

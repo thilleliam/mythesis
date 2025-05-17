@@ -1721,7 +1721,7 @@ class TransfererEquipementApp:
         ttk.Entry(info_frame, textvariable=self.volet_var, width=15).grid(row=1, column=1, padx=5, pady=5, sticky="w", columnspan=2)
         
         ttk.Label(info_frame, text="Modalité Transport:").grid(row=1, column=3, padx=5, pady=5, sticky="e")
-        transport_cb = ttk.Combobox(info_frame, textvariable=self.modalite_transport_var, values=["Camion", "Train", "Bateau", "Avion"], width=15)
+        transport_cb = ttk.Combobox(info_frame, textvariable=self.modalite_transport_var, values=["Tractable", "Chargeable"], width=15)
         transport_cb.grid(row=1, column=4, padx=5, pady=5, sticky="w")
         
         # Troisième ligne: Nom équipement et Total
@@ -1732,7 +1732,7 @@ class TransfererEquipementApp:
         
         ttk.Label(info_frame, text="Total Équipements:").grid(row=2, column=4, padx=5, pady=5, sticky="e")
         ttk.Spinbox(info_frame, textvariable=self.total_equipements_var, from_=1, to=1000, width=5).grid(row=2, column=5, padx=5, pady=5, sticky="w")
-        
+         
         # Quatrième ligne: Coordonnées du nouveau site (pour référence uniquement, pas sauvegardées)
         
         # Ajouter une note explicative
