@@ -1,0 +1,861 @@
+from sqlalchemy import Label
+import ttkbootstrap as ttk
+import tkinter as tk
+from ttkbootstrap.constants import *
+from tkinter import PhotoImage
+import os
+import sys
+from PIL import Image, ImageTk
+import random
+
+class MainApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Gestion de Flotte et Logistique")
+        self.root.geometry("1200x800")
+        
+        # Configurez le style global
+        self.style = ttk.Style()
+        
+        # Définir les couleurs de texte pour le thème cosmo
+        self.text_color = {
+            "dark": "#212529",    # Texte principal
+            "light": "#f8f9fa",   # Texte clair (sur fond sombre)
+            "muted": "#6c757d",   # Texte atténué/secondaire
+            "white": "#ffffff",   # Blanc pur
+            "black": "#000000"    # Noir pur
+        }
+        
+        # Configuration globale des styles
+        self.style.configure("TButton", font=("Roboto", 11))
+        self.style.configure("TLabel", font=("Roboto", 11), foreground=self.text_color["dark"])
+        self.style.configure("Title.TLabel", font=("Roboto", 28, "bold"), foreground=self.text_color["dark"])
+        self.style.configure("Subtitle.TLabel", font=("Roboto", 14), foreground=self.text_color["muted"])
+        self.style.configure("ModuleTitle.TLabel", font=("Roboto", 16, "bold"), foreground=self.text_color["dark"])
+        self.style.configure("Card.TFrame", relief="raised", borderwidth=0)
+        
+        # Configurations spécifiques pour les labels sur fonds colorés
+        self.style.configure("Light.TLabel", foreground=self.text_color["light"])
+        self.style.configure("Dark.TLabel", foreground=self.text_color["dark"])
+        self.style.configure("Muted.TLabel", foreground=self.text_color["muted"])
+        
+        # Création du conteneur principal avec structure de style sidebar
+        self.main_container = ttk.Frame(self.root)
+        self.main_container.pack(fill=BOTH, expand=True)
+        
+        # Sidebar
+        self.create_sidebar()
+        
+        # Zone de contenu principal
+        self.content_area = ttk.Frame(self.main_container, padding=20)
+        self.content_area.pack(side=LEFT, fill=BOTH, expand=True)
+        
+        # En-tête de l'application
+        self.create_header()
+        
+        # Zone des modules (dashboard)
+        # Canvas scrollable dans content_area
+        canvas = tk.Canvas(self.content_area, background="white", highlightthickness=0)
+        canvas.pack(side=LEFT, fill=BOTH, expand=True)
+
+        scrollbar = ttk.Scrollbar(self.content_area, orient=VERTICAL, command=canvas.yview)
+        scrollbar.pack(side=RIGHT, fill=Y)
+
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Frame qui contiendra les modules (scrollable)
+        self.modules_frame = ttk.Frame(canvas, padding=10)
+        canvas.create_window((0, 0), window=self.modules_frame, anchor="nw")
+
+        # Mise à jour du scroll en fonction du contenu
+        def on_frame_configure(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        self.modules_frame.bind("<Configure>", on_frame_configure)
+
+        # Activer le scroll avec la molette
+        def on_mousewheel(event):
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        canvas.bind_all("<MouseWheel>", on_mousewheel)
+
+        
+        # Créer les modules sous forme de cartes modernes
+        self.create_module_cards()
+        
+        # Barre d'état inférieure
+        self.create_status_bar()
+        
+        # Animation de démarrage
+        self.animate_startup()
+    
+    def create_sidebar(self):
+        """Sidebar claire avec boutons unifiés"""
+        self.sidebar = ttk.Frame(self.main_container, bootstyle="light", width=220)
+        self.sidebar.pack(side=LEFT, fill=Y)
+        self.sidebar.pack_propagate(False)
+
+        # Logo + titre
+        logo_frame = ttk.Frame(self.sidebar, bootstyle="light")
+        logo_frame.pack(fill=X, padx=10, pady=20)
+
+        try:
+            logo_image = Image.open("C:\\Users\\BIG-computer\\Pictures\\Logo.png")
+            logo_image = logo_image.resize((50, 50), Image.Resampling.LANCZOS)
+            logo_photo = ImageTk.PhotoImage(logo_image)
+            logo_label = ttk.Label(logo_frame, image=logo_photo, bootstyle="light")
+            logo_label.image = logo_photo
+            logo_label.pack(side=LEFT, padx=5)
+        except Exception:
+            logo_canvas = tk.Canvas(logo_frame, width=50, height=50, bg="#f8f9fa", bd=0, highlightthickness=0)
+            logo_canvas.pack(side=LEFT, padx=5)
+            logo_canvas.create_oval(5, 5, 45, 45, fill="#007BFF", outline="")
+            logo_canvas.create_text(25, 25, text="FL", font=("Segoe UI", 14, "bold"), fill="white")
+
+        ttk.Label(
+            logo_frame,
+            text="FleetManager",
+            font=("Segoe UI", 14, "bold"),
+            foreground="#343a40",
+            background="#f8f9fa"
+        ).pack(side=LEFT, padx=10)
+
+        ttk.Separator(self.sidebar).pack(fill=X, padx=10, pady=(0, 10))
+
+        # Liste des boutons du menu (même couleur pour tous)
+        menu_items = [
+            ("Tableau de bord", self.show_dashboard),
+            ("Véhicules", self.open_vehicule_view),
+            ("Équipements", self.open_equipement_view),
+            ("Chantiers", self.open_chantiers_view),
+            ("Tournées", self.open_tournee_view),
+            ("Conducteurs", self.open_conducteur_view),
+            ("Commandes", self.open_commande_view),
+            ("Affectations", self.open_affectation_view),
+            ("Carte", self.open_carte_view),
+            ("Notifications", self.open_notification_view),
+            ("Gestion des DTM", self.open_transferer_equipement_view)
+        ]
+
+        for label, command in menu_items:
+            self.create_sidebar_button(self.sidebar, label, command)
+
+        self.create_user_section()
+    def create_sidebar_button(self, parent, text, command):
+        """Bouton clair à fond uni bleu"""
+        button = ttk.Button(
+            parent,
+            text=text,
+            style="Sidebar.TButton",
+            command=command,
+            cursor="hand2",
+            padding=(10, 8)
+        )
+        button.pack(fill=X, padx=12, pady=4)
+    
+
+    def create_menu_item(self, parent, text, command, icon_name=None):
+        """Crée un élément de menu dans la sidebar, adapté au thème flatly"""
+        item_frame = ttk.Frame(parent, bootstyle="light")
+        item_frame.pack(fill=X, pady=3, padx=5)
+        item_frame.configure(cursor="hand2")
+
+        def on_hover(e):
+            item_frame.configure(style="secondary.TFrame")
+        def on_leave(e):
+            item_frame.configure(style="light.TFrame")
+
+        item_frame.bind("<Enter>", on_hover)
+        item_frame.bind("<Leave>", on_leave)
+        item_frame.bind("<Button-1>", lambda e: command())
+
+        icon_canvas = tk.Canvas(item_frame, width=24, height=24, bg=self.style.colors.light, highlightthickness=0)
+        icon_canvas.pack(side=LEFT, padx=10, pady=6)
+
+        icon_colors = {
+            "house": self.style.colors.info,
+            "truck": self.style.colors.success,
+            "tools": self.style.colors.warning,
+            "building": self.style.colors.info,
+            "map": self.style.colors.primary,
+            "people": self.style.colors.success,
+            "clipboard": self.style.colors.info,
+            "shuffle": self.style.colors.warning,
+            "globe": self.style.colors.primary,
+            "bell": self.style.colors.danger
+        }
+
+        color = icon_colors.get(icon_name, self.style.colors.secondary)
+        if icon_name == "house":
+            icon_canvas.create_polygon(4, 14, 12, 4, 20, 14, 20, 22, 4, 22, fill=color, outline="")
+        elif icon_name == "truck":
+            icon_canvas.create_rectangle(3, 10, 18, 16, fill=color, outline="")
+            icon_canvas.create_rectangle(18, 12, 22, 16, fill=color, outline="")
+            icon_canvas.create_oval(6, 16, 10, 20, fill="black")
+            icon_canvas.create_oval(14, 16, 18, 20, fill="black")
+        else:
+            icon_canvas.create_rectangle(6, 6, 18, 18, fill=color, outline="")
+
+        menu_label = ttk.Label(
+            item_frame,
+            text=text,
+            bootstyle="dark",
+            font=("Segoe UI", 10, "bold"),
+            cursor="hand2"
+        )
+        menu_label.pack(side=LEFT, fill=X, pady=6)
+        menu_label.bind("<Button-1>", lambda e: command())
+        icon_canvas.bind("<Button-1>", lambda e: command())
+
+        return item_frame
+
+    def create_user_section(self):
+        """Crée la section utilisateur en bas de la sidebar"""
+        # Séparateur
+        ttk.Separator(self.sidebar).pack(fill=X, padx=10, pady=(20, 10))
+        
+        # Frame utilisateur
+        user_frame = ttk.Frame(self.sidebar, bootstyle="secondary")
+        user_frame.pack(fill=X, padx=10, pady=10, side=BOTTOM)
+        
+        # Avatar utilisateur (simulé avec un canvas)
+        avatar_canvas = ttk.Canvas(user_frame, width=32, height=32,
+                                background=self.style.colors.secondary)
+        avatar_canvas.pack(side=LEFT, padx=10)
+        avatar_canvas.create_oval(2, 2, 30, 30, fill=self.style.colors.light, outline="")
+        avatar_canvas.create_text(16, 16, text="AP", font=("Roboto", 10, "bold"), fill=self.style.colors.secondary)
+        
+        # Info utilisateur
+        user_info = ttk.Frame(user_frame, bootstyle="secondary")
+        user_info.pack(side=LEFT, fill=X, expand=True)
+        
+        ttk.Label(
+            user_info,
+            text="Admin Projet",
+            font=("Roboto", 10, "bold"),
+            style="Light.TLabel"
+        ).pack(anchor=W)
+        
+        ttk.Label(
+            user_info,
+            text="En ligne",
+            font=("Roboto", 8),
+            bootstyle="success",
+            foreground=self.style.colors.success
+        ).pack(anchor=W)
+    
+    def create_header(self):
+        """Crée l'en-tête de l'application"""
+        header_frame = ttk.Frame(self.content_area)
+        header_frame.pack(fill=X, pady=(0, 20))
+        
+        # Titre principal avec style plus moderne
+        title_frame = ttk.Frame(header_frame)
+        title_frame.pack(side=LEFT)
+        
+        ttk.Label(
+            title_frame, 
+            text="Tableau de bord", 
+            style="Title.TLabel",
+            bootstyle="primary",
+            foreground=self.style.colors.primary
+        ).pack(anchor=W)
+        
+        ttk.Label(
+            title_frame,
+            text="Superviser et gérer efficacement votre flotte et vos ressources",
+            style="Subtitle.TLabel"
+        ).pack(anchor=W, pady=(5, 0))
+        
+        # Zone de recherche et notifications à droite
+        actions_frame = ttk.Frame(header_frame)
+        actions_frame.pack(side=RIGHT, fill=Y)
+        
+        # Barre de recherche
+        search_frame = ttk.Frame(actions_frame)
+        search_frame.pack(side=LEFT, padx=10)
+        
+        search_entry = ttk.Entry(search_frame, width=25, bootstyle="primary")
+        search_entry.insert(0, "Rechercher...")
+        search_entry.pack(side=LEFT)
+        
+        search_btn = ttk.Button(search_frame, text="🔍", bootstyle="primary-outline", width=3)
+        search_btn.pack(side=LEFT, padx=(5, 0))
+        
+        # Bouton de notifications
+        notif_btn = ttk.Button(actions_frame, text="🔔", bootstyle="primary-outline", width=3)
+        notif_btn.pack(side=LEFT, padx=5)
+        
+        # Indicateur de notifications
+        notif_canvas = ttk.Canvas(actions_frame, width=16, height=16, background=self.root.cget("background"))
+        notif_canvas.place(in_=notif_btn, x=25, y=3)
+        notif_canvas.create_oval(0, 0, 16, 16, fill=self.style.colors.danger, outline="")
+        notif_canvas.create_text(8, 8, text="3", fill=self.text_color["white"], font=("Roboto", 8, "bold"))
+    
+    def create_module_cards(self):
+        """Crée des cartes modernes pour les modules"""
+        # Utiliser un notebook avec onglets pour organiser le contenu
+        notebook = ttk.Notebook(self.modules_frame)
+        notebook.pack(fill=BOTH, expand=True)
+        
+        # Tableau de bord principal
+        dashboard_tab = ttk.Frame(notebook, padding=10)
+        notebook.add(dashboard_tab, text="Tableau de bord")
+        
+        # Onglet de gestion
+        management_tab = ttk.Frame(notebook, padding=10)
+        notebook.add(management_tab, text="Gestion")
+        
+        # Onglet de rapports
+        reports_tab = ttk.Frame(notebook, padding=10)
+        notebook.add(reports_tab, text="Rapports")
+        
+        # Créer des modules dans l'onglet du tableau de bord
+        # Première rangée: statistiques générales
+        stats_frame = ttk.Frame(dashboard_tab)
+        stats_frame.pack(fill=X, pady=10)
+        
+        # KPI Cards
+        kpi_data = [
+            {"title": "Véhicules actifs", "value": "42", "change": "+5%", "icon": "truck", "color": "primary"},
+            {"title": "Chantiers en cours", "value": "12", "change": "+2", "icon": "building", "color": "success"},
+            {"title": "Tournées du jour", "value": "8", "change": "-1", "icon": "map", "color": "warning"},
+            {"title": "Commandes à livrer", "value": "23", "change": "+15%", "icon": "clipboard", "color": "danger"}
+        ]
+        
+        for kpi in kpi_data:
+            self.create_kpi_card(stats_frame, kpi)
+        
+        # Deuxième rangée: modules principaux sur 2 colonnes
+        modules_container = ttk.Frame(dashboard_tab)
+        modules_container.pack(fill=BOTH, expand=True, pady=10)
+        
+        # Colonne gauche
+        left_col = ttk.Frame(modules_container)
+        left_col.pack(side=LEFT, fill=BOTH, expand=True, padx=(0, 5))
+        
+        # Colonne droite
+        right_col = ttk.Frame(modules_container)
+        right_col.pack(side=LEFT, fill=BOTH, expand=True, padx=(5, 0))
+        
+        # Ajouter les modules graphiques
+        self.create_chart_module(left_col, "Disponibilité des véhicules", "primary")
+        self.create_progress_module(right_col, "Statut des chantiers", "success")
+        self.create_list_module(left_col, "Prochaines tournées", "warning")
+        self.create_table_module(right_col, "Dernières commandes", "danger")
+    
+    def create_kpi_card(self, parent, data):
+        """Crée une carte KPI moderne"""
+        card = ttk.Frame(parent, padding=15, bootstyle=f"{data['color']}-light")
+        card.pack(side=LEFT, fill=X, expand=True, padx=5)
+        
+        # En-tête de la carte
+        header = ttk.Frame(card, bootstyle=f"{data['color']}-light")
+        header.pack(fill=X)
+        
+        # Titre - utiliser un texte foncé pour un meilleur contraste sur fond clair
+        ttk.Label(
+            header,
+            text=data["title"],
+            font=("Roboto", 12),
+            foreground=self.text_color["dark"]
+        ).pack(anchor=W)
+        
+        # Corps de la carte
+        body = ttk.Frame(card, bootstyle=f"{data['color']}-light")
+        body.pack(fill=X, pady=10)
+        
+        # Valeur principale - utiliser la couleur primaire du thème pour le mettre en évidence
+        ttk.Label(
+            body,
+            text=data["value"],
+            font=("Roboto", 24, "bold"),
+            foreground=self.style.colors.get(data["color"])
+        ).pack(side=LEFT)
+        
+        # Variation
+        change_frame = ttk.Frame(body, bootstyle=f"{data['color']}-light")
+        change_frame.pack(side=LEFT, padx=10)
+        
+        # Déterminer la couleur de la variation
+        change_color = self.style.colors.success if "+" in data["change"] else self.style.colors.danger
+        
+        ttk.Label(
+            change_frame,
+            text=data["change"],
+            font=("Roboto", 12),
+            foreground=change_color
+        ).pack()
+        
+        # Icône (simulée)
+        icon_frame = ttk.Frame(card, bootstyle=f"{data['color']}-light")
+        icon_frame.pack(side=RIGHT)
+        
+        icon_canvas = ttk.Canvas(icon_frame, width=40, height=40, 
+                              background=self.style.lookup(f"{data['color']}-light", "background"))
+        icon_canvas.pack()
+        
+        # Dessiner un cercle avec l'icône à l'intérieur
+        icon_canvas.create_oval(0, 0, 40, 40, fill=self.style.colors.get(data["color"]), outline="")
+        icon_canvas.create_text(20, 20, text=data["icon"][0].upper(), fill=self.text_color["white"], font=("Roboto", 16, "bold"))
+    
+    def create_chart_module(self, parent, title, color):
+        """Crée un module avec graphique"""
+        module = ttk.LabelFrame(parent, text=title, padding=15, bootstyle=color)
+        module.pack(fill=BOTH, expand=True, pady=10)
+        
+        # Canvas pour simuler un graphique
+        chart_canvas = ttk.Canvas(module, width=400, height=200)
+        chart_canvas.pack(fill=BOTH, expand=True)
+        
+        # Simuler un graphique en barres
+        chart_colors = [self.style.colors.primary, self.style.colors.info, 
+                     self.style.colors.warning, self.style.colors.success, 
+                     self.style.colors.danger]
+        
+        bar_width = 50
+        margin = 40
+        chart_width = chart_canvas.winfo_reqwidth() - 2*margin
+        chart_height = chart_canvas.winfo_reqheight() - 2*margin
+        
+        # Dessiner les axes
+        chart_canvas.create_line(margin, margin, margin, chart_height+margin)
+        chart_canvas.create_line(margin, chart_height+margin, chart_width+margin, chart_height+margin)
+        
+        # Dessiner les barres
+        data = [75, 45, 80, 60, 90]
+        max_value = max(data)
+        bar_spacing = chart_width / (len(data) + 1)
+        
+        for i, value in enumerate(data):
+            bar_height = (value / max_value) * chart_height
+            x0 = margin + (i + 1) * bar_spacing - bar_width/2
+            y0 = chart_height + margin - bar_height
+            x1 = x0 + bar_width
+            y1 = chart_height + margin
+            
+            chart_canvas.create_rectangle(x0, y0, x1, y1, 
+                                      fill=chart_colors[i % len(chart_colors)], 
+                                      outline="")
+            
+            # Ajouter la valeur au-dessus de la barre
+            chart_canvas.create_text(x0 + bar_width/2, y0 - 10, 
+                                  text=str(value) + "%", 
+                                  font=("Roboto", 8),
+                                  fill=self.text_color["dark"])
+            
+            # Ajouter l'étiquette
+            labels = ["Lun", "Mar", "Mer", "Jeu", "Ven"]
+            chart_canvas.create_text(x0 + bar_width/2, y1 + 15, 
+                                  text=labels[i], 
+                                  font=("Roboto", 8),
+                                  fill=self.text_color["dark"])
+    
+    def create_progress_module(self, parent, title, color):
+        """Crée un module avec barres de progression"""
+        module = ttk.LabelFrame(parent, text=title, padding=15, bootstyle=color)
+        module.pack(fill=BOTH, expand=True, pady=10)
+        
+        # Données de progression
+        progress_data = [
+            {"name": "Chantier Paris", "progress": 75, "color": "success"},
+            {"name": "Chantier Lyon", "progress": 45, "color": "primary"},
+            {"name": "Chantier Marseille", "progress": 90, "color": "warning"},
+            {"name": "Chantier Bordeaux", "progress": 30, "color": "danger"},
+            {"name": "Chantier Lille", "progress": 60, "color": "info"}
+        ]
+        
+        for item in progress_data:
+            item_frame = ttk.Frame(module)
+            item_frame.pack(fill=X, pady=5)
+            
+            # Nom et pourcentage
+            label_frame = ttk.Frame(item_frame)
+            label_frame.pack(fill=X)
+            
+            # Utiliser une couleur foncée pour les textes sur fond clair
+            ttk.Label(
+                label_frame,
+                text=item["name"],
+                font=("Roboto", 10),
+                foreground=self.text_color["dark"]
+            ).pack(side=LEFT)
+            
+            ttk.Label(
+                label_frame,
+                text=f"{item['progress']}%",
+                font=("Roboto", 10, "bold"),
+                foreground=self.style.colors.get(item["color"])
+            ).pack(side=RIGHT)
+            
+            # Barre de progression
+            progress = ttk.Progressbar(
+                item_frame,
+                value=item["progress"],
+                bootstyle=item["color"]
+            )
+            progress.pack(fill=X, pady=(5, 0))
+
+    def create_list_module(self, parent, title, color):
+        """Crée un module avec liste d'éléments"""
+        module = ttk.LabelFrame(parent, text=title, padding=15, bootstyle=color)
+        module.pack(fill=BOTH, expand=True, pady=10)
+        
+        # En-tête de liste
+        header_frame = ttk.Frame(module)
+        header_frame.pack(fill=X, pady=(0, 10))
+        
+        # Utiliser des couleurs foncées pour les en-têtes sur fond clair
+        ttk.Label(
+            header_frame,
+            text="Tournée",
+            font=("Roboto", 10, "bold"),
+            foreground=self.text_color["dark"]
+        ).pack(side=LEFT, padx=(0, 10))
+        
+        ttk.Label(
+            header_frame,
+            text="Date",
+            font=("Roboto", 10, "bold"),
+            foreground=self.text_color["dark"]
+        ).pack(side=LEFT, padx=50)
+        
+        ttk.Label(
+            header_frame,
+            text="Statut",
+            font=("Roboto", 10, "bold"),
+            foreground=self.text_color["dark"]
+        ).pack(side=RIGHT)
+        
+        # Séparateur
+        ttk.Separator(module).pack(fill=X, pady=(0, 10))
+        
+        # Éléments de liste
+        list_data = [
+            {"name": "Tournée Nord", "date": "18/05/2025", "status": "À venir", "status_color": "info"},
+            {"name": "Tournée Sud", "date": "19/05/2025", "status": "Planifiée", "status_color": "primary"},
+            {"name": "Tournée Est", "date": "20/05/2025", "status": "Planifiée", "status_color": "primary"},
+            {"name": "Tournée Ouest", "date": "21/05/2025", "status": "Attente", "status_color": "warning"}
+        ]
+        
+        for item in list_data:
+            item_frame = ttk.Frame(module)
+            item_frame.pack(fill=X, pady=5)
+            
+            # Texte principal en couleur foncée
+            ttk.Label(
+                item_frame,
+                text=item["name"],
+                font=("Roboto", 10),
+                foreground=self.text_color["dark"]
+            ).pack(side=LEFT)
+            
+            # Date en couleur légèrement atténuée mais encore visible
+            ttk.Label(
+                item_frame,
+                text=item["date"],
+                font=("Roboto", 10),
+                foreground=self.text_color["muted"]
+            ).pack(side=LEFT, padx=50)
+            
+            # Badge de statut avec contraste amélioré
+            status_frame = ttk.Frame(item_frame, bootstyle=f"{item['status_color']}-light")
+            status_frame.pack(side=RIGHT, padx=2, pady=2)
+            
+            # S'assurer que le texte du statut est bien visible sur son fond
+            status_label = ttk.Label(
+                status_frame,
+                text=item["status"],
+                font=("Roboto", 9, "bold"),  # Ajout du bold pour améliorer la lisibilité
+                padding=(5, 2),
+                foreground=self.style.colors.get(item['status_color'])
+            )
+            status_label.pack()
+
+    def create_table_module(self, parent, title, color):
+        """Crée un module avec tableau"""
+        module = ttk.LabelFrame(parent, text=title, padding=15, bootstyle=color)
+        module.pack(fill=BOTH, expand=True, pady=10)
+        
+        # Créer un tableau avec Treeview
+        columns = ("id", "client", "date", "montant", "statut")
+        tree = ttk.Treeview(module, columns=columns, show="headings", height=5)
+        
+        # Définir les en-têtes
+        tree.heading("id", text="ID")
+        tree.heading("client", text="Client")
+        tree.heading("date", text="Date")
+        tree.heading("montant", text="Montant")
+        tree.heading("statut", text="Statut")
+        
+        # Définir les largeurs de colonnes
+        tree.column("id", width=50)
+        tree.column("client", width=120)
+        tree.column("date", width=80)
+        tree.column("montant", width=80)
+        tree.column("statut", width=80)
+        
+        # Insérer des données de test
+        data = [
+            ("CMD-001", "Entreprise A", "17/05/2025", "1250 €", "Livrée"),
+            ("CMD-002", "Entreprise B", "16/05/2025", "890 €", "En cours"),
+            ("CMD-003", "Entreprise C", "15/05/2025", "2340 €", "En cours"),
+            ("CMD-004", "Entreprise D", "14/05/2025", "760 €", "Livrée"),
+            ("CMD-005", "Entreprise E", "13/05/2025", "1120 €", "Livrée")
+        ]
+        
+        for i, item in enumerate(data):
+            tree.insert("", END, values=item, tags=(f"row{i}",))
+            if i % 2 == 0:
+                tree.tag_configure(f"row{i}", background="#f5f5f5")
+        
+        tree.pack(fill=BOTH, expand=True)
+
+    def create_status_bar(self):
+        """Crée une barre d'état moderne"""
+        status_bar = ttk.Frame(self.root, bootstyle="light")
+        status_bar.pack(side=BOTTOM, fill=X)
+        
+        # Informations système - amélioration du contraste
+        ttk.Label(
+            status_bar,
+            text="© 2025 - FleetManager Pro v2.0",
+            font=("Roboto", 9),
+            foreground=self.text_color["dark"]  # Utiliser une couleur foncée sur fond clair
+        ).pack(side=LEFT, padx=10, pady=5)
+        
+        # Statut du système - s'assurer que le vert est visible
+        ttk.Label(
+            status_bar,
+            text="Système: En ligne",
+            font=("Roboto", 9, "bold"),  # Ajout du bold pour la visibilité
+            foreground=self.style.colors.success
+        ).pack(side=RIGHT, padx=10, pady=5)
+        
+        # Heure de dernière mise à jour
+        ttk.Label(
+            status_bar,
+            text="Dernière mise à jour: 17/05/2025 14:30",
+            font=("Roboto", 9),
+            foreground=self.text_color["dark"]  # Utiliser une couleur foncée sur fond clair
+        ).pack(side=RIGHT, padx=10, pady=5)
+
+    def animate_startup(self):
+        """Applique une simple animation de démarrage"""
+        # Masquer tous les widgets existants temporairement
+        self.content_area.update_idletasks()
+        
+        # Révéler progressivement les éléments
+        delay = 100  # millisecondes
+        
+        def reveal_widgets():
+            self.sidebar.pack(side=LEFT, fill=Y)
+            self.root.after(delay, lambda: self.content_area.pack(side=LEFT, fill=BOTH, expand=True))
+        
+        # Lancer l'animation
+        self.root.after(delay, reveal_widgets)
+
+    def show_dashboard(self):
+        """Affiche le tableau de bord principal"""
+        # Implémentation future pour basculer entre les vues
+        pass
+
+    # Méthodes pour ouvrir les différentes vues
+    def open_equipement_view(self):
+        try:
+            self.root.withdraw()
+            new_window = ttk.Toplevel(title="Gestion des Équipements")
+            new_window.geometry("1200x800")
+            from application.views.equipement_view import EquipementApp
+            app = EquipementApp(new_window)
+            new_window.protocol("WM_DELETE_WINDOW", lambda: self.on_view_close(new_window))
+        except Exception as e:
+            print(f"Erreur lors de l'ouverture de la vue Équipement: {str(e)}")
+            self.root.deiconify()
+
+    def open_vehicule_view(self):
+        try:
+            self.root.withdraw()  # Cacher la fenêtre principale
+            new_window = ttk.Toplevel(title="Gestion des Véhicules")
+            new_window.geometry("1200x800")
+            
+            # Import local pour éviter les imports circulaires
+            from application.views.vehicule_view import VehiculeApp
+            app = VehiculeApp(new_window)
+            
+            # Quand la fenêtre est fermée, réafficher la principale
+            new_window.protocol("WM_DELETE_WINDOW", lambda: self.on_view_close(new_window))
+            
+        except Exception as e:
+            print(f"Erreur lors de l'ouverture de la vue Chantier: {str(e)}")
+            self.root.deiconify()
+
+    def open_tournee_view(self):
+        try:
+            self.root.withdraw()
+            new_window = ttk.Toplevel(title="Gestion des Tournées")
+            new_window.geometry("1200x800")
+            
+            from application.views.tournee_view import TourneeApp
+            app = TourneeApp(new_window)
+            
+            new_window.protocol("WM_DELETE_WINDOW", lambda: self.on_view_close(new_window))
+            
+        except Exception as e:
+            print(f"Erreur lors de l'ouverture de la vue Tournée: {str(e)}")
+            self.root.deiconify()
+
+    def open_conducteur_view(self):
+        try:
+            self.root.withdraw()
+            new_window = ttk.Toplevel(title="Gestion des Conducteurs")
+            new_window.geometry("1200x800")
+            
+            from application.views.conducteur_view import ConducteurApp
+            app = ConducteurApp(new_window)
+            
+            new_window.protocol("WM_DELETE_WINDOW", lambda: self.on_view_close(new_window))
+            
+        except Exception as e:
+            print(f"Erreur lors de l'ouverture de la vue Conducteur: {str(e)}")
+            self.root.deiconify()
+
+    def open_commande_view(self):
+        try:
+            self.root.withdraw()
+            new_window = ttk.Toplevel(title="Gestion des Commandes")
+            new_window.geometry("1200x800")
+            
+            from application.views.commande_view import CommandeApp
+            app = CommandeApp(new_window)
+            
+            new_window.protocol("WM_DELETE_WINDOW", lambda: self.on_view_close(new_window))
+            
+        except Exception as e:
+            print(f"Erreur lors de l'ouverture de la vue Commande: {str(e)}")
+            self.root.deiconify()
+
+    def open_affectation_view(self):
+        try:
+            self.root.withdraw()
+            new_window = ttk.Toplevel(title="Affectations")
+            new_window.geometry("1200x800")
+            
+            from application.views.affectation_view import AffectationApp
+            app = AffectationApp(new_window)
+            
+            new_window.protocol("WM_DELETE_WINDOW", lambda: self.on_view_close(new_window))
+            
+        except Exception as e:
+            print(f"Erreur lors de l'ouverture de la vue Affectation: {str(e)}")
+            self.root.deiconify()
+
+    def open_chantiers_view(self):
+        try:
+            self.root.withdraw()
+            new_window = ttk.Toplevel(title="Gestion des Chantiers")
+            new_window.geometry("1000x700")
+            
+            from application.views.chantiers_view import ChantierApp
+            app = ChantierApp(new_window)
+            
+            new_window.protocol("WM_DELETE_WINDOW", lambda: self.on_view_close(new_window))
+            
+        except Exception as e:
+            print(f"Erreur lors de l'ouverture de la vue Chantier: {str(e)}")
+            self.root.deiconify()
+
+    def open_transferer_equipement_view(self):
+        try:
+            self.root.withdraw()
+            new_window = ttk.Toplevel(title="Gestion des DTM")
+            new_window.geometry("1000x700")
+            
+            from application.views.transferer_equipement_view import TransfererEquipementApp
+            app = TransfererEquipementApp(new_window)
+            
+            new_window.protocol("WM_DELETE_WINDOW", lambda: self.on_view_close(new_window))
+            
+        except Exception as e:
+            print(f"Erreur lors de l'ouverture de la vue Chantier: {str(e)}")
+            self.root.deiconify()
+
+    def open_carte_view(self):
+        try:
+            self.root.withdraw()
+            new_window = ttk.Toplevel(title="Carte")
+            new_window.geometry("1200x800")
+            
+            from application.views.carte import CarteApp
+            app = CarteApp(new_window)
+            
+            new_window.protocol("WM_DELETE_WINDOW", lambda: self.on_view_close(new_window))
+            
+        except Exception as e:
+            print(f"Erreur lors de l'ouverture de la vue Carte: {str(e)}")
+            self.root.deiconify()
+    
+    def open_notification_view(self):
+        try:
+            self.root.withdraw()
+            new_window = ttk.Toplevel(title="Notifications")
+            new_window.geometry("1200x800")
+            
+            from application.views.notification import NotificationApp
+            app = NotificationApp(new_window)
+            
+            new_window.protocol("WM_DELETE_WINDOW", lambda: self.on_view_close(new_window))
+            
+        except Exception as e:
+            print(f"Erreur lors de l'ouverture de la vue Notification: {str(e)}")
+            self.root.deiconify()
+    
+    def on_view_close(self, window):
+        # Ferme la fenêtre et réaffiche la principale
+        window.destroy()
+        self.root.deiconify()
+        
+        # Afficher un message de statut temporaire
+        self.show_status_notification("Retour au tableau de bord principal")
+    
+    def show_status_notification(self, message, duration=3000):
+        """Affiche une notification temporaire dans la barre d'état"""
+        # Créer un cadre de notification flottant
+        notification = ttk.Frame(self.root, padding=10, bootstyle="info")
+        
+        # Positionner en bas au centre
+        notification.place(relx=0.5, rely=0.95, anchor=CENTER)
+        
+        # Message avec icône
+        notif_frame = ttk.Frame(notification)
+        notif_frame.pack()
+        
+        # Icône (simulée)
+        icon_canvas = ttk.Canvas(notif_frame, width=20, height=20, background=self.style.colors.info)
+        icon_canvas.pack(side=LEFT, padx=(0, 10))
+        icon_canvas.create_oval(2, 2, 18, 18, fill=self.style.colors.light, outline="")
+        icon_canvas.create_text(10, 10, text="i", font=("Roboto", 10, "bold"), fill=self.style.colors.info)
+        
+        # Texte de notification
+        ttk.Label(
+            notif_frame,
+            text=message,
+            font=("Roboto", 11),
+            bootstyle="light"
+        ).pack(side=LEFT)
+        
+        # Faire disparaître après un délai
+        self.root.after(duration, notification.destroy)
+
+
+# Point d'entrée de l'application
+if __name__ == "__main__":
+    # Configurer le chemin d'accès aux modules
+    module_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if module_path not in sys.path:
+        sys.path.append(module_path)
+    
+    # Lancer l'application avec un thème moderne
+    root = ttk.Window(themename="flatly")  # Options: cosmo, litera, minty, lumen, sandstone, yeti, pulse, morph, superhero, darkly
+    app = MainApp(root)
+    root.mainloop()
