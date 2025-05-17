@@ -490,33 +490,51 @@ class MainApp:
         self.sidebar.pack_propagate(False)
 
         # Logo + titre
-        logo_frame = ttk.Frame(self.sidebar, bootstyle="light")
-        logo_frame.pack(fill=X, padx=10, pady=20)
+                # Définir le style pour le fond g# Style cohérent
+        style = ttk.Style()
+        style.configure("Sidebar.TFrame", background="#f8f9fa")
+        style.configure("SidebarTitle.TLabel", font=("Segoe UI", 14, "bold"), foreground="#212529", background="#f8f9fa")
 
+        # Frame du logo
+        logo_frame = ttk.Frame(self.sidebar, style="Sidebar.TFrame", width=220)
+
+        logo_frame.pack(fill=X, expand=True, padx=10, pady=20)
+
+
+        # Logo (à gauche)
+        # Logo (à gauche)
         try:
             logo_image = Image.open("C:\\Users\\BIG-computer\\Pictures\\Logo.png")
             logo_image = logo_image.resize((50, 50), Image.Resampling.LANCZOS)
             logo_photo = ImageTk.PhotoImage(logo_image)
-            logo_label = ttk.Label(logo_frame, image=logo_photo, bootstyle="light")
-            logo_label.image = logo_photo
+            logo_label = ttk.Label(logo_frame, image=logo_photo, background="#f8f9fa")
+            logo_label.image = logo_photo  # Conserver une référence à l'image
             logo_label.pack(side=LEFT, padx=5)
         except Exception:
             logo_canvas = tk.Canvas(logo_frame, width=50, height=50, bg="#f8f9fa", bd=0, highlightthickness=0)
-            logo_canvas.pack(side=LEFT, padx=5)
             logo_canvas.create_oval(5, 5, 45, 45, fill="#007BFF", outline="")
             logo_canvas.create_text(25, 25, text="FL", font=("Segoe UI", 14, "bold"), fill="white")
+            logo_canvas.pack(side=LEFT, padx=5)
+
+
+        # Label "FleetManager" à gauche aussi
+        title_container = ttk.Frame(logo_frame, style="Sidebar.TFrame")
+        title_container.pack(side=LEFT, fill=X, expand=True, padx=(5, 0))
+
 
         ttk.Label(
-            logo_frame,
-            text="FleetManager",
-            font=("Segoe UI", 14, "bold"),
-            foreground="#343a40",
-            background="#f8f9fa"
-        ).pack(side=LEFT, padx=10)
+            title_container,
+            text="Fleet Manager",
+            style="SidebarTitle.TLabel",
+            anchor="w"
+        ).pack(fill=X)
 
-        ttk.Separator(self.sidebar).pack(fill=X, padx=10, pady=(0, 10))
 
-        # Liste des boutons du menu (même couleur pour tous)
+
+
+        ttk.Separator(self.sidebar).pack(fill=X, padx=10, pady=(0, 15))
+
+        # Boutons de menu
         menu_items = [
             ("Tableau de bord", self.show_dashboard),
             ("Véhicules", self.open_vehicule_view),
@@ -535,6 +553,7 @@ class MainApp:
             self.create_sidebar_button(self.sidebar, label, command)
 
         self.create_user_section()
+
     def create_sidebar_button(self, parent, text, command):
         """Bouton clair à fond uni bleu"""
         button = ttk.Button(
@@ -605,39 +624,67 @@ class MainApp:
 
     def create_user_section(self):
         """Crée la section utilisateur en bas de la sidebar"""
+        # Créer un frame pour maintenir l'utilisateur en bas
+        # qui prendra tout l'espace disponible restant
+        spacer = ttk.Frame(self.sidebar)
+        spacer.pack(fill=tk.Y, expand=True)
+
         # Séparateur
-        ttk.Separator(self.sidebar).pack(fill=X, padx=10, pady=(20, 10))
-        
+        ttk.Separator(self.sidebar).pack(fill=tk.X, padx=10, pady=(5, 10))
+
         # Frame utilisateur
-        user_frame = ttk.Frame(self.sidebar, bootstyle="secondary")
-        user_frame.pack(fill=X, padx=10, pady=10, side=BOTTOM)
-        
-        # Avatar utilisateur (simulé avec un canvas)
-        avatar_canvas = ttk.Canvas(user_frame, width=32, height=32,
-                                background=self.style.colors.secondary)
-        avatar_canvas.pack(side=LEFT, padx=10)
-        avatar_canvas.create_oval(2, 2, 30, 30, fill=self.style.colors.light, outline="")
-        avatar_canvas.create_text(16, 16, text="AP", font=("Roboto", 10, "bold"), fill=self.style.colors.secondary)
-        
+        user_frame = ttk.Frame(self.sidebar, style="Sidebar.TFrame")
+        user_frame.pack(fill=tk.X, padx=10, pady=10)
+
+        # Avatar utilisateur
+        avatar_canvas = tk.Canvas(
+            user_frame,
+            width=32,
+            height=32,
+            bg="#f8f9fa",  # Fond cohérent avec style Sidebar.TFrame
+            highlightthickness=0
+        )
+        avatar_canvas.pack(side=tk.LEFT, padx=10, pady=5)
+        avatar_canvas.create_oval(2, 2, 30, 30, fill="#007BFF", outline="")
+        avatar_canvas.create_text(16, 16, text="AP", font=("Roboto", 10, "bold"), fill="white")
+
         # Info utilisateur
-        user_info = ttk.Frame(user_frame, bootstyle="secondary")
-        user_info.pack(side=LEFT, fill=X, expand=True)
-        
+        user_info = ttk.Frame(user_frame, style="Sidebar.TFrame")
+        user_info.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+
         ttk.Label(
             user_info,
             text="Admin Projet",
             font=("Roboto", 10, "bold"),
-            style="Light.TLabel"
-        ).pack(anchor=W)
-        
+            foreground="#212529"  # Texte foncé pour contraste
+        ).pack(anchor=tk.W)
+
         ttk.Label(
             user_info,
             text="En ligne",
             font=("Roboto", 8),
-            bootstyle="success",
-            foreground=self.style.colors.success
-        ).pack(anchor=W)
-    
+            foreground="#28a745"  # Couleur verte pour "En ligne"
+        ).pack(anchor=tk.W)
+        
+        # Bouton de déconnexion
+        logout_btn = ttk.Button(
+            user_frame,
+            text="⏻",
+            command=self.logout,
+            style="Sidebar.TButton",
+            cursor="hand2"
+        )
+        logout_btn.pack(side=tk.RIGHT, padx=5)
+        
+    def logout(self):
+        """Déconnecte l'utilisateur et retourne à l'écran de connexion"""
+        # Effacer tous les widgets existants
+        for widget in self.root.winfo_children():
+            widget.destroy()
+        
+        # Afficher l'écran de connexion
+        self.show_login_screen()
+
     def create_header(self):
         """Crée l'en-tête de l'application"""
         header_frame = ttk.Frame(self.content_area)
@@ -712,7 +759,7 @@ class MainApp:
         # KPI Cards
         kpi_data = [
             {"title": "Véhicules actifs", "value": "42", "change": "+5%", "icon": "truck", "color": "primary"},
-            {"title": "Chantiers en cours", "value": "12", "change": "+2", "icon": "building", "color": "success"},
+            {"title": "DTM en cours", "value": "12", "change": "+2", "icon": "building", "color": "success"},
             {"title": "Tournées du jour", "value": "8", "change": "-1", "icon": "map", "color": "warning"},
             {"title": "Commandes à livrer", "value": "23", "change": "+15%", "icon": "clipboard", "color": "danger"}
         ]
@@ -734,7 +781,7 @@ class MainApp:
         
         # Ajouter les modules graphiques
         self.create_chart_module(left_col, "Disponibilité des véhicules", "primary")
-        self.create_progress_module(right_col, "Statut des chantiers", "success")
+        self.create_progress_module(right_col, "Statut des DTM", "success")
         self.create_list_module(left_col, "Prochaines tournées", "warning")
         self.create_table_module(right_col, "Dernières commandes", "danger")
     
@@ -853,11 +900,11 @@ class MainApp:
         
         # Données de progression
         progress_data = [
-            {"name": "Chantier Paris", "progress": 75, "color": "success"},
-            {"name": "Chantier Lyon", "progress": 45, "color": "primary"},
-            {"name": "Chantier Marseille", "progress": 90, "color": "warning"},
-            {"name": "Chantier Bordeaux", "progress": 30, "color": "danger"},
-            {"name": "Chantier Lille", "progress": 60, "color": "info"}
+            {"name": "Chantier EGS 100", "progress": 75, "color": "success"},
+            {"name": "Chantier EGS 120", "progress": 45, "color": "primary"},
+            {"name": "Chantier MMM", "progress": 90, "color": "warning"},
+            {"name": "Chantier 100", "progress": 30, "color": "danger"},
+            {"name": "Chantier 200", "progress": 60, "color": "info"}
         ]
         
         for item in progress_data:
@@ -927,10 +974,10 @@ class MainApp:
         
         # Éléments de liste
         list_data = [
-            {"name": "Tournée Nord", "date": "18/05/2025", "status": "À venir", "status_color": "info"},
-            {"name": "Tournée Sud", "date": "19/05/2025", "status": "Planifiée", "status_color": "primary"},
-            {"name": "Tournée Est", "date": "20/05/2025", "status": "Planifiée", "status_color": "primary"},
-            {"name": "Tournée Ouest", "date": "21/05/2025", "status": "Attente", "status_color": "warning"}
+            {"name": "Tournée X", "date": "18/05/2025", "status": "À venir", "status_color": "info"},
+            {"name": "Tournée Y", "date": "19/05/2025", "status": "Planifiée", "status_color": "primary"},
+            {"name": "Tournée Z", "date": "20/05/2025", "status": "Planifiée", "status_color": "primary"},
+            {"name": "Tournée A", "date": "21/05/2025", "status": "Attente", "status_color": "warning"}
         ]
         
         for item in list_data:
@@ -992,11 +1039,11 @@ class MainApp:
         
         # Insérer des données de test
         data = [
-            ("CMD-001", "Entreprise A", "17/05/2025", "1250 €", "Livrée"),
-            ("CMD-002", "Entreprise B", "16/05/2025", "890 €", "En cours"),
-            ("CMD-003", "Entreprise C", "15/05/2025", "2340 €", "En cours"),
-            ("CMD-004", "Entreprise D", "14/05/2025", "760 €", "Livrée"),
-            ("CMD-005", "Entreprise E", "13/05/2025", "1120 €", "Livrée")
+            ("CMD-001", "A", "17/05/2025", "1250 €", "Livrée"),
+            ("CMD-002", " B", "16/05/2025", "890 €", "En cours"),
+            ("CMD-003", " C", "15/05/2025", "2340 €", "En cours"),
+            ("CMD-004", "D", "14/05/2025", "760 €", "Livrée"),
+            ("CMD-005", "E", "13/05/2025", "1120 €", "Livrée")
         ]
         
         for i, item in enumerate(data):
