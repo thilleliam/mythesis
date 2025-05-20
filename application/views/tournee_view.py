@@ -22,7 +22,8 @@ class DateEntry(ttk.Frame):
     """Widget personnalisé pour la sélection de date"""
     def __init__(self, parent, textvariable_jour, textvariable_mois, textvariable_annee, **kwargs):
         super().__init__(parent, **kwargs)
-        
+        photo = tk.PhotoImage(file="C:\\Users\\BIG-computer\\Pictures\\Logo1.png")
+        root.iconphoto(False, photo)
         self.jour_var = textvariable_jour
         self.mois_var = textvariable_mois
         self.annee_var = textvariable_annee

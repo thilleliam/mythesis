@@ -16,6 +16,8 @@ class ChantierApp:
         self.root = root
         self.root.title("Gestion des Chantiers")
         self.root.geometry("900x600")
+        photo = ttk.PhotoImage(file="C:\\Users\\BIG-computer\\Pictures\\Logo1.png")
+        root.iconphoto(False, photo)
         
         # Import local pour éviter les imports circulaires
         from application.models.chantiers import Chantier

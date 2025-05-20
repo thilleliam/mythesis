@@ -21,6 +21,8 @@ class LoginScreen:
         self.root = root
         self.on_login_success = on_login_success
         self.root.title("FleetManager - Authentification")
+        photo = tk.PhotoImage(file="C:\\Users\\BIG-computer\\Pictures\\Logo1.png")
+        root.iconphoto(False, photo)
         
         # Centrer la fenêtre avec taille fixe pour le login
         self.root.geometry("600x700")
@@ -379,7 +381,8 @@ class MainApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Gestion de Flotte et Logistique")
-        
+        photo = tk.PhotoImage(file="C:\\Users\\BIG-computer\\Pictures\\Logo1.png")
+        root.iconphoto(False, photo)
         # Initialiser l'écran de connexion d'abord
         self.show_login_screen()
     
@@ -1205,7 +1208,7 @@ class MainApp:
             
         except Exception as e:
             print(f"Erreur lors de l'ouverture de la vue Chantier: {str(e)}")
-            self.root.deiconify()
+            self.root.deiconify() 
 
     def open_transferer_equipement_view(self):
         try:

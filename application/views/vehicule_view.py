@@ -6,6 +6,7 @@ from sqlalchemy.orm import sessionmaker, configure_mappers
 from application.database import engine
 from sqlalchemy import func
 from datetime import date, datetime
+import tkinter as tk
 configure_mappers()
 
 from sqlalchemy.orm import sessionmaker, scoped_session
@@ -19,7 +20,8 @@ class VehiculeApp(ttk.Frame):
     def __init__(self, master):
         super().__init__(master)
         self.pack(fill=BOTH, expand=True)
-
+        photo = tk.PhotoImage(file="C:\\Users\\BIG-computer\\Pictures\\Logo1.png")
+        root.iconphoto(False, photo)
         # Import local pour éviter les références circulaires
         from application.models.vehicule import Vehicule
 

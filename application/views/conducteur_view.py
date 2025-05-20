@@ -17,6 +17,8 @@ class ConducteurApp:
         self.root = root
         self.root.title("Gestion des Conducteurs")
         self.root.geometry("800x500")
+        photo = ttk.PhotoImage(file="C:\\Users\\BIG-computer\\Pictures\\Logo1.png")
+        root.iconphoto(False, photo)
         
         # Import local pour éviter les imports circulaires
         from application.models.conducteurs import Conducteur

@@ -17,6 +17,8 @@ class CommandeApp:
         self.root = root
         self.root.title("Gestion des Commandes")
         self.root.geometry("1200x700")
+        photo = ttk.PhotoImage(file="C:\\Users\\BIG-computer\\Pictures\\Logo1.png")
+        root.iconphoto(False, photo)
         
         # Appliquer le thème Darkly
         style = ttk.Style("cosmo")

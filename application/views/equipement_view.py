@@ -19,6 +19,8 @@ class EquipementApp:
         self.root = root
         self.root.title("Gestion des Équipements")
         self.root.geometry("950x650")  # Dimensions agrandies pour plus d'espace
+        photo = ttk.PhotoImage(file="C:\\Users\\BIG-computer\\Pictures\\Logo1.png")
+        root.iconphoto(False, photo)
         
         # Import local pour éviter les imports circulaires
         from application.models.equipements import Equipement

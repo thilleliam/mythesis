@@ -476,6 +476,8 @@ if __name__ == "__main__":
     root = ttkb.Window(themename="cosmo")
     root.title("Gestion des Affectations")
     root.geometry("1200x700")
+    photo = tk.PhotoImage(file="C:\\Users\\BIG-computer\\Pictures\\Logo1.png")
+    root.iconphoto(False, photo)
     
     app = AffectationView(root)
     

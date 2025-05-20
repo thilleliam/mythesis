@@ -970,6 +970,8 @@ class TransfererEquipementApp:
         self.root = root
         self.root.title("Gestion des Transferts d'Équipements")
         self.root.geometry("1200x700")
+        photo = tk.PhotoImage(file="C:\\Users\\BIG-computer\\Pictures\\Logo1.png")
+        root.iconphoto(False, photo)
         
         # Import local pour éviter les imports circulaires
         from application.models.transferer_equipement import TransfererEquipement
