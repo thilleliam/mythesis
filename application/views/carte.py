@@ -18,6 +18,7 @@ import time
 import math
 import tempfile
 import networkx as nx # type: ignore
+from PyQt5.QtGui import QIcon
 
 # Import de votre modèle Chantier
 from application.models.chantiers import Chantier
@@ -28,6 +29,8 @@ class CarteChantiers(QMainWindow):
         super().__init__()
         self.setWindowTitle("Carte Interactive des Chantiers")
         self.setGeometry(100, 100, 1200, 900)
+        self.setWindowIcon(QIcon("C:\\Users\\BIG-computer\\Pictures\\Logo1.png"))
+        
         
         # Fichier temporaire pour la carte
         self.temp_file = os.path.join(tempfile.gettempdir(), "carte_chantiers_temp.html")
@@ -1192,45 +1195,7 @@ def initialiser_base_segments():
         print(f"❌ Erreur lors de l'initialisation: {str(e)}")
         return False
 
-def migrer_segments_existants(segments_existants):
-    """
-    Fonction pour migrer des segments existants vers la base de données
     
-    Args:
-        segments_existants (list): Liste des segments au format interface
-    """
-    from application.models.segment import GestionnaireSegments
-    
-    segments_migrés = 0
-    for segment in segments_existants:
-        try:
-            # Vérifier que le segment a les informations nécessaires
-            if 'point1' in segment and 'point2' in segment and 'distance' in segment:
-                segment_db = GestionnaireSegments.sauvegarder_segment(
-                    point1=segment['point1'],
-                    point2=segment['point2'],
-                    distance=segment['distance'],
-                    couleur=segment.get('couleur', 'blue'),
-                    epaisseur=segment.get('epaisseur', 3),
-                    afficher_distance=segment.get('afficher_distance', True),
-                    nom_segment=segment.get('nom_segment'),
-                    description=segment.get('description', 'Segment migré'),
-                    cree_par="migration"
-                )
-                
-                if segment_db:
-                    segments_migrés += 1
-                    
-        except Exception as e:
-            print(f"❌ Erreur lors de la migration d'un segment: {str(e)}")
-    
-    print(f"✅ {segments_migrés} segments migrés vers la base de données")
-    return segments_migrés
-
-# =======================
-# EXEMPLE D'UTILISATION COMPLÈTE
-# =======================
-
 def main():
     """
     Fonction principale avec initialisation de la base de données
@@ -1248,15 +1213,6 @@ def main():
     fenetre = CarteChantiers()
     fenetre.show()
     
-    # 3. Message d'information sur les nouvelles fonctionnalités
-    QMessageBox.information(None, "Nouvelles fonctionnalités", 
-                           "🎉 Nouvelles fonctionnalités disponibles :\n\n"
-                           "💾 Sauvegarde automatique des segments en base de données\n"
-                           "📊 Statistiques des segments (Menu Segments)\n"
-                           "🗑️ Suppression sélective des segments\n"
-                           "📄 Export des segments en CSV\n"
-                           "🔄 Chargement automatique des segments existants\n\n"
-                           "Consultez le menu 'Segments' pour accéder à ces fonctionnalités !")
     
     sys.exit(app.exec_())
 

@@ -1231,8 +1231,8 @@ class MainApp:
             new_window = ttk.Toplevel(title="Carte")
             new_window.geometry("1200x800")
             
-            from application.views.carte import CarteApp
-            app = CarteApp(new_window)
+            from application.views.carte import CarteChantiers
+            app = CarteChantiers(new_window)
             
             new_window.protocol("WM_DELETE_WINDOW", lambda: self.on_view_close(new_window))
             
