@@ -22,7 +22,7 @@ import networkx as nx # type: ignore
 # Import de votre modèle Chantier
 from application.models.chantiers import Chantier
 from application.config import Base, engine
-
+from application.models.segment import Segment, GestionnaireSegments
 class CarteChantiers(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -39,11 +39,20 @@ class CarteChantiers(QMainWindow):
         self.points_selectionnes = []
         self.chantiers = []
         self.chantiers_valides = []
+        self.segments_db = []  # Pour stocker les segments chargés de la DB
         
-        # Groupes de calques pour les réseaux
+        # Charger les segments existants depuis la base de données
+        self.charger_segments_depuis_db()
+        # Groupes de calques pour les réseaux - Initialisation à None
         self.groupe_reseau_minimal = None
         self.groupe_reseau_complet = None
         self.groupe_toutes_connexions = None
+        self.groupe_plan_sahara = None
+        
+        # Groupes de base
+        self.groupe_chantiers = None
+        self.groupe_points_utilisateur = None
+        self.groupe_segments = None
         
         # Création de la carte
         self.creer_carte()
@@ -131,12 +140,6 @@ class CarteChantiers(QMainWindow):
         # Calculer l'arbre couvrant minimal
         mst = nx.minimum_spanning_tree(G, weight='weight')
         
-        # Supprimer l'ancien groupe s'il existe
-        if hasattr(self, 'groupe_reseau_minimal'):
-            if self.groupe_reseau_minimal in self.carte._children.values():
-                self.carte._children = {k: v for k, v in self.carte._children.items() 
-                                    if v != self.groupe_reseau_minimal}
-        
         # Créer un nouveau groupe pour le réseau minimal
         self.groupe_reseau_minimal = FeatureGroup(name='Réseau routier minimal')
         
@@ -161,10 +164,7 @@ class CarteChantiers(QMainWindow):
             )
             line.add_to(self.groupe_reseau_minimal)
         
-        # Ajouter le groupe à la carte
-        self.groupe_reseau_minimal.add_to(self.carte)
-        
-        # Mettre à jour la carte
+        # Mettre à jour la carte (qui va ajouter correctement le groupe à la carte)
         self.mettre_a_jour_carte()
         
         # Afficher un message d'information
@@ -232,96 +232,6 @@ class CarteChantiers(QMainWindow):
                             f"Distance totale : {total_distance:.1f} km\n"
                             f"Nombre de points : {len(tour)}")
 
-    def afficher_toutes_connexions(self):
-        """
-        Affiche toutes les connexions possibles entre les points sur la carte.
-        Ce réseau complet montre toutes les liaisons directes entre chaque paire de points.
-        """
-        # Vérifier qu'il y a suffisamment de points pour créer un réseau
-        tous_points = self.obtenir_tous_points()
-        if len(tous_points) < 2:
-            QMessageBox.warning(self, "Toutes les connexions", 
-                            "Il faut au moins 2 points pour afficher les connexions.")
-            return
-            
-        # Créer un nouveau groupe pour toutes les connexions
-        self.groupe_toutes_connexions = FeatureGroup(name='Toutes les connexions')
-        
-        # Compteurs pour le message d'information
-        total_distance = 0
-        nb_connexions = 0
-        
-        # Dessiner une ligne entre chaque paire de points
-        for i, point1 in enumerate(tous_points):
-            for j, point2 in enumerate(tous_points):
-                if i < j:  # Pour éviter de traiter la même paire deux fois
-                    distance = self.calculer_distance(
-                        point1['lat'], point1['lon'],
-                        point2['lat'], point2['lon']
-                    )
-                    total_distance += distance
-                    nb_connexions += 1
-                    
-                    # Dessiner la ligne
-                    PolyLine(
-                        [[point1['lat'], point1['lon']], [point2['lat'], point2['lon']]],
-                        color='red',
-                        weight=2,
-                        opacity=0.5,
-                        tooltip=f"{point1['nom']} ↔ {point2['nom']} ({distance:.1f} km)"
-                    ).add_to(self.groupe_toutes_connexions)
-        
-        # Mettre à jour la carte (qui va ajouter correctement le groupe à la carte)
-        self.mettre_a_jour_carte()
-        
-        # Afficher un message d'information
-        QMessageBox.information(self, "Toutes les connexions", 
-                            f"Toutes les connexions possibles affichées.\n"
-                            f"Distance totale cumulée : {total_distance:.1f} km\n"
-                            f"Nombre de connexions : {nb_connexions}")
-
-    def mettre_a_jour_carte(self):
-        """Sauvegarde et recharge la carte mise à jour"""
-        try:
-            # Méthode plus sûre pour recréer la carte au lieu de simplement ajouter/supprimer des calques
-            # Sauvegarde de la position actuelle et du niveau de zoom
-            center = self.carte.get_center()
-            zoom = self.carte.options['zoom_start']
-            
-            # Recréation de la carte de base
-            self.carte = Map(
-                location=center,
-                zoom_start=zoom,
-                control_scale=True,
-                tiles='OpenStreetMap'
-            )
-            
-            # Ajouter à nouveau les groupes existants
-            if hasattr(self, 'groupe_chantiers') and self.groupe_chantiers:
-                self.groupe_chantiers.add_to(self.carte)
-            if hasattr(self, 'groupe_points_utilisateur') and self.groupe_points_utilisateur:
-                self.groupe_points_utilisateur.add_to(self.carte)
-            if hasattr(self, 'groupe_segments') and self.groupe_segments:
-                self.groupe_segments.add_to(self.carte)
-                
-            # Ajouter les groupes de réseaux s'ils existent
-            if hasattr(self, 'groupe_reseau_minimal') and self.groupe_reseau_minimal:
-                self.groupe_reseau_minimal.add_to(self.carte)
-            if hasattr(self, 'groupe_reseau_complet') and self.groupe_reseau_complet:
-                self.groupe_reseau_complet.add_to(self.carte)
-            if hasattr(self, 'groupe_toutes_connexions') and self.groupe_toutes_connexions:
-                self.groupe_toutes_connexions.add_to(self.carte)
-            if hasattr(self, 'groupe_plan_sahara') and self.groupe_plan_sahara:
-                self.groupe_plan_sahara.add_to(self.carte)
-            
-            # Ajouter le contrôle des calques en dernier
-            LayerControl().add_to(self.carte)
-            
-            # Sauvegarder et afficher la carte mise à jour
-            self.carte.save(self.temp_file)
-            self.browser.load(QUrl.fromLocalFile(self.temp_file))
-        except Exception as e:
-            QMessageBox.critical(self, "Erreur", f"Erreur lors de la mise à jour de la carte : {str(e)}")
     def nearest_neighbor_tsp(self, distance_matrix):
         """
         Implémentation de l'algorithme du plus proche voisin pour le problème du voyageur de commerce.
@@ -352,11 +262,6 @@ class CarteChantiers(QMainWindow):
                                "Il faut au moins 2 points pour afficher les connexions.")
             return
             
-        # Supprimer l'ancien groupe s'il existe
-        if self.groupe_toutes_connexions:
-            self.carte._children = {k: v for k, v in self.carte._children.items() 
-                                  if v != self.groupe_toutes_connexions}
-        
         # Créer un nouveau groupe pour toutes les connexions
         self.groupe_toutes_connexions = FeatureGroup(name='Toutes les connexions')
         
@@ -384,10 +289,7 @@ class CarteChantiers(QMainWindow):
                         tooltip=f"{point1['nom']} ↔ {point2['nom']} ({distance:.1f} km)"
                     ).add_to(self.groupe_toutes_connexions)
         
-        # Ajouter le groupe à la carte
-        self.groupe_toutes_connexions.add_to(self.carte)
-        
-        # Mettre à jour la carte
+        # Mettre à jour la carte (qui va ajouter correctement le groupe à la carte)
         self.mettre_a_jour_carte()
         
         # Afficher un message d'information
@@ -460,6 +362,9 @@ class CarteChantiers(QMainWindow):
             ((10, 11), 80)  # OUARGLA - HASSI MESSAOUD
         ]
         
+        # Créer le groupe pour le plan Sahara
+        self.groupe_plan_sahara = FeatureGroup(name='Plan du Sahara (EGS190)')
+        
         # Ajout des marqueurs si demandé
         if show_markers:
             for nom, lat, lon, desc in points:
@@ -469,7 +374,7 @@ class CarteChantiers(QMainWindow):
                     tooltip=nom,
                     icon=Icon(color='green', icon='info-sign')
                 )
-                marker.add_to(self.carte)
+                marker.add_to(self.groupe_plan_sahara)
         
         # Ajout des routes si demandé
         if show_routes:
@@ -489,7 +394,7 @@ class CarteChantiers(QMainWindow):
                     weight=3,
                     opacity=0.7,
                     tooltip=tooltip
-                ).add_to(self.carte)
+                ).add_to(self.groupe_plan_sahara)
         
         # Mise à jour de la carte
         self.mettre_a_jour_carte()
@@ -508,7 +413,9 @@ class CarteChantiers(QMainWindow):
         QMessageBox.information(self, "Plan de route ajouté", message)
       
     def ajouter_menu(self):
-        """Ajoute un menu à la fenêtre principale"""
+        """
+        Version mise à jour du menu avec les nouvelles fonctionnalités
+        """
         menubar = self.menuBar()
         
         # Menu Fichier
@@ -518,9 +425,27 @@ class CarteChantiers(QMainWindow):
         action_export.triggered.connect(self.exporter_carte)
         file_menu.addAction(action_export)
         
+        # 🔥 NOUVEAU: Export des segments
+        action_export_segments = QAction("Exporter les segments (CSV)", self)
+        action_export_segments.triggered.connect(self.exporter_segments_csv)
+        file_menu.addAction(action_export_segments)
+        
+        file_menu.addSeparator()
+        
         action_quit = QAction("Quitter", self)
         action_quit.triggered.connect(self.close)
         file_menu.addAction(action_quit)
+        
+        # Menu Segments (NOUVEAU)
+        segments_menu = menubar.addMenu("Segments")
+        
+        action_stats = QAction("Statistiques des segments", self)
+        action_stats.triggered.connect(self.afficher_statistiques_segments)
+        segments_menu.addAction(action_stats)
+        
+        action_supprimer = QAction("Supprimer un segment", self)
+        action_supprimer.triggered.connect(self.supprimer_segment_dialog)
+        segments_menu.addAction(action_supprimer)
         
         # Menu Outils
         tools_menu = menubar.addMenu("Outils")
@@ -643,22 +568,53 @@ class CarteChantiers(QMainWindow):
         }
         self.points_ajoutes.append(point)
         
-        # Ajouter le marqueur à la carte
-        marker = Marker(
-            location=[lat, lon],
-            popup=Popup(f"<b>{nom}</b><br>Point ajouté manuellement", max_width=200),
-            tooltip=nom,
-            icon=Icon(color='red', icon='star')
-        )
-        marker.add_to(self.groupe_points_utilisateur)
-        
+        # Mettre à jour la carte pour afficher le nouveau point
         self.mettre_a_jour_carte()
         QMessageBox.information(self, "Point ajouté", f"Le point {nom} a été ajouté à la carte.")
     
+    def charger_segments_depuis_db(self):
+        """
+        Charge tous les segments existants depuis la base de données
+        """
+        try:
+            segments_db = GestionnaireSegments.charger_tous_segments()
+            self.segments_db = segments_db
+            
+            # Convertir les segments DB en format utilisable par l'interface
+            for segment_db in segments_db:
+                segment_interface = {
+                    'point1': {
+                        'id': segment_db.point1_id_reference,
+                        'nom': segment_db.point1_nom,
+                        'lat': segment_db.point1_latitude,
+                        'lon': segment_db.point1_longitude,
+                        'type': segment_db.point1_type
+                    },
+                    'point2': {
+                        'id': segment_db.point2_id_reference,
+                        'nom': segment_db.point2_nom,
+                        'lat': segment_db.point2_latitude,
+                        'lon': segment_db.point2_longitude,
+                        'type': segment_db.point2_type
+                    },
+                    'distance': segment_db.distance_km,
+                    'couleur': segment_db.couleur,
+                    'epaisseur': segment_db.epaisseur,
+                    'afficher_distance': segment_db.afficher_distance,
+                    'db_id': segment_db.id,  # ID de la base de données
+                    'nom_segment': segment_db.nom_segment,
+                    'description': segment_db.description
+                }
+                self.segments_ajoutes.append(segment_interface)
+                
+            print(f"✅ {len(segments_db)} segments chargés depuis la base de données")
+            
+        except Exception as e:
+            print(f"❌ Erreur lors du chargement des segments: {str(e)}")
+    
     def creer_segment(self, dialog):
         """
-        Crée le segment entre les deux points sélectionnés et l'ajoute à la carte.
-        Calcule et affiche la distance entre les points.
+        Version modifiée pour sauvegarder en base de données
         """
         try:
             point1 = self.combo_point1.currentData()
@@ -678,47 +634,222 @@ class CarteChantiers(QMainWindow):
             # Ajouter info de distance si cochée
             afficher_distance = self.check_distance.isChecked()
             
-            # Création du segment
-            segment = {
-                'point1': point1,
-                'point2': point2,
-                'distance': distance,
-                'couleur': 'blue',
-                'epaisseur': 3,
-                'afficher_distance': afficher_distance
-            }
-            self.segments_ajoutes.append(segment)
+            # Demander un nom pour le segment (optionnel)
+            nom_segment, ok = QInputDialog.getText(
+                self, "Nom du segment", 
+                "Entrez un nom pour ce segment (optionnel):",
+                text=f"{point1['nom']} - {point2['nom']}"
+            )
+            if not ok:
+                nom_segment = f"{point1['nom']} - {point2['nom']}"
             
-            # Préparer le texte du tooltip
-            tooltip = f"Segment: {point1['nom']} → {point2['nom']}"
-            if afficher_distance:
-                tooltip += f" ({distance:.1f} km)"
+            # Demander une description (optionnel)
+            description, ok = QInputDialog.getText(
+                self, "Description", 
+                "Entrez une description (optionnel):"
+            )
+            if not ok:
+                description = ""
             
-            # Dessiner la ligne directement sans méthode séparée
-            line = PolyLine(
-                locations=[
-                    [point1['lat'], point1['lon']],
-                    [point2['lat'], point2['lon']]
-                ],
-                color='blue',
-                weight=3,
-                opacity=0.7,
-                tooltip=tooltip
+            # 🔥 NOUVEAUTÉ: Sauvegarder en base de données
+            segment_db = GestionnaireSegments.sauvegarder_segment(
+                point1=point1,
+                point2=point2,
+                distance=distance,
+                couleur='blue',
+                epaisseur=3,
+                afficher_distance=afficher_distance,
+                nom_segment=nom_segment,
+                description=description,
+                cree_par="utilisateur_carte"  # Vous pouvez personnaliser ceci
             )
             
-            # Ajouter la ligne au groupe de segments
-            line.add_to(self.groupe_segments)
-            
-            dialog.accept()
-            self.mettre_a_jour_carte()
-            QMessageBox.information(
-                self, "Segment ajouté", 
-                f"Segment créé entre {point1['nom']} et {point2['nom']}.\n"
-                f"Distance: {distance:.2f} km"
-            )
+            if segment_db:
+                # Création du segment pour l'interface
+                segment = {
+                    'point1': point1,
+                    'point2': point2,
+                    'distance': distance,
+                    'couleur': 'blue',
+                    'epaisseur': 3,
+                    'afficher_distance': afficher_distance,
+                    'db_id': segment_db.id,  # 🔥 ID de la base de données
+                    'nom_segment': nom_segment,
+                    'description': description
+                }
+                self.segments_ajoutes.append(segment)
+                
+                dialog.accept()
+                self.mettre_a_jour_carte()
+                
+                # Message de confirmation avec plus d'infos
+                QMessageBox.information(
+                    self, "Segment sauvegardé", 
+                    f"✅ Segment créé et sauvegardé en base de données!\n\n"
+                    f"📍 Points: {point1['nom']} → {point2['nom']}\n"
+                    f"📏 Distance: {distance:.2f} km\n"
+                    f"🏷️  Nom: {nom_segment}\n"
+                    f"🆔 ID Base de données: {segment_db.id}"
+                )
+            else:
+                QMessageBox.warning(self, "Erreur", "Impossible de sauvegarder le segment en base de données.")
+                
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Impossible de créer le segment: {str(e)}")
 
+    def supprimer_segment_dialog(self):
+        """
+        Nouvelle fonction pour supprimer un segment avec confirmation
+        """
+        if not self.segments_ajoutes:
+            QMessageBox.information(self, "Aucun segment", "Aucun segment à supprimer.")
+            return
+        
+        # Créer une boîte de dialogue pour sélectionner le segment à supprimer
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Supprimer un segment")
+        dialog.setMinimumWidth(500)
+        
+        layout = QVBoxLayout()
+        
+        layout.addWidget(QLabel("Sélectionnez le segment à supprimer:"))
+        
+        liste_segments = QListWidget()
+        for i, segment in enumerate(self.segments_ajoutes):
+            nom_affichage = segment.get('nom_segment', f"{segment['point1']['nom']} - {segment['point2']['nom']}")
+            distance = segment['distance']
+            db_id = segment.get('db_id', 'N/A')
+            
+            item_text = f"[ID:{db_id}] {nom_affichage} ({distance:.2f} km)"
+            liste_segments.addItem(item_text)
+            
+        layout.addWidget(liste_segments)
+        
+        # Boutons
+        btn_box = QHBoxLayout()
+        
+        btn_supprimer = QPushButton("Supprimer")
+        btn_supprimer.clicked.connect(lambda: self.confirmer_suppression_segment(dialog, liste_segments))
+        btn_box.addWidget(btn_supprimer)
+        
+        btn_annuler = QPushButton("Annuler")
+        btn_annuler.clicked.connect(dialog.reject)
+        btn_box.addWidget(btn_annuler)
+        
+        layout.addLayout(btn_box)
+        dialog.setLayout(layout)
+        
+        dialog.exec_()
+    
+    def confirmer_suppression_segment(self, dialog, liste_segments):
+        """
+        Confirme et exécute la suppression d'un segment
+        """
+        selection = liste_segments.currentRow()
+        if selection == -1:
+            QMessageBox.warning(self, "Sélection", "Veuillez sélectionner un segment à supprimer.")
+            return
+        
+        segment = self.segments_ajoutes[selection]
+        nom_segment = segment.get('nom_segment', f"{segment['point1']['nom']} - {segment['point2']['nom']}")
+        
+        # Confirmation
+        confirm = QMessageBox.question(
+            self, "Confirmation de suppression",
+            f"Êtes-vous sûr de vouloir supprimer le segment :\n\n"
+            f"🏷️  {nom_segment}\n"
+            f"📏 Distance: {segment['distance']:.2f} km\n"
+            f"🆔 ID: {segment.get('db_id', 'N/A')}\n\n"
+            f"⚠️  Cette action est irréversible !",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        
+        if confirm == QMessageBox.Yes:
+            # Supprimer de la base de données
+            db_id = segment.get('db_id')
+            if db_id and GestionnaireSegments.supprimer_segment(db_id):
+                # Supprimer de la liste locale
+                self.segments_ajoutes.pop(selection)
+                dialog.accept()
+                self.mettre_a_jour_carte()
+                QMessageBox.information(self, "Suppression", f"✅ Segment '{nom_segment}' supprimé avec succès.")
+            else:
+                QMessageBox.warning(self, "Erreur", "Impossible de supprimer le segment de la base de données.")
+    
+    def afficher_statistiques_segments(self):
+        """
+        Affiche les statistiques des segments
+        """
+        stats = GestionnaireSegments.obtenir_statistiques_segments()
+        
+        if stats:
+            message = "📊 STATISTIQUES DES SEGMENTS\n\n"
+            message += f"📈 Nombre total de segments: {stats['total_segments']}\n"
+            message += f"📏 Distance totale: {stats['distance_totale']} km\n"
+            message += f"📊 Distance moyenne: {stats['distance_moyenne']} km\n"
+            message += f"📉 Distance minimale: {stats['distance_min']} km\n"
+            message += f"📈 Distance maximale: {stats['distance_max']} km\n"
+            
+            # Calcul du temps de parcours estimé (à 50 km/h moyenne)
+            if stats['distance_totale'] > 0:
+                temps_heures = stats['distance_totale'] / 50
+                message += f"\n⏱️  Temps de parcours estimé (50 km/h): {temps_heures:.1f} heures"
+        else:
+            message = "❌ Impossible de récupérer les statistiques"
+        
+        QMessageBox.information(self, "Statistiques des segments", message)
+    
+    def exporter_segments_csv(self):
+        """
+        Exporte tous les segments dans un fichier CSV
+        """
+        import csv
+        
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "Exporter les segments", "", 
+            "Fichiers CSV (*.csv);;Tous les fichiers (*)"
+        )
+        
+        if file_path:
+            if not file_path.lower().endswith('.csv'):
+                file_path += '.csv'
+            
+            try:
+                segments_db = GestionnaireSegments.charger_tous_segments()
+                
+                with open(file_path, 'w', newline='', encoding='utf-8') as csvfile:
+                    fieldnames = [
+                        'ID', 'Nom_Segment', 'Point1_Nom', 'Point1_Lat', 'Point1_Lon', 'Point1_Type',
+                        'Point2_Nom', 'Point2_Lat', 'Point2_Lon', 'Point2_Type',
+                        'Distance_KM', 'Couleur', 'Date_Creation', 'Description'
+                    ]
+                    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                    
+                    writer.writeheader()
+                    for segment in segments_db:
+                        writer.writerow({
+                            'ID': segment.id,
+                            'Nom_Segment': segment.nom_segment or '',
+                            'Point1_Nom': segment.point1_nom,
+                            'Point1_Lat': segment.point1_latitude,
+                            'Point1_Lon': segment.point1_longitude,
+                            'Point1_Type': segment.point1_type,
+                            'Point2_Nom': segment.point2_nom,
+                            'Point2_Lat': segment.point2_latitude,
+                            'Point2_Lon': segment.point2_longitude,
+                            'Point2_Type': segment.point2_type,
+                            'Distance_KM': segment.distance_km,
+                            'Couleur': segment.couleur,
+                            'Date_Creation': segment.date_creation.strftime('%Y-%m-%d %H:%M:%S'),
+                            'Description': segment.description or ''
+                        })
+                
+                QMessageBox.information(self, "Export réussi", 
+                                      f"✅ {len(segments_db)} segments exportés dans :\n{file_path}")
+                
+            except Exception as e:
+                QMessageBox.critical(self, "Erreur d'export", f"❌ Erreur lors de l'export: {str(e)}")
     def segment_existe_deja(self, point1, point2):
         """
         Vérifie si un segment entre les deux points existe déjà
@@ -761,8 +892,8 @@ class CarteChantiers(QMainWindow):
         """Permet à l'utilisateur de dessiner un segment entre deux points"""
         tous_points = self.obtenir_tous_points()
         
-        if not tous_points:
-            QMessageBox.warning(self, "Erreur", "Aucun point disponible pour dessiner un segment.")
+        if len(tous_points) < 2:
+            QMessageBox.warning(self, "Erreur", "Il faut au moins 2 points pour dessiner un segment.")
             return
         
         # Créer une boîte de dialogue pour sélectionner les points
@@ -879,28 +1010,106 @@ class CarteChantiers(QMainWindow):
             QMessageBox.information(self, "Export réussi", f"La carte a été exportée dans :\n{file_path}")
     
     def effacer_carte(self):
-        """Efface tous les éléments ajoutés par l'utilisateur"""
-        confirm = QMessageBox.question(
-            self, "Confirmation",
-            "Voulez-vous vraiment effacer tous les points et segments ajoutés ?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
-        )
+        """
+        Version modifiée pour proposer de supprimer aussi de la base de données
+        """
+        if not self.segments_ajoutes and not self.points_ajoutes:
+            QMessageBox.information(self, "Aucun élément", "Aucun élément à effacer.")
+            return
         
-        if confirm == QMessageBox.Yes:
-            self.points_ajoutes = []
-            self.segments_ajoutes = []
+        # Options de suppression
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Options de suppression")
+        dialog.setMinimumWidth(400)
+        
+        layout = QVBoxLayout()
+        
+        layout.addWidget(QLabel("Que souhaitez-vous effacer ?"))
+        
+        # Cases à cocher
+        self.check_points_manuels = QCheckBox(f"Points ajoutés manuellement ({len(self.points_ajoutes)})")
+        self.check_points_manuels.setChecked(True)
+        layout.addWidget(self.check_points_manuels)
+        
+        self.check_segments_interface = QCheckBox(f"Segments de l'interface ({len(self.segments_ajoutes)})")
+        self.check_segments_interface.setChecked(True)
+        layout.addWidget(self.check_segments_interface)
+        
+        # Compter les segments avec ID de base de données
+        segments_avec_db_id = len([s for s in self.segments_ajoutes if s.get('db_id')])
+        self.check_segments_db = QCheckBox(f"Segments de la base de données ({segments_avec_db_id})")
+        self.check_segments_db.setChecked(False)  # Par défaut, ne pas supprimer de la DB
+        layout.addWidget(self.check_segments_db)
+        
+        # Message d'avertissement
+        warning_label = QLabel("⚠️ La suppression des segments de la base de données est irréversible !")
+        warning_label.setStyleSheet("color: red; font-weight: bold;")
+        layout.addWidget(warning_label)
+        
+        # Boutons
+        btn_box = QHBoxLayout()
+        
+        btn_confirmer = QPushButton("Confirmer la suppression")
+        btn_confirmer.clicked.connect(lambda: self.executer_suppression(dialog))
+        btn_box.addWidget(btn_confirmer)
+        
+        btn_annuler = QPushButton("Annuler")
+        btn_annuler.clicked.connect(dialog.reject)
+        btn_box.addWidget(btn_annuler)
+        
+        layout.addLayout(btn_box)
+        dialog.setLayout(layout)
+        
+        dialog.exec_()
+    def executer_suppression(self, dialog):
+        """
+        Exécute la suppression selon les options choisies
+        """
+        elements_supprimes = []
+        
+        try:
+            # Supprimer les points manuels
+            if self.check_points_manuels.isChecked():
+                nb_points = len(self.points_ajoutes)
+                self.points_ajoutes = []
+                elements_supprimes.append(f"{nb_points} points manuels")
             
-            # Recréer les groupes vides
-            self.groupe_points_utilisateur = FeatureGroup(name='Points ajoutés')
-            self.groupe_segments = FeatureGroup(name='Segments')
+            # Supprimer les segments de la base de données si demandé
+            if self.check_segments_db.isChecked():
+                segments_db_supprimes = 0
+                for segment in self.segments_ajoutes:
+                    db_id = segment.get('db_id')
+                    if db_id and GestionnaireSegments.supprimer_segment(db_id):
+                        segments_db_supprimes += 1
+                
+                if segments_db_supprimes > 0:
+                    elements_supprimes.append(f"{segments_db_supprimes} segments de la base de données")
             
-            # Re-ajouter les groupes à la carte
-            self.groupe_points_utilisateur.add_to(self.carte)
-            self.groupe_segments.add_to(self.carte)
+            # Supprimer les segments de l'interface
+            if self.check_segments_interface.isChecked():
+                nb_segments = len(self.segments_ajoutes)
+                self.segments_ajoutes = []
+                elements_supprimes.append(f"{nb_segments} segments de l'interface")
             
+            # Réinitialiser les groupes de réseaux
+            self.groupe_reseau_minimal = None
+            self.groupe_reseau_complet = None
+            self.groupe_toutes_connexions = None
+            self.groupe_plan_sahara = None
+            
+            dialog.accept()
             self.mettre_a_jour_carte()
-            QMessageBox.information(self, "Carte effacée", "Tous les éléments ajoutés ont été supprimés.")
+            
+            if elements_supprimes:
+                message = "✅ Éléments supprimés avec succès :\n" + "\n".join([f"• {elem}" for elem in elements_supprimes])
+            else:
+                message = "Aucun élément n'a été supprimé."
+            
+            QMessageBox.information(self, "Suppression terminée", message)
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur", f"❌ Erreur lors de la suppression: {str(e)}")
+
     def mettre_a_jour_carte(self):
         """Sauvegarde et recharge la carte mise à jour"""
         try:
@@ -924,7 +1133,7 @@ class CarteChantiers(QMainWindow):
                 tiles='OpenStreetMap'
             )
             
-            # Recréation des groupes de calques
+            # Recréation des groupes de calques de base
             self.groupe_chantiers = FeatureGroup(name='Chantiers')
             self.groupe_points_utilisateur = FeatureGroup(name='Points ajoutés')
             self.groupe_segments = FeatureGroup(name='Segments')
@@ -947,12 +1156,22 @@ class CarteChantiers(QMainWindow):
             for segment in self.segments_ajoutes:
                 self.dessiner_segment_sur_carte(segment)
             
-            # Ajouter les groupes à la nouvelle carte
+            # Ajouter les groupes de base à la nouvelle carte
             self.groupe_chantiers.add_to(self.carte)
             self.groupe_points_utilisateur.add_to(self.carte)
             self.groupe_segments.add_to(self.carte)
             
-            # Ajouter le contrôle des calques
+            # Ajouter les groupes de réseaux s'ils existent
+            if self.groupe_reseau_minimal is not None:
+                self.groupe_reseau_minimal.add_to(self.carte)
+            if self.groupe_reseau_complet is not None:
+                self.groupe_reseau_complet.add_to(self.carte)
+            if self.groupe_toutes_connexions is not None:
+                self.groupe_toutes_connexions.add_to(self.carte)
+            if self.groupe_plan_sahara is not None:
+                self.groupe_plan_sahara.add_to(self.carte)
+            
+            # Ajouter le contrôle des calques en dernier
             LayerControl().add_to(self.carte)
             
             # Sauvegarder et afficher la carte mise à jour
@@ -961,11 +1180,84 @@ class CarteChantiers(QMainWindow):
             
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Erreur lors de la mise à jour de la carte : {str(e)}")
+def initialiser_base_segments():
+    """
+    Fonction à exécuter une seule fois pour créer la table segments
+    """
+    try:
+        from application.models.segment import creer_table_segments
+        creer_table_segments()
+        return True
+    except Exception as e:
+        print(f"❌ Erreur lors de l'initialisation: {str(e)}")
+        return False
+
+def migrer_segments_existants(segments_existants):
+    """
+    Fonction pour migrer des segments existants vers la base de données
+    
+    Args:
+        segments_existants (list): Liste des segments au format interface
+    """
+    from application.models.segment import GestionnaireSegments
+    
+    segments_migrés = 0
+    for segment in segments_existants:
+        try:
+            # Vérifier que le segment a les informations nécessaires
+            if 'point1' in segment and 'point2' in segment and 'distance' in segment:
+                segment_db = GestionnaireSegments.sauvegarder_segment(
+                    point1=segment['point1'],
+                    point2=segment['point2'],
+                    distance=segment['distance'],
+                    couleur=segment.get('couleur', 'blue'),
+                    epaisseur=segment.get('epaisseur', 3),
+                    afficher_distance=segment.get('afficher_distance', True),
+                    nom_segment=segment.get('nom_segment'),
+                    description=segment.get('description', 'Segment migré'),
+                    cree_par="migration"
+                )
+                
+                if segment_db:
+                    segments_migrés += 1
+                    
+        except Exception as e:
+            print(f"❌ Erreur lors de la migration d'un segment: {str(e)}")
+    
+    print(f"✅ {segments_migrés} segments migrés vers la base de données")
+    return segments_migrés
+
+# =======================
+# EXEMPLE D'UTILISATION COMPLÈTE
+# =======================
 
 def main():
+    """
+    Fonction principale avec initialisation de la base de données
+    """
     app = QApplication(sys.argv)
+    
+    # 1. Initialiser la table segments si elle n'existe pas
+    print("=== Initialisation de la base de données ===")
+    if not initialiser_base_segments():
+        QMessageBox.critical(None, "Erreur", 
+                           "❌ Impossible d'initialiser la base de données des segments.\n"
+                           "L'application va continuer mais la sauvegarde ne fonctionnera pas.")
+    
+    # 2. Créer et afficher la fenêtre
     fenetre = CarteChantiers()
     fenetre.show()
+    
+    # 3. Message d'information sur les nouvelles fonctionnalités
+    QMessageBox.information(None, "Nouvelles fonctionnalités", 
+                           "🎉 Nouvelles fonctionnalités disponibles :\n\n"
+                           "💾 Sauvegarde automatique des segments en base de données\n"
+                           "📊 Statistiques des segments (Menu Segments)\n"
+                           "🗑️ Suppression sélective des segments\n"
+                           "📄 Export des segments en CSV\n"
+                           "🔄 Chargement automatique des segments existants\n\n"
+                           "Consultez le menu 'Segments' pour accéder à ces fonctionnalités !")
+    
     sys.exit(app.exec_())
 
 if __name__ == "__main__":
