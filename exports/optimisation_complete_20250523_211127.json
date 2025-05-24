@@ -1,0 +1,199 @@
+{
+  "vehicule_utilise": {
+    "nom": "SEMI-REMORQUE STANDARD",
+    "type": "LOURD",
+    "capacite_poids_max": 40,
+    "capacite_volume_max": 100,
+    "vitesse_kmh": 75,
+    "cout_fixe_jour": 400,
+    "cout_variable_km": 1.2
+  },
+  "nb_vehicules_necessaires": 1,
+  "duree_reelle": 5,
+  "respect_contrainte": true,
+  "vehicule_optimal": {
+    "cout_total": 2450.5,
+    "cout_fixe_total": 2000.0,
+    "cout_variable_total": 450.5,
+    "voyages_par_vehicule": 3,
+    "nb_vehicules_necessaires": 1,
+    "duree_reelle_jours": 5
+  },
+  "demande_equivalente": {
+    "nom": "TRANSPORT MULTI-PRODUITS A→B",
+    "distance_km": 800,
+    "vitesse_kmh": 80,
+    "quantite_poids": 45.5,
+    "quantite_volume": 120.3
+  },
+  "produits_a_transporter": [
+    {
+      "nom": "MACHINES INDUSTRIELLES",
+      "quantite": 15,
+      "poids_unitaire": 2.5,
+      "volume_unitaire": 8.0,
+      "distance_km": 800,
+      "vitesse_kmh": 80
+    },
+    {
+      "nom": "ÉQUIPEMENTS ÉLECTRONIQUES",
+      "quantite": 80,
+      "poids_unitaire": 0.3,
+      "volume_unitaire": 1.2,
+      "distance_km": 800,
+      "vitesse_kmh": 80
+    }
+  ],
+  "planification_detaillee": {
+    "nb_vehicules": 1,
+    "total_voyages": 3,
+    "date_debut": "2025-06-02",
+    "date_fin": "2025-06-06",
+    "duree_reelle_jours": 5,
+    "respect_contrainte": true,
+    "planifications_vehicules": [
+      {
+        "vehicule_id": 1,
+        "nb_voyages": 3,
+        "produits_transportes": {
+          "MACHINES INDUSTRIELLES": 15,
+          "ÉQUIPEMENTS ÉLECTRONIQUES": 80
+        },
+        "charge_totale": {
+          "poids": 45.5,
+          "volume": 120.3
+        },
+        "voyages": [
+          {
+            "voyage_numero": 1,
+            "charge_transportee": {
+              "poids": 20.0,
+              "volume": 60.0,
+              "produits": [
+                {
+                  "produit": {
+                    "nom": "MACHINES INDUSTRIELLES",
+                    "poids_unitaire": 2.5,
+                    "volume_unitaire": 8.0
+                  },
+                  "quantite_voyage": 8
+                }
+              ]
+            },
+            "temps_chargement": "01:30",
+            "aller": {
+              "date_depart": "2025-06-02",
+              "heure_depart": "08:00",
+              "date_arrivee": "2025-06-02",
+              "heure_arrivee": "18:30",
+              "distance_km": 800,
+              "temps_conduite_total": 10.5,
+              "pauses_repos": 4,
+              "pauses_nuit": 0
+            },
+            "temps_dechargement": "01:30",
+            "retour": {
+              "date_depart": "2025-06-02",
+              "heure_depart": "20:00",
+              "date_arrivee": "2025-06-03",
+              "heure_arrivee": "06:30",
+              "distance_km": 800,
+              "temps_conduite_total": 10.5,
+              "pauses_repos": 4,
+              "pauses_nuit": 1
+            },
+            "est_dernier_voyage": false,
+            "respecte_contrainte_temporelle": true
+          },
+          {
+            "voyage_numero": 2,
+            "charge_transportee": {
+              "poids": 15.2,
+              "volume": 40.1,
+              "produits": [
+                {
+                  "produit": {
+                    "nom": "MACHINES INDUSTRIELLES",
+                    "poids_unitaire": 2.5,
+                    "volume_unitaire": 8.0
+                  },
+                  "quantite_voyage": 6
+                }
+              ]
+            },
+            "temps_chargement": "01:30",
+            "aller": {
+              "date_depart": "2025-06-03",
+              "heure_depart": "08:00",
+              "date_arrivee": "2025-06-03",
+              "heure_arrivee": "18:30",
+              "distance_km": 800,
+              "temps_conduite_total": 10.5,
+              "pauses_repos": 4,
+              "pauses_nuit": 0
+            },
+            "temps_dechargement": "01:30",
+            "retour": {
+              "date_depart": "2025-06-03",
+              "heure_depart": "20:00",
+              "date_arrivee": "2025-06-04",
+              "heure_arrivee": "06:30",
+              "distance_km": 800,
+              "temps_conduite_total": 10.5,
+              "pauses_repos": 4,
+              "pauses_nuit": 1
+            },
+            "est_dernier_voyage": false,
+            "respecte_contrainte_temporelle": true
+          },
+          {
+            "voyage_numero": 3,
+            "charge_transportee": {
+              "poids": 10.3,
+              "volume": 20.2,
+              "produits": [
+                {
+                  "produit": {
+                    "nom": "MACHINES INDUSTRIELLES",
+                    "poids_unitaire": 2.5,
+                    "volume_unitaire": 8.0
+                  },
+                  "quantite_voyage": 1
+                },
+                {
+                  "produit": {
+                    "nom": "ÉQUIPEMENTS ÉLECTRONIQUES",
+                    "poids_unitaire": 0.3,
+                    "volume_unitaire": 1.2
+                  },
+                  "quantite_voyage": 80
+                }
+              ]
+            },
+            "temps_chargement": "01:30",
+            "aller": {
+              "date_depart": "2025-06-04",
+              "heure_depart": "08:00",
+              "date_arrivee": "2025-06-04",
+              "heure_arrivee": "18:30",
+              "distance_km": 800,
+              "temps_conduite_total": 10.5,
+              "pauses_repos": 4,
+              "pauses_nuit": 0
+            },
+            "temps_dechargement": "01:30",
+            "retour": null,
+            "est_dernier_voyage": true,
+            "respecte_contrainte_temporelle": true
+          }
+        ]
+      }
+    ]
+  },
+  "export_metadata": {
+    "timestamp": "20250523_211127",
+    "export_date": "2025-05-23T21:11:27.509973",
+    "version": "1.0",
+    "format": "optimisation_navettes_json"
+  }
+}
