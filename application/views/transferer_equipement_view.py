@@ -1150,6 +1150,11 @@ class TransfererEquipementApp:
         ttk.Button(btn_frame, text="Exporter résultats", 
                 command=self.exporter_resultats_optimisation, 
                 bootstyle=WARNING).pack(side=LEFT, padx=5)
+        
+        # Nouveau bouton pour exporter vers MS Project
+        ttk.Button(btn_frame, text="Exporter vers MS Project", 
+                command=self.exporter_vers_msproject, 
+                bootstyle=SUCCESS).pack(side=LEFT, padx=5)
 
     def effacer_resultats_optimisation(self):
         """Efface les résultats de l'optimisation"""
@@ -2241,6 +2246,36 @@ class TransfererEquipementApp:
         except Exception as e:
             messagebox.showerror("Erreur", f"Impossible de générer le rapport: {str(e)}")
             print(f"Erreur lors de la génération du rapport: {str(e)}")
+
+    def exporter_vers_msproject(self):
+        """Exporte la solution actuelle au format CSV compatible avec MS Project"""
+        try:
+            # Vérifier qu'une solution existe
+            if not hasattr(self, 'current_solution') or not hasattr(self, 'current_instance'):
+                messagebox.showerror("Erreur", "Aucune solution d'optimisation n'est disponible. Exécutez d'abord la métaheuristique.")
+                return
+            
+            # Demander où enregistrer le fichier CSV
+            fichier = filedialog.asksaveasfilename(
+                defaultextension=".csv",
+                filetypes=[("Fichiers CSV", "*.csv"), ("Tous les fichiers", "*.*")],
+                title="Exporter au format MS Project"
+            )
+            
+            if not fichier:  # Si l'utilisateur annule
+                return
+            
+            # Importer la fonction d'exportation depuis le module metaheuristique
+            from application.models.metaheuristique import export_solution_to_msproject_csv
+            
+            # Exporter la solution
+            export_solution_to_msproject_csv(self.current_solution, fichier)
+            
+            messagebox.showinfo("Succès", f"Solution exportée au format MS Project dans le fichier:\n{fichier}")
+            
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Impossible d'exporter la solution: {str(e)}")
+            traceback.print_exc()
 
 
 if __name__ == "__main__":

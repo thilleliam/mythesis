@@ -2004,6 +2004,215 @@ def save_solution(solution, filename):
         
         print(f"Solution sauvegardée dans le fichier {filename}")
 
+def export_to_ms_project_csv(solution, filename):
+    """
+    Exporte une solution au format CSV compatible avec MS Project
+    
+    Args:
+        solution: Solution à exporter
+        filename: Nom du fichier CSV
+    """
+    import csv
+    from datetime import datetime, timedelta
+    
+    # Définir la date de début du projet (par défaut: aujourd'hui)
+    start_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # En-têtes du CSV compatibles avec MS Project
+    headers = [
+        "ID", "Name", "Duration", "Start", "Finish", "Predecessors", 
+        "Resource Names", "Notes", "% Complete", "Priority"
+    ]
+    
+    # Créer la liste des tâches
+    tasks = []
+    
+    # Ajouter une tâche de projet principale
+    tasks.append({
+        "ID": 1,
+        "Name": f"Plan de transport ({len(solution.transports)} opérations)",
+        "Duration": f"{len(solution.instance.T)}w",  # Durée en semaines
+        "Start": start_date.strftime("%Y-%m-%d"),
+        "Finish": (start_date + timedelta(weeks=len(solution.instance.T))).strftime("%Y-%m-%d"),
+        "Predecessors": "",
+        "Resource Names": "",
+        "Notes": "Plan de transport généré automatiquement",
+        "% Complete": 0,
+        "Priority": "Normal"
+    })
+    
+    task_id = 2
+    
+    # Ajouter une tâche récapitulative pour chaque semaine
+    for week in solution.instance.T:
+        week_start = start_date + timedelta(weeks=week-1)
+        week_end = start_date + timedelta(weeks=week)
+        week_transports = [t for t in solution.transports if t.week == week]
+        
+        if not week_transports:
+            continue
+            
+        # Tâche récapitulative pour la semaine
+        tasks.append({
+            "ID": task_id,
+            "Name": f"Semaine {week}",
+            "Duration": "1w",
+            "Start": week_start.strftime("%Y-%m-%d"),
+            "Finish": week_end.strftime("%Y-%m-%d"),
+            "Predecessors": "",
+            "Resource Names": "",
+            "Notes": f"Transports de la semaine {week}",
+            "% Complete": 0,
+            "Priority": "Normal"
+        })
+        
+        week_task_id = task_id
+        task_id += 1
+        
+        # Trier les transports par véhicule et séquence
+        week_transports.sort(key=lambda t: (t.vehicle_type, t.vehicle_idx, t.seq))
+        
+        # Regrouper par véhicule
+        vehicles_in_week = {}
+        for t in week_transports:
+            key = (t.vehicle_type, t.vehicle_idx)
+            if key not in vehicles_in_week:
+                vehicles_in_week[key] = []
+            vehicles_in_week[key].append(t)
+        
+        # Pour chaque véhicule utilisé dans la semaine
+        for (vtype, vidx), vehicle_transports in vehicles_in_week.items():
+            # Récupérer l'immatriculation et le type du véhicule
+            vehicle_plate = solution.instance.get_vehicle_plate(vtype, vidx) if hasattr(solution.instance, "get_vehicle_plate") else f"V{vtype}-{vidx}"
+            vehicle_type_name = solution.instance.get_vehicle_type_name(vtype) if hasattr(solution.instance, "get_vehicle_type_name") else f"Type {vtype}"
+            
+            # Calculer les heures pour les transports sans horaires définis
+            for transport in vehicle_transports:
+                if (transport.load_end_A is None or transport.departure_A is None or 
+                    transport.arrival_B is None or transport.unload_start_B is None or 
+                    transport.unload_end_B is None):
+                    solution.compute_times_for_transport(transport)
+            
+            # Tâche récapitulative pour le véhicule
+            tasks.append({
+                "ID": task_id,
+                "Name": f"Véhicule {vehicle_plate} ({vehicle_type_name})",
+                "Duration": "1d",  # Durée d'une journée (approximative)
+                "Start": week_start.strftime("%Y-%m-%d"),
+                "Finish": week_start.strftime("%Y-%m-%d"),
+                "Predecessors": week_task_id,
+                "Resource Names": vehicle_plate,
+                "Notes": f"Opérations du véhicule {vehicle_plate} pour la semaine {week}",
+                "% Complete": 0,
+                "Priority": "Normal"
+            })
+            
+            vehicle_task_id = task_id
+            task_id += 1
+            
+            prev_task_id = None
+            
+            # Pour chaque transport du véhicule
+            for transport in vehicle_transports:
+                # Convertir les heures en format datetime
+                base_date = week_start.date()
+                
+                # Fonction pour convertir une heure décimale en format HH:MM
+                def format_project_time(hour_decimal, base_date):
+                    hours = int(hour_decimal)
+                    minutes = int((hour_decimal - hours) * 60)
+                    dt = datetime.combine(base_date, datetime.min.time())
+                    dt = dt.replace(hour=hours, minute=minutes)
+                    return dt.strftime("%Y-%m-%d %H:%M")
+                
+                # Calculer la durée des opérations en minutes (pour MS Project)
+                def calc_duration_minutes(start_time, end_time):
+                    return int((end_time - start_time) * 60)
+                
+                # 1. Chargement au site A
+                load_duration_minutes = calc_duration_minutes(transport.load_start_A, transport.load_end_A)
+                tasks.append({
+                    "ID": task_id,
+                    "Name": f"Chargement (SEQ {transport.seq})",
+                    "Duration": f"{load_duration_minutes}m",
+                    "Start": format_project_time(transport.load_start_A, base_date),
+                    "Finish": format_project_time(transport.load_end_A, base_date),
+                    "Predecessors": f"{vehicle_task_id}{';' + str(prev_task_id) if prev_task_id else ''}",
+                    "Resource Names": vehicle_plate,
+                    "Notes": f"Chargement de {transport.weight_AB:.1f} kg / {transport.volume_AB:.1f} m³",
+                    "% Complete": 0,
+                    "Priority": "Normal"
+                })
+                
+                loading_task_id = task_id
+                task_id += 1
+                
+                # 2. Trajet A → B
+                travel_AB_duration_minutes = calc_duration_minutes(transport.departure_A, transport.arrival_B)
+                tasks.append({
+                    "ID": task_id,
+                    "Name": f"Trajet A→B (SEQ {transport.seq})",
+                    "Duration": f"{travel_AB_duration_minutes}m",
+                    "Start": format_project_time(transport.departure_A, base_date),
+                    "Finish": format_project_time(transport.arrival_B, base_date),
+                    "Predecessors": loading_task_id,
+                    "Resource Names": vehicle_plate,
+                    "Notes": f"Transport A→B avec {transport.breaks_AB} pauses",
+                    "% Complete": 0,
+                    "Priority": "Normal"
+                })
+                
+                travel_AB_task_id = task_id
+                task_id += 1
+                
+                # 3. Déchargement au site B
+                unload_duration_minutes = calc_duration_minutes(transport.unload_start_B, transport.unload_end_B)
+                tasks.append({
+                    "ID": task_id,
+                    "Name": f"Déchargement (SEQ {transport.seq})",
+                    "Duration": f"{unload_duration_minutes}m",
+                    "Start": format_project_time(transport.unload_start_B, base_date),
+                    "Finish": format_project_time(transport.unload_end_B, base_date),
+                    "Predecessors": travel_AB_task_id,
+                    "Resource Names": vehicle_plate,
+                    "Notes": f"Déchargement de {transport.weight_AB:.1f} kg / {transport.volume_AB:.1f} m³",
+                    "% Complete": 0,
+                    "Priority": "Normal"
+                })
+                
+                unload_task_id = task_id
+                task_id += 1
+                
+                # 4. Trajet B → A (si présent)
+                if transport.departure_B is not None and transport.arrival_A is not None:
+                    travel_BA_duration_minutes = calc_duration_minutes(transport.departure_B, transport.arrival_A)
+                    tasks.append({
+                        "ID": task_id,
+                        "Name": f"Retour B→A (SEQ {transport.seq})",
+                        "Duration": f"{travel_BA_duration_minutes}m",
+                        "Start": format_project_time(transport.departure_B, base_date),
+                        "Finish": format_project_time(transport.arrival_A, base_date),
+                        "Predecessors": unload_task_id,
+                        "Resource Names": vehicle_plate,
+                        "Notes": f"Retour B→A avec {transport.breaks_BA} pauses",
+                        "% Complete": 0,
+                        "Priority": "Normal"
+                    })
+                    prev_task_id = task_id
+                else:
+                    prev_task_id = unload_task_id
+                
+                task_id += 1
+    
+    # Écrire dans le fichier CSV
+    with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=headers)
+        writer.writeheader()
+        for task in tasks:
+            writer.writerow(task)
+    
+    print(f"Solution exportée au format MS Project CSV dans {filename}")
+
 def visualize_solution(solution, instance):
         """
         Visualise la solution avec matplotlib
@@ -2755,8 +2964,167 @@ def main():
     
     print(f"\nTemps d'exécution : {end_time - start_time:.2f} secondes")
     return best_solution
+
+def export_solution_to_msproject_csv(solution, filename):
+    """
+    Exporte une solution dans un fichier CSV compatible avec MS Project.
+    
+    Format MS Project: chaque tâche est représentée sur une ligne avec:
+    - ID: identifiant unique de la tâche
+    - Nom: nom de la tâche
+    - Durée: durée de la tâche (format: 1h, 30mn, etc.)
+    - Début: date et heure de début (format YYYY-MM-DD HH:MM)
+    - Fin: date et heure de fin (format YYYY-MM-DD HH:MM)
+    - Prédécesseurs: relations de dépendance
+    - Ressources: ressources assignées à la tâche
+    
+    Args:
+        solution: Solution à exporter
+        filename: Nom du fichier CSV
+    """
+    import csv
+    from datetime import datetime, timedelta
+    
+    # Date de référence pour le projet (commencer un lundi)
+    reference_date = datetime.today()
+    # Ajuster pour commencer un lundi
+    days_to_monday = (0 - reference_date.weekday()) % 7
+    if days_to_monday > 0:
+        reference_date += timedelta(days=days_to_monday)
+    
+    # Ouvrir le fichier CSV en mode écriture
+    with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
+        # Créer le writer CSV
+        writer = csv.writer(csvfile, delimiter=';')
+        
+        # Écrire l'en-tête
+        writer.writerow(["ID", "Nom", "Durée", "Début", "Fin", "Prédécesseurs", "Ressources"])
+        
+        # ID de tâche initial
+        task_id = 1
+        
+        # Écrire une ligne pour le projet global
+        writer.writerow([task_id, "Projet de transport", "", 
+                         reference_date.strftime("%Y-%m-%d %H:%M"), "", "", ""])
+        project_id = task_id
+        task_id += 1
+        
+        # Pour chaque semaine, créer un groupe de tâches
+        week_tasks = {}
+        for week in solution.instance.T:
+            # Créer une tâche pour la semaine
+            week_start = reference_date + timedelta(days=(week-1)*7)
+            week_end = week_start + timedelta(days=6)
+            
+            writer.writerow([task_id, f"Semaine {week}", f"{7}j", 
+                            week_start.strftime("%Y-%m-%d %H:%M"), 
+                            week_end.strftime("%Y-%m-%d %H:%M"), 
+                            project_id, ""])
+            
+            week_tasks[week] = task_id
+            task_id += 1
+        
+        # Pour chaque transport
+        transport_tasks = {}
+        for transport in solution.transports:
+            week = transport.week
+            vtype = transport.vehicle_type
+            vidx = transport.vehicle_idx
+            seq = transport.seq
+            
+            # Date pour ce transport (jour de la semaine = le lundi de cette semaine)
+            transport_date = reference_date + timedelta(days=(week-1)*7)
+            
+            # Si les heures ne sont pas définies, calculer ces valeurs
+            if transport.load_start_A is None:
+                solution.compute_times_for_transport(transport)
+            
+            # Obtenir la plaque d'immatriculation et le type du véhicule s'ils sont disponibles
+            vehicle_name = ""
+            if hasattr(transport, 'vehicle_plate') and transport.vehicle_plate:
+                vehicle_name = transport.vehicle_plate
+            else:
+                vehicle_name = f"Véhicule {vtype}-{vidx}"
+            
+            vehicle_type_name = ""
+            if hasattr(transport, 'vehicle_type_name') and transport.vehicle_type_name:
+                vehicle_type_name = transport.vehicle_type_name
+            else:
+                vehicle_type_name = f"Type {vtype}"
+            
+            # Ressource (véhicule)
+            resource = f"{vehicle_name} ({vehicle_type_name})"
+            
+            # 1. Tâche: Chargement au site A
+            load_start_time = transport_date + timedelta(hours=transport.load_start_A)
+            load_end_time = transport_date + timedelta(hours=transport.load_end_A)
+            load_duration = (transport.load_end_A - transport.load_start_A) * 60  # en minutes
+            
+            writer.writerow([task_id, f"Chargement {week}.{vtype}.{vidx}.{seq} - Site A", 
+                            f"{int(load_duration)}mn", 
+                            load_start_time.strftime("%Y-%m-%d %H:%M"), 
+                            load_end_time.strftime("%Y-%m-%d %H:%M"), 
+                            week_tasks[week], resource])
+            
+            load_task_id = task_id
+            task_id += 1
+            
+            # 2. Tâche: Trajet A→B
+            travel_AB_start_time = transport_date + timedelta(hours=transport.departure_A)
+            travel_AB_end_time = transport_date + timedelta(hours=transport.arrival_B)
+            travel_AB_duration = (transport.arrival_B - transport.departure_A) * 60  # en minutes
+            
+            writer.writerow([task_id, f"Trajet A→B {week}.{vtype}.{vidx}.{seq}", 
+                            f"{int(travel_AB_duration)}mn", 
+                            travel_AB_start_time.strftime("%Y-%m-%d %H:%M"), 
+                            travel_AB_end_time.strftime("%Y-%m-%d %H:%M"), 
+                            load_task_id, resource])
+            
+            travel_AB_task_id = task_id
+            task_id += 1
+            
+            # 3. Tâche: Déchargement au site B
+            unload_start_time = transport_date + timedelta(hours=transport.unload_start_B)
+            unload_end_time = transport_date + timedelta(hours=transport.unload_end_B)
+            unload_duration = (transport.unload_end_B - transport.unload_start_B) * 60  # en minutes
+            
+            writer.writerow([task_id, f"Déchargement {week}.{vtype}.{vidx}.{seq} - Site B", 
+                            f"{int(unload_duration)}mn", 
+                            unload_start_time.strftime("%Y-%m-%d %H:%M"), 
+                            unload_end_time.strftime("%Y-%m-%d %H:%M"), 
+                            travel_AB_task_id, resource])
+            
+            unload_task_id = task_id
+            task_id += 1
+            
+            # 4. Trajet retour B→A (s'il existe)
+            if transport.departure_B is not None and transport.arrival_A is not None:
+                travel_BA_start_time = transport_date + timedelta(hours=transport.departure_B)
+                travel_BA_end_time = transport_date + timedelta(hours=transport.arrival_A)
+                travel_BA_duration = (transport.arrival_A - transport.departure_B) * 60  # en minutes
+                
+                writer.writerow([task_id, f"Trajet B→A {week}.{vtype}.{vidx}.{seq}", 
+                                f"{int(travel_BA_duration)}mn", 
+                                travel_BA_start_time.strftime("%Y-%m-%d %H:%M"), 
+                                travel_BA_end_time.strftime("%Y-%m-%d %H:%M"), 
+                                unload_task_id, resource])
+                
+                transport_tasks[(week, vtype, vidx, seq)] = task_id
+                task_id += 1
+            else:
+                transport_tasks[(week, vtype, vidx, seq)] = unload_task_id
+    
+    print(f"Solution exportée au format MS Project dans le fichier {filename}")
+    return filename
+
 if __name__ == "__main__":
     import math  # Ajout de l'import math nécessaire pour la fonction is_optimal
     
     # Exécuter la fonction principale
     best_solution = main()
+    
+    # Section ajoutée: Export en CSV compatible avec MS Project
+    print("\nExport en CSV compatible avec MS Project...")
+    csv_filename = "plan_transport_msproject.csv"
+    export_solution_to_msproject_csv(best_solution, csv_filename)
+    print(f"Le fichier CSV a été généré avec succès: {csv_filename}")
