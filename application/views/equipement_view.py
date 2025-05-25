@@ -234,8 +234,8 @@ class EquipementApp:
         self.tree.column("volume", width=100, anchor=CENTER)
         
         # Ajouter un style de bandes alternées
-        self.tree.tag_configure('oddrow', background='#2a2a2a')
-        self.tree.tag_configure('evenrow', background='#323232')
+        self.tree.tag_configure('oddrow', background='#f9f9f9')
+        self.tree.tag_configure('evenrow', background='#e6f7ff')
         
         # Lier l'événement de sélection
         self.tree.bind("<ButtonRelease-1>", self.selectionner)
@@ -557,8 +557,8 @@ class EquipementApp:
                     tags=(tag,)
                 )
             
-            details_tree.tag_configure('oddrow', background='#2a2a2a')
-            details_tree.tag_configure('evenrow', background='#323232')
+            details_tree.tag_configure('oddrow', background='#f9f9f9')
+            details_tree.tag_configure('evenrow', background='#e6f7ff')
             
             # Boutons d'action
             button_frame = ttk.Frame(details_window, padding=10)
@@ -830,7 +830,7 @@ class EquipementApp:
             
         return True
 if __name__ == "__main__":
-    # Créer une fenêtre avec le thème darkly directement lors de l'initialisation
-    root = ttk.Window(themename="cosmo")
+    # Créer une fenêtre avec le thème flatly directement lors de l'initialisation
+    root = ttk.Window(themename="flatly")
     app = EquipementApp(root)
     root.mainloop()

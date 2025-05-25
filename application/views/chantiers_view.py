@@ -101,6 +101,10 @@ class ChantierApp:
         self.tree.column("distance_goudron", width=120)
         self.tree.column("distance_piste", width=120)
         self.tree.column("temps_aller", width=100)
+        
+        # Configurer les tags pour colorer les lignes selon l'accès
+        self.tree.tag_configure('acces_facile', background='#e6f7ff')  # bleu très clair
+        self.tree.tag_configure('acces_difficile', background='#ffe6e6')  # rouge très clair
 
         self.tree.bind("<ButtonRelease-1>", self.selectionner)
 
@@ -224,6 +228,9 @@ class ChantierApp:
             nature_terrain = chantier.nature_terrain or ""
             if nature_terrain not in ["Accès facile", "Accès difficile"]:
                 nature_terrain = "Accès facile"  # Valeur par défaut
+            
+            # Définir le tag en fonction de la nature du terrain
+            tag = 'acces_facile' if nature_terrain == "Accès facile" else 'acces_difficile'
                 
             self.tree.insert("", "end", values=(
                 chantier.id_client,
@@ -234,7 +241,7 @@ class ChantierApp:
                 chantier.distanceAllerGoudron or "",
                 chantier.distanceAllerPiste or "",
                 chantier.temps_aller or ""
-                ))
+                ), tags=(tag,))
                 
         print(f"Nombre de lignes affichées dans le tableau: {len(self.tree.get_children())}")
         
@@ -280,6 +287,16 @@ class ChantierApp:
         
         commandes_tree.pack(fill=BOTH, expand=True)
         
+        # Configurer les tags pour colorer les lignes
+        commandes_tree.tag_configure('acces_facile', background='#e6f7ff')  # bleu très clair
+        commandes_tree.tag_configure('acces_difficile', background='#ffe6e6')  # rouge très clair
+        
+        # Récupérer la nature du terrain pour ce chantier
+        chantier = session.query(self.Chantier).filter_by(id_client=id_client).first()
+        tag = 'acces_facile'
+        if chantier and chantier.nature_terrain == "Accès difficile":
+            tag = 'acces_difficile'
+        
         # Chargement des commandes pour ce client
         try:
             commandes = session.query(Commande).filter_by(id_client=id_client).all()
@@ -295,7 +312,7 @@ class ChantierApp:
                     commande.lieu_chargement,
                     date_commande,
                     date_livraison
-                ))
+                ), tags=(tag,))
             
             # Afficher un message si aucune commande n'est trouvée
             if not commandes:
@@ -312,7 +329,7 @@ class ChantierApp:
 
 
 if __name__ == "__main__":
-    # Créer une fenêtre avec le thème darkly directement lors de l'initialisation
-    root = ttk.Window(themename="cosmo")
+    # Créer une fenêtre avec le thème flatly directement lors de l'initialisation
+    root = ttk.Window(themename="flatly")
     app = ChantierApp(root)
     root.mainloop()
