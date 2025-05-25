@@ -323,6 +323,8 @@ class Instance:
         self.dw_AB = {t: 0 for t in self.T}  # Demandes en poids de A vers B
         self.dv_AB = {t: 0 for t in self.T}  # Demandes en volume de A vers B
         
+        print(f"Récupération des demandes réelles pour le client ID: {self.id_client}")
+        
         # Créer une session SQLAlchemy
         session = SessionLocal()
         
@@ -334,15 +336,21 @@ class Instance:
             
             transfers = query.all()
             
+            print(f"Nombre de transferts trouvés: {len(transfers)}")
+            
             # Pour chaque transfert d'équipement
             for transfer in transfers:
                 # Récupérer l'équipement correspondant
                 equipement = session.query(Equipement).filter_by(ID_equipement=transfer.id_equipement).first()
                 
+                print(f"Traitement de l'équipement: {transfer.nom_equipement} (ID: {transfer.id_equipement})")
+                
                 if equipement:
                     # Récupérer le poids et le volume unitaires (valeurs par défaut si None)
                     poids_unitaire = equipement.poids or 0  # en kg
                     volume_unitaire = equipement.volume or 0  # en m³
+                    
+                    print(f"  - Poids unitaire: {poids_unitaire}kg, Volume unitaire: {volume_unitaire}m³")
                     
                     # Mappings des colonnes de semaines
                     semaines_mapping = {
@@ -377,27 +385,18 @@ class Instance:
                             # Ajouter aux demandes totales pour cette semaine
                             self.dw_AB[semaine] += poids_total
                             self.dv_AB[semaine] += volume_total
+                            
+                            print(f"  - Semaine {semaine}: {quantite} unités = {poids_total}kg, {volume_total}m³")
                 
             # Vérifier si des demandes ont été trouvées
             if all(self.dw_AB[t] == 0 for t in self.T) and all(self.dv_AB[t] == 0 for t in self.T):
-                print("ATTENTION: Aucune demande de transfert trouvée dans la base de données.")
-                print("Génération de demandes factices pour tester la métaheuristique...")
-                
-                # Générer des demandes fictives si aucune n'est trouvée
-                import random
-                for t in self.T:
-                    week_factor_AB = 0.9 + 0.2 * random.random()
-                    self.dw_AB[t] = int(200 * week_factor_AB)  # Demande en poids base 200
-                    self.dv_AB[t] = int(80 * week_factor_AB)   # Demande en volume base 80
+                print("ERREUR: Aucune demande de transfert trouvée dans la base de données.")
+                print("Veuillez ajouter des demandes de transfert pour ce client avant d'exécuter la métaheuristique.")
+                raise ValueError("Aucune demande de transfert trouvée. Impossible de continuer sans données réelles.")
         
         except Exception as e:
             print(f"Erreur lors de la récupération des demandes: {e}")
-            # Fallback: générer des demandes aléatoires
-            import random
-            for t in self.T:
-                week_factor_AB = 0.9 + 0.2 * random.random()
-                self.dw_AB[t] = int(200 * week_factor_AB)
-                self.dv_AB[t] = int(80 * week_factor_AB)
+            raise ValueError(f"Impossible de récupérer les demandes réelles: {e}")
                 
         finally:
             session.close()
@@ -2279,17 +2278,26 @@ def repair_solution(solution, instance):
                             if vehicle_assigned:
                                 break
                         
-                        # Si aucun véhicule additionnel n'est disponible, essayer de réutiliser un véhicule
                         if not vehicle_assigned:
-                            # Chercher un véhicule déjà utilisé cette semaine avec un temps disponible
-                            used_vehicles = sorted(vehicles_used_this_week)
+                            # Si nous arrivons ici, c'est qu'aucun véhicule supplémentaire n'est disponible
+                            # Utiliser un véhicule déjà assigné pour cette semaine en ajoutant un second transport
                             
-                            for vtype, idx in used_vehicles:
-                                # Trouver le dernier transport pour ce véhicule
-                                last_seq = max([t.seq for t in solution.transports 
-                                            if t.week == week and t.vehicle_type == vtype and t.vehicle_idx == idx], 
-                                            default=0)
+                            # Trouver un véhicule déjà utilisé cette semaine
+                            used_vehicles = []
+                            for t in solution.transports:
+                                if t.week == week:
+                                    used_vehicles.append((t.vehicle_type, t.vehicle_idx))
+                            
+                            if used_vehicles:
+                                vtype, idx = used_vehicles[0]
+                                capacity_w = instance.L[vtype]["Qw"]
+                                capacity_v = instance.L[vtype]["Qv"]
                                 
+                                # Trouver la dernière séquence pour ce véhicule
+                                last_seq = max([t.seq for t in solution.transports 
+                                            if t.week == week and t.vehicle_type == vtype and t.vehicle_idx == idx])
+                                
+                                # Trouver le dernier transport de ce véhicule
                                 last_transport = None
                                 for t in solution.transports:
                                     if (t.week == week and t.vehicle_type == vtype and 
@@ -2298,28 +2306,26 @@ def repair_solution(solution, instance):
                                         break
                                 
                                 if last_transport:
-                                    # S'assurer que les temps sont calculés
-                                    if last_transport.arrival_A is None and last_transport.departure_B is not None:
+                                    # Calculer l'heure de début du nouveau transport
+                                    if last_transport.arrival_A is None:
                                         solution.compute_times_for_transport(last_transport)
                                     
-                                    # Vérifier s'il reste du temps dans la journée
-                                    next_start = last_transport.arrival_A if last_transport.arrival_A is not None else instance.T_end
+                                    next_start_time = last_transport.arrival_A
                                     
-                                    if next_start <= instance.T_end - 2:  # Au moins 2h avant la fin
-                                        capacity_w = instance.L[vtype]["Qw"]
-                                        capacity_v = instance.L[vtype]["Qv"]
-                                        
+                                    # S'assurer que le prochain transport commence dans la journée de travail
+                                    if next_start_time <= instance.T_end - 1:  # Au moins 1h avant la fin
+                                        # Calculer les quantités à transporter
                                         weight_to_AB = min(remaining_weight_AB, capacity_w)
                                         volume_to_AB = min(remaining_volume_AB, capacity_v)
                                         
-                                        # Créer un nouveau transport
+                                        # Créer le transport
                                         transport = Transport(
                                             week=week,
                                             vehicle_idx=idx,
                                             vehicle_type=vtype,
                                             weight_AB=weight_to_AB,
                                             volume_AB=volume_to_AB,
-                                            load_start_A=next_start,
+                                            load_start_A=next_start_time,
                                             seq=last_seq + 1
                                         )
                                         
@@ -2336,36 +2342,12 @@ def repair_solution(solution, instance):
                                         # Mettre à jour les demandes restantes
                                         remaining_weight_AB -= weight_to_AB
                                         remaining_volume_AB -= volume_to_AB
-                                        
-                                        vehicle_assigned = True
-                                        break
-                            
-                            # Si on ne peut pas réutiliser un véhicule, c'est qu'on a un problème
-                            if not vehicle_assigned:
-                                # En dernier recours, forcer l'utilisation d'un véhicule du plus grand type
-                                vtype = max(instance.L.keys(), key=lambda t: instance.L[t]["Qw"] + instance.L[t]["Qv"])
-                                idx = 1  # Prendre le premier véhicule par défaut
-                                
-                                # Forcer la création d'un transport (qui pourrait être infaisable)
-                                transport = Transport(
-                                    week=week,
-                                    vehicle_idx=idx,
-                                    vehicle_type=vtype,
-                                    weight_AB=remaining_weight_AB,
-                                    volume_AB=remaining_volume_AB,
-                                    load_start_A=instance.T_start,
-                                    seq=1
-                                )
-                                
-                                solution.compute_times_for_transport(transport)
-                                
-                                # Ajouter le transport sans se soucier des contraintes temporelles
-                                solution.transports.append(transport)
-                                solution.vehicles[(vtype, idx)].weeks_used.add(week)
-                                
-                                # Considérer les demandes comme satisfaites (même si ce n'est pas réaliste)
-                                remaining_weight_AB = 0
-                                remaining_volume_AB = 0
+                                    else:
+                                        # Si pas assez de temps, forcer l'utilisation d'un autre véhicule
+                                        # ou arrêter (échec de l'opération de réparation)
+                                        pass
+                            else:
+                                # Si on arrive ici, c'est qu'il n'y a pas de solution possible
                                 break
         
         # Réévaluer la solution réparée

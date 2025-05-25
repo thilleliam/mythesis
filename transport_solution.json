@@ -1,0 +1,81 @@
+{
+  "optimal_cost": 16001.25,
+  "vehicles_used": 5,
+  "project_duration": 1.125,
+  "total_trips": 5.0,
+  "vehicles_details": [
+    {
+      "id": "LEGER-001",
+      "type": "LEGER",
+      "units": 1.0,
+      "trips": 1.0,
+      "duration": 1.125,
+      "capacity_weight": 12,
+      "capacity_volume": 30,
+      "products_carried": {}
+    },
+    {
+      "id": "LEGER-002",
+      "type": "LEGER",
+      "units": 1.0,
+      "trips": 1.0,
+      "duration": 1.125,
+      "capacity_weight": 15,
+      "capacity_volume": 35,
+      "products_carried": {}
+    },
+    {
+      "id": "MOYEN-001",
+      "type": "MOYEN",
+      "units": 1.0,
+      "trips": 1.0,
+      "duration": 1.125,
+      "capacity_weight": 25,
+      "capacity_volume": 60,
+      "products_carried": {
+        "MATIERES": {
+          "quantity": 7.0,
+          "weight": 5.6000000000000005,
+          "volume": 17.5
+        }
+      }
+    },
+    {
+      "id": "SEMI-REMORQUE-001",
+      "type": "LOURD",
+      "units": 1.0,
+      "trips": 1.0,
+      "duration": 1.125,
+      "capacity_weight": 40,
+      "capacity_volume": 100,
+      "products_carried": {
+        "ELECTRONIQUES": {
+          "quantity": 40.0,
+          "weight": 12.0,
+          "volume": 48.0
+        }
+      }
+    },
+    {
+      "id": "SEMI-REMORQUE-002",
+      "type": "LOURD",
+      "units": 1.0,
+      "trips": 1.0,
+      "duration": 1.125,
+      "capacity_weight": 35,
+      "capacity_volume": 90,
+      "products_carried": {
+        "MACHINES": {
+          "quantity": 8.0,
+          "weight": 20.0,
+          "volume": 64.0
+        },
+        "MATIERES": {
+          "quantity": 53.0,
+          "weight": 42.400000000000006,
+          "volume": 132.5
+        }
+      }
+    }
+  ]
+}
