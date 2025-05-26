@@ -1892,10 +1892,14 @@ class VNSOptimiseur:
             self._voisinage_fusion_voyages,
             self._voisinage_inversion_sequence,
             self._voisinage_reoptimisation_vehicules
+            
 
         ]
         self.historique_vns = []
-    
+        self.historique_solutions = []  # Mémoire des bonnes solutions
+        self.zones_prometteuses = []    # Zones à explorer intensément
+        self.compteur_stagnation = 0   # Pour déclencher intensification
+        
     def optimiser_vns(self, resultats_heuristique, max_iterations=500, max_voisinages=6):
         """
         Applique VNS sur les résultats de l'heuristique
@@ -1939,6 +1943,11 @@ class VNSOptimiseur:
                             nb_ameliorations += 1
                             amelioration_trouvee = True
                             
+                            # ✅ NOUVELLES LIGNES - INTENSIFICATION
+                            self._marquer_zone_prometteuse(solution_amelioree, k)
+                            self._memoriser_solution(solution_amelioree)
+                            self.compteur_stagnation = 0
+                            
                             print(f"   ✅ Amélioration trouvée (voisinage {k+1}): {meilleur_cout:.2f}€")
                             
                             # Retour au premier voisinage
@@ -1952,9 +1961,27 @@ class VNSOptimiseur:
                 iteration += 1
                 
                 # Diversification si pas d'amélioration
-                if not amelioration_trouvee and iteration % 20 == 0:
-                    solution_courante = self._diversification(meilleure_solution)
-                    print(f"   🔄 Diversification appliquée (itération {iteration})")
+                # ✅ INTENSIFICATION ET DIVERSIFICATION
+                if not amelioration_trouvee:
+                    self.compteur_stagnation += 1
+                    
+                    # Intensification après 5 itérations sans amélioration
+                    if self.compteur_stagnation == 5:
+                        print(f"   🔍 INTENSIFICATION appliquée (itération {iteration})")
+                        solution_intensifiee = self._intensification(meilleure_solution)
+                        if solution_intensifiee and solution_intensifiee.cout_total < meilleur_cout:
+                            meilleure_solution = solution_intensifiee.clone()
+                            meilleur_cout = solution_intensifiee.cout_total
+                            solution_courante = solution_intensifiee.clone()
+                            print(f"   ✅ Intensification réussie: {meilleur_cout:.2f}€")
+                            self.compteur_stagnation = 0
+                            nb_ameliorations += 1
+                    
+                    # Diversification après plus de stagnation
+                    elif self.compteur_stagnation >= 10 and iteration % 20 == 0:
+                        solution_courante = self._diversification(meilleure_solution)
+                        print(f"   🔄 Diversification appliquée (itération {iteration})")
+                        self.compteur_stagnation = 0
             
             # Résultats
             amelioration_totale = solution_courante.cout_initial - meilleur_cout
@@ -1965,6 +1992,9 @@ class VNSOptimiseur:
             print(f"   - Amélioration: {amelioration_totale:.2f}€ ({amelioration_totale/solution_courante.cout_initial*100:.2f}%)")
             print(f"   - Nombre d'améliorations: {nb_ameliorations}")
             print(f"   - Iterations: {iteration}")
+            print(f"   - Zones prometteuses: {len(self.zones_prometteuses)}")
+            print(f"   - Solutions mémorisées: {len(self.historique_solutions)}")
+            print(f"   - Mécanisme intensification+diversification activé ✅")
             
             if amelioration_totale > 0:
                 return meilleure_solution.convertir_vers_format_original()
@@ -2200,6 +2230,55 @@ class VNSOptimiseur:
                 solution_diversifiee = nouvelle_solution
         
         return solution_diversifiee# ✅ MÉTHODE HELPER POUR TESTER LES VOISINAGES
+    def _marquer_zone_prometteuse(self, solution, voisinage_efficace):
+        """Marque une zone comme prometteuse pour intensification"""
+        zone = {
+            'voisinage_efficace': voisinage_efficace,
+            'cout': solution.cout_total,
+            'nb_voyages': len(solution.voyages)
+        }
+        self.zones_prometteuses.append(zone)
+        
+        # Garder seulement les 5 meilleures zones
+        self.zones_prometteuses.sort(key=lambda x: x['cout'])
+        if len(self.zones_prometteuses) > 5:
+            self.zones_prometteuses = self.zones_prometteuses[:5]
+
+    def _memoriser_solution(self, solution):
+        """Mémorise les bonnes solutions"""
+        solution_info = {
+            'solution': solution.clone(),
+            'cout': solution.cout_total
+        }
+        self.historique_solutions.append(solution_info)
+        
+        # Garder seulement les 10 meilleures
+        self.historique_solutions.sort(key=lambda x: x['cout'])
+        if len(self.historique_solutions) > 10:
+            self.historique_solutions = self.historique_solutions[:10]
+
+    def _intensification(self, solution_base):
+        """Stratégies d'intensification"""
+        if not self.zones_prometteuses:
+            return None
+        
+        # Stratégie 1: Explorer le voisinage le plus efficace
+        zone_prometteuse = self.zones_prometteuses[0]
+        voisinage_efficace = zone_prometteuse['voisinage_efficace']
+        
+        meilleure_solution = solution_base.clone()
+        meilleur_cout = solution_base.cout_total
+        
+        # Faire 5 essais dans le voisinage efficace
+        for _ in range(5):
+            solution_temp = self._generer_voisin(meilleure_solution, voisinage_efficace)
+            if solution_temp and solution_temp.est_solution_valide():
+                solution_amelioree = self._local_search_voisinage(solution_temp, 10)
+                if solution_amelioree.cout_total < meilleur_cout:
+                    meilleure_solution = solution_amelioree
+                    meilleur_cout = solution_amelioree.cout_total
+        
+        return meilleure_solution if meilleur_cout < solution_base.cout_total else None
 def tester_voisinages():
         """Fonction de test pour vérifier que tous les voisinages fonctionnent"""
         print("🧪 TEST DES VOISINAGES VNS")
