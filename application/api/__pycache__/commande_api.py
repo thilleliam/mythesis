@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 from sqlalchemy.orm import sessionmaker
 from application.database import engine
 from application.models.commande import Commande
+from application.models.equipements import Equipement  # Import du modèle Equipement
 from datetime import datetime
 
 app = Flask(__name__)
@@ -343,7 +344,6 @@ HTML_FORM = """
 </head>
 <body>
 
-
     <nav class="navbar">
         <div class="container">
             <h1><i class="fas fa-truck"></i> TMS - Transport Management</h1>
@@ -405,12 +405,15 @@ HTML_FORM = """
 
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="produits" class="required">Produits</label>
+                            <label for="id_equipement" class="required">Équipement</label>
                             <div class="input-group">
-                                <i class="fas fa-box"></i>
-                                <input type="text" id="produits" name="produits" placeholder="Spécifiez le produit à transporter" required>
+                                <i class="fas fa-cogs"></i>
+                                <select id="id_equipement" name="id_equipement" required>
+                                    <option value="">Sélectionner un équipement</option>
+                                    <!-- Les options seront chargées dynamiquement -->
+                                </select>
                             </div>
-                            <div class="form-text">Type de produit à transporter</div>
+                            <div class="form-text">Équipement requis pour le transport</div>
                         </div>
 
                         <div class="form-group">
@@ -492,6 +495,9 @@ HTML_FORM = """
             now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
             document.getElementById('date_commande').value = now.toISOString().slice(0, 16);
             
+            // Charger les équipements
+            loadEquipements();
+            
             // Calculer la barre de progression basée sur les champs remplis
             updateProgress();
             
@@ -502,6 +508,26 @@ HTML_FORM = """
                 element.addEventListener('change', updateProgress);
             });
         });
+
+        async function loadEquipements() {
+            try {
+                const response = await fetch('/api/equipements');
+                const equipements = await response.json();
+                
+                const select = document.getElementById('id_equipement');
+                select.innerHTML = '<option value="">Sélectionner un équipement</option>';
+                
+                equipements.forEach(eq => {
+                    const option = document.createElement('option');
+                    option.value = eq.ID_equipement;
+                    option.textContent = eq.nomEquipement;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Erreur lors du chargement des équipements:', error);
+                showError('Impossible de charger la liste des équipements');
+            }
+        }
 
         function updateProgress() {
             const formElements = document.querySelectorAll('#commandeForm input, #commandeForm select, #commandeForm textarea');
@@ -577,7 +603,7 @@ HTML_FORM = """
                     if (key === 'date_commande' || key === 'date_livraison') {
                         // Convertir le format datetime-local vers le format attendu par l'API
                         data[key] = new Date(value).toISOString().slice(0, 19).replace('T', ' ');
-                    } else if (key === 'quantite_requise' || key === 'id_client') {
+                    } else if (key === 'quantite_requise' || key === 'id_client' || key === 'id_equipement') {
                         data[key] = parseFloat(value) || parseInt(value);
                     } else {
                         data[key] = value;
@@ -639,6 +665,24 @@ HTML_FORM = """
 """
 
 # Routes API
+@app.route('/api/equipements', methods=['GET'])
+def get_equipements():
+    """Endpoint pour récupérer la liste des équipements"""
+    session = Session()
+    try:
+        equipements = session.query(Equipement).all()
+        result = []
+        for eq in equipements:
+            result.append({
+                'ID_equipement': eq.ID_equipement,
+                'nomEquipement': eq.nomEquipement
+            })
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
 @app.route('/api/commandes', methods=['POST'])
 def create_commande():
     data = request.json
@@ -646,6 +690,7 @@ def create_commande():
     try:
         commande = Commande(
             id_client=data.get('id_client'),
+            id_equipement=data.get('id_equipement'),  # Utilisation de id_equipement au lieu de produits
             nature_service=data.get('nature_service'),
             type_vehicule=data.get('type_vehicule'),
             quantite_requise=data.get('quantite_requise'),
@@ -665,20 +710,43 @@ def create_commande():
 @app.route('/api/commandes', methods=['GET'])
 def get_commandes():
     session = Session()
-    commandes = session.query(Commande).all()
-    result = []
-    for c in commandes:
-        result.append({
-            'id_commande': c.id_commande,
-            'id_client': c.id_client,
-            'nature_service': c.nature_service,
-            'type_vehicule': c.type_vehicule,
-            'quantite_requise': c.quantite_requise,
-            'lieu_chargement': c.lieu_chargement,
-            'date_commande': c.date_commande.strftime('%Y-%m-%d %H:%M:%S') if c.date_commande else None,
-            'date_livraison': c.date_livraison.strftime('%Y-%m-%d %H:%M:%S') if c.date_livraison else None
-        })
-    session.close()
+    try:
+        # Jointure avec la table equipements pour récupérer le nom
+        commandes = session.query(Commande).join(Equipement, Commande.id_equipement == Equipement.ID_equipement).all()
+        result = []
+        for c in commandes:
+            result.append({
+                'id_commande': c.id_commande,
+                'id_client': c.id_client,
+                'id_equipement': c.id_equipement,
+                'nomEquipement': c.equipement.nomEquipement,  # Nom de l'équipement via la relation
+                'nature_service': c.nature_service,
+                'type_vehicule': c.type_vehicule,
+                'quantite_requise': c.quantite_requise,
+                'lieu_chargement': c.lieu_chargement,
+                'date_commande': c.date_commande.strftime('%Y-%m-%d %H:%M:%S') if c.date_commande else None,
+                'date_livraison': c.date_livraison.strftime('%Y-%m-%d %H:%M:%S') if c.date_livraison else None
+            })
+    except Exception as e:
+        # Si la jointure échoue, récupérer les commandes sans les noms d'équipements
+        commandes = session.query(Commande).all()
+        result = []
+        for c in commandes:
+            result.append({
+                'id_commande': c.id_commande,
+                'id_client': c.id_client,
+                'id_equipement': c.id_equipement,
+                'nomEquipement': None,
+                'nature_service': c.nature_service,
+                'type_vehicule': c.type_vehicule,
+                'quantite_requise': c.quantite_requise,
+                'lieu_chargement': c.lieu_chargement,
+                'date_commande': c.date_commande.strftime('%Y-%m-%d %H:%M:%S') if c.date_commande else None,
+                'date_livraison': c.date_livraison.strftime('%Y-%m-%d %H:%M:%S') if c.date_livraison else None
+            })
+    finally:
+        session.close()
+    
     return jsonify(result)
 
 # Route pour le formulaire - HTML intégré
@@ -693,6 +761,7 @@ def home():
     <h1>🚀 TMS API</h1>
     <p><a href="/commande/form">📝 Nouveau formulaire de commande</a></p>
     <p><a href="/api/commandes">📋 Voir toutes les commandes (JSON)</a></p>
+    <p><a href="/api/equipements">🔧 Voir tous les équipements (JSON)</a></p>
     """
 
 if __name__ == '__main__':

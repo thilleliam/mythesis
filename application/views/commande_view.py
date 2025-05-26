@@ -146,7 +146,7 @@ class CommandeApp:
         
         # Configuration du tableau
         self.tree = ttk.Treeview(tree_frame, columns=(
-            "id_commande", "id_client", "tournee", "nature_service", 
+            "id_commande", "id_client", "nom_equipement", "tournee", "nature_service", 
             "type_vehicule", "quantite_requise", "lieu_chargement", 
             "date_commande", "date_livraison", "statut"), show="headings", 
             yscrollcommand=scrollbar_y.set, xscrollcommand=scrollbar_x.set)
@@ -158,6 +158,7 @@ class CommandeApp:
         # Configuration des colonnes
         self.tree.heading("id_commande", text="ID")
         self.tree.heading("id_client", text="Client")
+        self.tree.heading("nom_equipement", text="Nom Equipement")
         self.tree.heading("tournee", text="Tournée")
         self.tree.heading("nature_service", text="Service")
         self.tree.heading("type_vehicule", text="Véhicule")
@@ -170,6 +171,7 @@ class CommandeApp:
         # Configurer les largeurs des colonnes
         self.tree.column("id_commande", width=50)
         self.tree.column("id_client", width=50)
+        self.tree.column("nom_equipement", width=120)
         self.tree.column("tournee", width=60)
         self.tree.column("nature_service", width=120)
         self.tree.column("type_vehicule", width=100)
@@ -480,13 +482,14 @@ class CommandeApp:
                 id_tournee = None
                 if hasattr(commande, 'tournee') and commande.tournee:
                     id_tournee = commande.tournee.id_tournee
-                
                 # Récupérer le statut s'il existe
                 statut = getattr(commande, 'statut', "En attente") if hasattr(commande, 'statut') else "En attente"
-                
+                # Récupérer le nom d'équipement
+                nom_equipement = commande.equipement.nomEquipement if commande.equipement else "-"
                 self.tree.insert("", END, values=(
                     commande.id_commande, 
                     commande.id_client, 
+                    nom_equipement,
                     id_tournee if id_tournee else "Non assignée",
                     commande.nature_service, 
                     commande.type_vehicule, 

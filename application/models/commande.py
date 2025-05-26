@@ -8,12 +8,15 @@ class Commande(Base):
 
     id_commande = Column(Integer, primary_key=True, autoincrement=True)
     id_client = Column(String(255), ForeignKey("chantiers.id_client"))
+    id_equipement = Column(Integer, ForeignKey("equipements.ID_equipement"))
     nature_service = Column(String(255))
     type_vehicule = Column(String(255))
     quantite_requise = Column(Float)
     lieu_chargement = Column(String(255))
     date_commande = Column(DateTime)
     date_livraison = Column(DateTime)
+
+    equipement = relationship("Equipement")
 
     def est_en_retard(self, date_actuelle: datetime) -> bool:
         """Vérifie si la commande est en retard par rapport à la date actuelle."""
