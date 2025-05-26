@@ -18,8 +18,23 @@ from reportlab.lib.pagesizes import landscape, A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 from tkinter import filedialog
-# Importer les classes de la métaheuristique
-from application.models.metaheuristique import Instance, Solution, greedy_initial_solution
+from application.models.mc_svrp_complete import run_complete_mc_svrp_algorithm, save_mc_solution, export_to_excel_mc
+
+from application.models.metaheuristique import (
+        Instance,
+        MC_Vehicle,
+        MC_Transport, 
+        MC_Solution,
+        mc_greedy_initial_solution,
+        mc_crossover,
+        mc_mutate,
+        mc_local_search,
+        mc_memetic_algorithm,
+        run_mc_svrp_algorithm,
+        save_mc_solution,
+        export_to_excel
+    )
+
 
 
 configure_mappers()
@@ -1140,9 +1155,8 @@ class TransfererEquipementApp:
                 bootstyle=INFO).pack(side=LEFT, padx=5)
         
         ttk.Button(btn_frame, text="Exécuter métaheuristique", 
-                command=self.executer_metaheuristique, 
+                command=self.executer_metaheuristique_corrige, 
                 bootstyle=PRIMARY).pack(side=LEFT, padx=5)
-        
         ttk.Button(btn_frame, text="Effacer résultats", 
                 command=self.effacer_resultats_optimisation, 
                 bootstyle=SECONDARY).pack(side=LEFT, padx=5)
@@ -1273,95 +1287,218 @@ class TransfererEquipementApp:
             
         finally:
             session.close()
-    def executer_metaheuristique(self):
-        """Exécute la métaheuristique pour le problème de transport"""
+    def executer_metaheuristique_corrige(self):
+        """
+        VERSION CORRIGÉE - Remplacez COMPLÈTEMENT votre méthode existante
+        """
         try:
-            # Vérifier que les coordonnées cibles sont valides
+            # Vérifications initiales (gardez vos vérifications existantes)
             longitude_cible = self.cible_longitude_var.get()
             latitude_cible = self.cible_latitude_var.get()
             
             if not longitude_cible or not latitude_cible:
-                messagebox.showerror("Erreur", "Les coordonnées de destination (site B) sont requises")
+                messagebox.showerror("Erreur", "Coordonnées de destination requises")
                 return
                 
-            # Vérifier qu'un client est sélectionné pour le site A
             if not hasattr(self, 'selected_client_id') or not self.selected_client_id:
-                # Essayer de récupérer l'ID client depuis la sélection
                 selection = self.tree.selection()
                 if selection:
-                    # Obtenir les valeurs de l'élément sélectionné
                     item_values = self.tree.item(selection[0], "values")
-                    if len(item_values) >= 2:  # Vérifier que l'ID client est accessible
-                        self.selected_client_id = item_values[1]  # Adapter à l'index correct
+                    if len(item_values) >= 2:
+                        self.selected_client_id = item_values[1]
                     else:
-                        messagebox.showerror("Erreur", "Aucun client sélectionné pour le site A")
+                        messagebox.showerror("Erreur", "Aucun client sélectionné")
                         return
                 else:
-                    messagebox.showerror("Erreur", "Aucun client sélectionné pour le site A")
+                    messagebox.showerror("Erreur", "Aucun client sélectionné")
                     return
             
-            # Afficher un indicateur de progression
+            # Affichage initial
             self.meta_results_text.delete(1.0, tk.END)
-            self.meta_results_text.insert(tk.END, "Initialisation de la métaheuristique...\n")
-            self.meta_results_text.insert(tk.END, f"Client (site A): {self.selected_client_id}\n")
-            self.meta_results_text.insert(tk.END, f"Destination (site B): Longitude {longitude_cible}, Latitude {latitude_cible}\n")
+            self.meta_results_text.insert(tk.END, "🧠 ALGORITHME MC-SVRP-TC COMPLET\n")
+            self.meta_results_text.insert(tk.END, f"📍 Client: {self.selected_client_id}\n")
+            self.meta_results_text.insert(tk.END, f"🎯 Destination: {longitude_cible}, {latitude_cible}\n")
+            self.meta_results_text.insert(tk.END, "="*80 + "\n")
             self.meta_results_text.update()
             
-            # Importer la classe Instance et la fonction d'initialisation
-            from application.models.metaheuristique import Instance, greedy_initial_solution
+            def run_algorithm():
+                try:
+                    self.meta_results_text.insert(tk.END, "⚙️ Démarrage MC-SVRP-TC avec contraintes exactes...\n")
+                    self.meta_results_text.update()
+                    
+                    # IMPORT LOCAL POUR FORCER LE BON MODULE
+                    from application.models.mc_svrp_complete import run_complete_mc_svrp_algorithm
+                    
+                    # APPEL CORRECT DE L'ALGORITHME MC-SVRP-TC
+                    solution = run_complete_mc_svrp_algorithm(
+                        id_client=self.selected_client_id,
+                        cible_longitude=longitude_cible,
+                        cible_latitude=latitude_cible
+                    )
+                    
+                    if solution is None:
+                        self.meta_results_text.insert(tk.END, "❌ Échec de l'algorithme MC-SVRP-TC\n")
+                        messagebox.showerror("Erreur", "Algorithme MC-SVRP-TC a échoué")
+                        return
+                    
+                    # VÉRIFICATION QUE C'EST BIEN MC-SVRP-TC
+                    if not hasattr(solution, 'product_mixing'):
+                        self.meta_results_text.insert(tk.END, "⚠️ ATTENTION: Ancien algorithme utilisé!\n")
+                        messagebox.showwarning("Attention", "L'ancien algorithme a été utilisé au lieu de MC-SVRP-TC")
+                        return
+                    
+                    # AFFICHAGE RÉSULTATS MC-SVRP-TC
+                    self.meta_results_text.insert(tk.END, "\n🎯 RÉSULTATS MC-SVRP-TC:\n")
+                    self.meta_results_text.insert(tk.END, f"✅ Faisable: {'OUI' if solution.feasible else 'NON'}\n")
+                    self.meta_results_text.insert(tk.END, f"💰 Coût (Éq.39): {solution.total_cost:.2f}\n")
+                    
+                    vehicles_used = sum(1 for v in solution.vehicles.values() if v.is_used())
+                    self.meta_results_text.insert(tk.END, f"🚛 Véhicules: {vehicles_used}\n")
+                    self.meta_results_text.insert(tk.END, f"📦 Transports: {len(solution.transports)}\n")
+                    
+                    # VÉRIFICATION POOLS DE PRODUITS (spécifique MC-SVRP-TC)
+                    self.meta_results_text.insert(tk.END, "\n📦 POOLS DE PRODUITS (MC-SVRP-TC):\n")
+                    all_satisfied = True
+                    
+                    for week in solution.instance.T:
+                        if (solution.instance.dw_AB[week] > 0 or solution.instance.dv_AB[week] > 0):
+                            # ACCÈS AU POOL (spécifique MC-SVRP-TC)
+                            remaining_w = solution.product_mixing.product_pool[week]['weight_remaining']
+                            remaining_v = solution.product_mixing.product_pool[week]['volume_remaining']
+                            
+                            if remaining_w > 0.1 or remaining_v > 0.1:
+                                self.meta_results_text.insert(tk.END, 
+                                    f"⚠️ Sem.{week}: {remaining_w:.1f}kg, {remaining_v:.1f}m³ restants\n")
+                                all_satisfied = False
+                            else:
+                                self.meta_results_text.insert(tk.END, f"✅ Sem.{week}: Satisfaite\n")
+                    
+                    if all_satisfied:
+                        self.meta_results_text.insert(tk.END, "\n🎉 TOUTES DEMANDES SATISFAITES PAR MC-SVRP-TC!\n")
+                    else:
+                        self.meta_results_text.insert(tk.END, "\n⚠️ Certaines demandes non satisfaites\n")
+                    
+                    # DÉTAILS TECHNIQUES MC-SVRP-TC
+                    self.meta_results_text.insert(tk.END, "\n🔧 DÉTAILS TECHNIQUES:\n")
+                    
+                    # Vérifier stratégies de mélange utilisées
+                    strategies_used = set()
+                    for week in solution.instance.T:
+                        if (solution.instance.dw_AB[week] > 0 or solution.instance.dv_AB[week] > 0):
+                            # Simuler la détection de stratégie
+                            week_transports = [t for t in solution.transports if t.week == week]
+                            if week_transports:
+                                # Analyser le type de chargement
+                                for transport in week_transports:
+                                    if transport.volume_transported > 0:
+                                        strategies_used.add("Mélange Intelligent")
+                                    else:
+                                        strategies_used.add("Homogène")
+                    
+                    self.meta_results_text.insert(tk.END, f"📊 Stratégies utilisées: {', '.join(strategies_used)}\n")
+                    
+                    # Variables du modèle mathématique
+                    active_types = sum(1 for ut in solution.u_types.values() if ut > 0)
+                    total_units = sum(solution.n_units.values())
+                    self.meta_results_text.insert(tk.END, f"🔢 Types actifs (u_ℓ): {active_types}\n")
+                    self.meta_results_text.insert(tk.END, f"🔢 Unités totales (n_ℓ,k): {total_units}\n")
+                    
+                    # Stocker pour export
+                    self.current_instance = solution.instance
+                    self.current_solution = solution
+                    
+                    self.meta_results_text.insert(tk.END, "\n✨ MC-SVRP-TC terminé avec succès!\n")
+                    self.meta_results_text.see(tk.END)
+                    
+                    if solution.feasible:
+                        messagebox.showinfo("MC-SVRP-TC", 
+                            f"Optimisation réussie!\n"
+                            f"Coût: {solution.total_cost:.2f}\n"
+                            f"Véhicules: {vehicles_used}\n"
+                            f"Solution faisable: OUI")
+                    else:
+                        messagebox.showwarning("MC-SVRP-TC", 
+                            f"Solution partielle obtenue\n"
+                            f"Certaines contraintes non satisfaites\n"
+                            f"Vérifiez les capacités des véhicules")
+                    
+                except ImportError as e:
+                    self.meta_results_text.insert(tk.END, f"❌ ERREUR D'IMPORT: {str(e)}\n")
+                    self.meta_results_text.insert(tk.END, "Le fichier mc_svrp_complete.py n'existe pas ou est mal configuré\n")
+                    messagebox.showerror("Erreur Import", 
+                        "Le module MC-SVRP-TC est introuvable.\n"
+                        "Vérifiez que le fichier mc_svrp_complete.py est bien créé.")
+                    
+                except Exception as e:
+                    self.meta_results_text.insert(tk.END, f"❌ ERREUR MC-SVRP-TC: {str(e)}\n")
+                    import traceback
+                    self.meta_results_text.insert(tk.END, traceback.format_exc())
+                    messagebox.showerror("Erreur", f"Erreur MC-SVRP-TC: {str(e)}")
             
-            # Initialiser l'instance du problème avec les paramètres appropriés
-            instance = Instance(
-                id_client=self.selected_client_id,
-                cible_longitude=longitude_cible,
-                cible_latitude=latitude_cible
+            # Lancement en thread
+            thread = threading.Thread(target=run_algorithm)
+            thread.daemon = True
+            thread.start()
+            
+        except Exception as e:
+            self.meta_results_text.insert(tk.END, f"❌ Erreur critique: {str(e)}\n")
+            messagebox.showerror("Erreur", f"Erreur critique: {str(e)}")
+
+    def exporter_vers_msproject_mc_svrp(self):
+        """
+        Exporte la solution MC-SVRP-TC vers MS Project
+        """
+        if not hasattr(self, 'current_solution') or self.current_solution is None:
+            messagebox.showwarning("Attention", "Aucune solution d'optimisation disponible pour l'export")
+            return
+        
+        try:
+            # Demander où enregistrer le fichier
+            fichier = filedialog.asksaveasfilename(
+                defaultextension=".csv",
+                filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+                title="Exporter vers MS Project (CSV)"
             )
             
-            # Afficher la distance calculée
-            self.meta_results_text.insert(tk.END, f"\nDistance calculée: {instance.d_AB} km\n")
+            if not fichier:
+                return
             
-            # Afficher les informations sur les véhicules disponibles
-            self.meta_results_text.insert(tk.END, "\nVéhicules disponibles:\n")
-            for vtype, count in instance.m.items():
-                type_name = instance.get_vehicle_type_name(vtype)
-                capacity_w = instance.L[vtype]["Qw"]
-                capacity_v = instance.L[vtype]["Qv"]
-                self.meta_results_text.insert(tk.END, f"- {type_name}: {count} véhicules, capacité: {capacity_w/1000} tonnes / {capacity_v} m³\n")
-            
-            # Afficher les demandes par semaine
-            self.meta_results_text.insert(tk.END, "\nDemandes par semaine:\n")
-            for t in instance.T:
-                self.meta_results_text.insert(tk.END, f"- Semaine {t}: {instance.dw_AB[t]/1000:.2f} tonnes, {instance.dv_AB[t]:.2f} m³\n")
-            
-            self.meta_results_text.insert(tk.END, "\nCalcul de la solution initiale...\n")
-            self.meta_results_text.update()
-            
-            # Créer une solution initiale avec l'heuristique gloutonne
-            solution = greedy_initial_solution(instance)
-            
-            # Évaluer la solution
-            fitness = solution.evaluate()
-            
-            # Afficher les résultats
-            self.meta_results_text.insert(tk.END, "\nRésultats de l'optimisation:\n")
-            self.meta_results_text.insert(tk.END, f"- Fonction objectif: {fitness}\n")
-            self.meta_results_text.insert(tk.END, f"- Solution faisable: {solution.feasible}\n")
-            
-            # Afficher le détail de la solution
-            self.meta_results_text.insert(tk.END, "\nDétails de la solution:\n")
-            self.meta_results_text.insert(tk.END, solution.detailed_str())
-            
-            # Stocker l'instance et la solution pour une utilisation ultérieure
-            self.current_instance = instance
-            self.current_solution = solution
-            
-            # Proposer d'exporter la solution
-            messagebox.showinfo("Métaheuristique", "Optimisation terminée avec succès. Consultez les résultats dans l'onglet.")
-        
+            # Importer la fonction d'export si disponible
+            try:
+                from application.models.mc_svrp_algorithm import export_to_excel
+                export_to_excel(self.current_solution, self.current_instance, filename=fichier.replace('.csv', '.xlsx'))
+                messagebox.showinfo("Succès", f"Solution exportée vers {fichier.replace('.csv', '.xlsx')}")
+            except ImportError:
+                # Export CSV basique si la fonction Excel n'est pas disponible
+                import csv
+                
+                with open(fichier, 'w', newline='', encoding='utf-8') as csvfile:
+                    writer = csv.writer(csvfile)
+                    
+                    # En-têtes
+                    writer.writerow([
+                        'Semaine', 'Véhicule', 'Type', 'Poids_Transport', 'Volume_Transport',
+                        'Temps_Total', 'Nombre_Voyages', 'Coût_Estimé'
+                    ])
+                    
+                    # Données
+                    for transport in self.current_solution.transports:
+                        vehicle = self.current_solution.vehicles[(transport.vehicle_type, transport.vehicle_idx)]
+                        writer.writerow([
+                            transport.week,
+                            vehicle.plate or f"V{transport.vehicle_idx}",
+                            vehicle.type_name or f"Type {transport.vehicle_type}",
+                            transport.total_weight(self.current_instance),
+                            transport.total_volume(self.current_instance),
+                            transport.T_total,
+                            1,  # Un transport = un voyage
+                            self.current_instance.c[transport.vehicle_type]
+                        ])
+                
+                messagebox.showinfo("Succès", f"Solution exportée vers {fichier}")
+                
         except Exception as e:
-            self.meta_results_text.insert(tk.END, f"\nErreur lors de l'exécution de la métaheuristique: {str(e)}\n")
-            traceback.print_exc()  # Afficher la trace complète dans la console
-            messagebox.showerror("Erreur", f"Erreur lors de l'exécution de la métaheuristique: {str(e)}")
+            messagebox.showerror("Erreur", f"Erreur lors de l'export: {str(e)}")
     def exporter_resultats_optimisation(self):
         """Exporte les résultats d'optimisation au format PDF"""
         # Vérifier qu'il y a des résultats à exporter

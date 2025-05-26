@@ -436,94 +436,64 @@ class Instance:
         if hasattr(self, 'type_mapping') and vtype in self.type_mapping:
             return self.type_mapping[vtype]
         return f"Type {vtype}"
-
-class Vehicle:
-    def __init__(self, vtype, idx, instance=None):
-        """
-        Représente un véhicule spécifique
-        
-        Args:
-            vtype: Type de véhicule (entier)
-            idx: Indice du véhicule dans ce type
-            instance: Instance du problème (pour accéder aux immatriculations)
-        """
-        self.type = vtype
-        self.idx = idx
+class MC_Vehicle:
+    """
+    Représente un véhicule individuel dans le modèle MC-SVRP-TC
+    Chaque véhicule a ses propres capacités individuelles
+    """
+    def __init__(self, vehicle_type, vehicle_idx, weight_capacity, volume_capacity, instance=None):
+        self.type = vehicle_type  # ℓ dans le modèle
+        self.idx = vehicle_idx    # k dans le modèle
+        self.weight_capacity = weight_capacity  # C^w_{ℓ,k}
+        self.volume_capacity = volume_capacity  # C^v_{ℓ,k}
         self.weeks_used = set()  # Semaines où ce véhicule est utilisé
+        self.num_units_used = 0  # n_{ℓ,k} - nombre d'unités de ce véhicule utilisées
+        self.num_trips = 0       # m_{ℓ,k} - nombre de voyages assignés
+        self.duration = 0.0      # τ_{ℓ,k} - durée d'utilisation en jours
         
-        # Récupérer l'immatriculation si l'instance est fournie
+        # Informations additionnelles
         self.plate = None
-        if instance is not None:
-            self.plate = instance.get_vehicle_plate(vtype, idx)
-        
-        # Récupérer le type réel du véhicule
         self.type_name = None
         if instance is not None:
-            self.type_name = instance.get_vehicle_type_name(vtype)
-        
+            self.plate = instance.get_vehicle_plate(vehicle_type, vehicle_idx)
+            self.type_name = instance.get_vehicle_type_name(vehicle_type)
+    
     def is_used(self):
-        """Retourne True si le véhicule est utilisé au moins une fois"""
+        """Vérifie si le véhicule est utilisé (x_{ℓ,k} = 1)"""
         return len(self.weeks_used) > 0
-        
-    def __str__(self):
-        """Représentation textuelle du véhicule"""
-        plate_info = f" ({self.plate})" if self.plate else ""
-        type_name = self.type_name if self.type_name else f"Type {self.type}"
-        return f"Véhicule {self.idx} de {type_name}{plate_info}"
+    
+    def reset_usage(self):
+        """Remet à zéro l'utilisation du véhicule"""
+        self.weeks_used.clear()
+        self.num_units_used = 0
+        self.num_trips = 0
+        self.duration = 0.0
 
-class Transport:
-    def __init__(self, week, vehicle_idx, vehicle_type, weight_AB=0, volume_AB=0, 
-                 load_start_A=None, load_end_A=None, departure_A=None, arrival_B=None,
-                 unload_start_B=None, unload_end_B=None, departure_B=None, arrival_A=None,
-                 breaks_AB=0, breaks_BA=0, seq=1, instance=None):
-        """
-        Représente un transport effectué par un véhicule pendant une semaine donnée
+class MC_Transport:
+    """
+    Représente un transport dans le modèle MC-SVRP-TC
+    Inclut les variables y_{p,t,k,ℓ} et les contraintes temporelles
+    """
+    def __init__(self, week, vehicle_idx, vehicle_type, products_transported=None, 
+                 trip_sequence=1, instance=None):
+        self.week = week                    # Semaine t
+        self.vehicle_idx = vehicle_idx      # Véhicule k
+        self.vehicle_type = vehicle_type    # Type ℓ
+        self.trip_sequence = trip_sequence  # Séquence du voyage dans la semaine
         
-        Args:
-            week: Semaine du transport
-            vehicle_idx: Indice du véhicule utilisé
-            vehicle_type: Type du véhicule
-            weight_AB: Quantité en poids transportée de A vers B
-            volume_AB: Quantité en volume transportée de A vers B
-            load_start_A: Heure de début du chargement au site A
-            load_end_A: Heure de fin du chargement au site A
-            departure_A: Heure de départ du site A
-            arrival_B: Heure d'arrivée au site B
-            unload_start_B: Heure de début du déchargement au site B
-            unload_end_B: Heure de fin du déchargement au site B
-            departure_B: Heure de départ du site B pour retour à vide
-            arrival_A: Heure d'arrivée au site A du véhicule vide
-            breaks_AB: Nombre de pauses prises pendant le trajet A→B
-            breaks_BA: Nombre de pauses prises pendant le trajet retour B→A
-            seq: Numéro de séquence du transport dans la journée
-            instance: Instance du problème (pour accéder aux informations des véhicules)
-        """
-        self.week = week
-        self.vehicle_idx = vehicle_idx
-        self.vehicle_type = vehicle_type
-        self.weight_AB = weight_AB
-        self.volume_AB = volume_AB
+        # Products transported: dict {product_id: quantity}
+        self.products_transported = products_transported or {}
         
-        # Variables temporelles
-        self.load_start_A = load_start_A if load_start_A is not None else 7.0  # Par défaut: début journée
-        self.load_end_A = load_end_A
-        self.departure_A = departure_A
-        self.arrival_B = arrival_B
-        self.unload_start_B = unload_start_B
-        self.unload_end_B = unload_end_B
-        self.departure_B = departure_B
-        self.arrival_A = arrival_A
+        # Variables temporelles détaillées du modèle
+        self.T_conduite = 0.0      # T^conduite_{ℓ,k,t}
+        self.T_pauses = 0.0        # T^pauses_{ℓ,k,t}
+        self.T_nuit = 0.0          # T^nuit_{ℓ,k,t}
+        self.N_pauses = 0          # N^pauses_{ℓ,k,t}
+        self.N_nuits = 0           # N^nuits_{ℓ,k,t}
+        self.T_total = 0.0         # Temps total du voyage
         
-        # Variables liées aux pauses
-        self.breaks_AB = breaks_AB
-        self.breaks_BA = breaks_BA
-        
-        # Séquence du transport dans la journée
-        self.seq = seq
-        
-        # Variable pour indiquer si le trajet continue sur le jour suivant
-        self.overnight_AB = False
-        self.overnight_BA = False
+        # Variables de respect des contraintes
+        self.delta = True          # δ_{ℓ,k} - respect contrainte temporelle
         
         # Informations sur le véhicule
         self.vehicle_plate = None
@@ -531,2600 +501,988 @@ class Transport:
         if instance is not None:
             self.vehicle_plate = instance.get_vehicle_plate(vehicle_type, vehicle_idx)
             self.vehicle_type_name = instance.get_vehicle_type_name(vehicle_type)
+    
+    def total_weight(self, instance):
+        """Calcule le poids total transporté"""
+        total = 0
+        for product_id, quantity in self.products_transported.items():
+            # Utiliser les données de poids de l'instance ou par défaut
+            if hasattr(instance, 'product_weights') and product_id in instance.product_weights:
+                total += quantity * instance.product_weights[product_id]
+        return total
+    
+    def total_volume(self, instance):
+        """Calcule le volume total transporté"""
+        total = 0
+        for product_id, quantity in self.products_transported.items():
+            # Utiliser les données de volume de l'instance ou par défaut
+            if hasattr(instance, 'product_volumes') and product_id in instance.product_volumes:
+                total += quantity * instance.product_volumes[product_id]
+        return total
 
-class Solution:
+class MC_Solution:
+    """
+    Solution pour le problème MC-SVRP-TC
+    Implémente la fonction objectif (39) et toutes les contraintes
+    """
     def __init__(self, instance):
-        """
-        Représente une solution au problème de transport
-        
-        Args:
-            instance: Instance du problème
-        """
         self.instance = instance
-        self.vehicles = {}  # Dictionnaire: clé = (type, idx), valeur = Vehicle
-        self.transports = []  # Liste des transports effectués
+        self.vehicles = {}  # Dict: (type_ℓ, idx_k) -> MC_Vehicle
+        self.transports = []  # Liste des MC_Transport
         self.fitness = float('inf')
         self.feasible = False
         
-        # Initialiser les véhicules disponibles
-        for vtype, count in instance.m.items():
+        # Variables du modèle
+        self.u_types = {}      # u_ℓ - types de véhicules utilisés
+        self.total_cost = 0.0  # Fonction objectif Z
+        
+        # Initialiser les véhicules avec leurs capacités individuelles
+        self._initialize_vehicles()
+    
+    def _initialize_vehicles(self):
+        """Initialise les véhicules avec leurs capacités individuelles"""
+        for vtype, count in self.instance.m.items():
             for i in range(1, count + 1):
-                self.vehicles[(vtype, i)] = Vehicle(vtype, i, instance)
+                # Récupérer les capacités de base du type
+                base_weight = self.instance.L[vtype]["Qw"]
+                base_volume = self.instance.L[vtype]["Qv"]
+                
+                # Ajouter une variation individuelle (±10% pour simuler l'hétérogénéité)
+                weight_variation = 1.0 + random.uniform(-0.1, 0.1)
+                volume_variation = 1.0 + random.uniform(-0.1, 0.1)
+                
+                individual_weight = base_weight * weight_variation
+                individual_volume = base_volume * volume_variation
+                
+                vehicle = MC_Vehicle(
+                    vehicle_type=vtype,
+                    vehicle_idx=i,
+                    weight_capacity=individual_weight,
+                    volume_capacity=individual_volume,
+                    instance=self.instance
+                )
+                
+                self.vehicles[(vtype, i)] = vehicle
     
     def evaluate(self):
         """
-        Évalue la solution en calculant la fonction objectif et en vérifiant sa faisabilité
-        
-        Returns:
-            float: Valeur de la fonction objectif (nombre de véhicules utilisés)
+        Évalue la solution selon la fonction objectif (39) du modèle MC-SVRP-TC
         """
-        # Réinitialiser les semaines d'utilisation des véhicules
+        # Réinitialiser les véhicules
         for vehicle in self.vehicles.values():
-            vehicle.weeks_used.clear()
+            vehicle.reset_usage()
         
-        # Marquer les semaines d'utilisation de chaque véhicule
-        for transport in self.transports:
-            self.vehicles[(transport.vehicle_type, transport.vehicle_idx)].weeks_used.add(transport.week)
+        # Calculer l'utilisation des véhicules à partir des transports
+        self._update_vehicle_usage()
         
-        # Compter le nombre de véhicules utilisés (ceux utilisés au moins une fois)
-        vehicles_used = sum(1 for vehicle in self.vehicles.values() if vehicle.is_used())
+        # Calculer les variables u_ℓ (types utilisés)
+        self._update_type_usage()
         
-        # Vérifier la satisfaction des demandes et les contraintes temporelles
-        self.feasible = self.check_feasibility()
+        # Vérifier la faisabilité
+        self.feasible = self._check_feasibility()
         
-        # Mettre à jour la fitness (objectif: minimiser le nombre de véhicules)
-        self.fitness = vehicles_used if self.feasible else float('inf')
+        # Calculer la fonction objectif (39)
+        if self.feasible:
+            self.fitness = self._calculate_objective()
+        else:
+            self.fitness = float('inf')
         
         return self.fitness
     
-    def check_feasibility(self):
-        """
-        Vérifie si la solution est faisable (demandes satisfaites + contraintes temporelles)
-        
-        Returns:
-            bool: True si la solution est faisable, False sinon
-        """
-        # Vérifier la satisfaction des demandes
-        if not self.check_demands_satisfaction():
-            return False
-        
-        # Vérifier les contraintes temporelles
-        if not self.check_temporal_constraints():
-            return False
-        
-        return True
-    
-    def check_demands_satisfaction(self):
-        """
-        Vérifie si toutes les demandes sont satisfaites
-        
-        Returns:
-            bool: True si toutes les demandes sont satisfaites, False sinon
-        """
-        # Calculer les quantités transportées par semaine (uniquement A→B)
-        transported_weight_AB = defaultdict(float)
-        transported_volume_AB = defaultdict(float)
-        
+    def _update_vehicle_usage(self):
+        """Met à jour l'utilisation des véhicules à partir des transports"""
         for transport in self.transports:
-            week = transport.week
-            transported_weight_AB[week] += transport.weight_AB
-            transported_volume_AB[week] += transport.volume_AB
-        
-        # Vérifier si toutes les demandes sont satisfaites
-        for week in self.instance.T:
-            if transported_weight_AB[week] < self.instance.dw_AB[week]:
-                return False
-            if transported_volume_AB[week] < self.instance.dv_AB[week]:
-                return False
-        
-        return True
-    
-    def check_temporal_constraints(self):
-        """
-        Vérifie si toutes les contraintes temporelles sont respectées
-        
-        Returns:
-            bool: True si toutes les contraintes temporelles sont respectées, False sinon
-        """
-        # Regrouper les transports par semaine et véhicule
-        transports_by_week_veh = {}
-        for transport in self.transports:
-            key = (transport.week, transport.vehicle_type, transport.vehicle_idx)
-            if key not in transports_by_week_veh:
-                transports_by_week_veh[key] = []
-            transports_by_week_veh[key].append(transport)
-        
-        # Pour chaque semaine et véhicule, vérifier la séquence temporelle
-        for (week, vtype, vidx), week_veh_transports in transports_by_week_veh.items():
-            # Trier les transports par séquence
-            week_veh_transports.sort(key=lambda t: t.seq)
+            vehicle_key = (transport.vehicle_type, transport.vehicle_idx)
+            vehicle = self.vehicles[vehicle_key]
             
-            # Vérifier la journée de travail et les pauses
-            for transport in week_veh_transports:
-                # 1. Vérifier les heures de travail (sauf si overnight)
-                if not transport.overnight_AB and not transport.overnight_BA:
-                    if (transport.load_start_A < self.instance.T_start or 
-                        (transport.arrival_A is not None and transport.arrival_A > self.instance.T_end)):
-                        return False
-                
-                # 2. Vérifier cohérence temporelle des opérations
-                if (transport.load_end_A is None or transport.departure_A is None or 
-                    transport.arrival_B is None or transport.unload_start_B is None or 
-                    transport.unload_end_B is None):
-                    # Si les temps ne sont pas définis, les définir
-                    self.compute_times_for_transport(transport)
-                
-                # 3. Vérifier les séquences d'opérations
-                if (transport.load_end_A > transport.departure_A or 
-                    transport.departure_A > transport.arrival_B or 
-                    transport.arrival_B > transport.unload_start_B or 
-                    transport.unload_start_B > transport.unload_end_B):
-                    return False
-                
-                # 4. Si le véhicule revient à A, vérifier les séquences de retour
-                if transport.departure_B is not None:
-                    if (transport.unload_end_B > transport.departure_B or 
-                        transport.departure_B > transport.arrival_A):
-                        return False
+            # Marquer la semaine comme utilisée
+            vehicle.weeks_used.add(transport.week)
             
-            # Vérifier la séquence des transports dans la journée
-            for i in range(1, len(week_veh_transports)):
-                prev_transport = week_veh_transports[i-1]
-                curr_transport = week_veh_transports[i]
-                
-                # Le transport suivant doit commencer après la fin du précédent
-                if prev_transport.arrival_A is not None:
-                    if curr_transport.load_start_A < prev_transport.arrival_A:
-                        return False
-        
-        return True
+            # Compter les voyages
+            vehicle.num_trips += 1
+            
+            # Calculer la durée (simplifié pour l'instant)
+            self._calculate_transport_times(transport, vehicle)
     
-    def compute_times_for_transport(self, transport):
+    def _calculate_transport_times(self, transport, vehicle):
         """
-        Calcule les temps pour un transport (si non définis)
-        
-        Args:
-            transport: Transport à traiter
+        Calcule les temps pour un transport selon les équations (49-58)
         """
-        instance = self.instance
         vtype = transport.vehicle_type
         
-        # 1. Temps de chargement
-        if transport.load_end_A is None:
-            transport.load_end_A = transport.load_start_A + instance.T_load_A
+        # Distance et vitesse
+        D = self.instance.d_AB
+        S = self.instance.V[vtype]
         
-        # 2. Départ du site A
-        if transport.departure_A is None:
-            transport.departure_A = transport.load_end_A
+        # Temps de conduite (49)
+        transport.T_conduite = (2 * D) / S
         
-        # 3. Calcul du nombre de pauses pour A→B
-        drive_time_AB = instance.d_AB / instance.V[vtype]
-        if transport.breaks_AB == 0:
-            transport.breaks_AB = math.floor(drive_time_AB / instance.T_drive)
+        # Nombre de pauses (50) - approximation
+        transport.N_pauses = max(0, math.floor((transport.T_conduite - 2) / 2.0) + 1)
         
-        # 4. Arrivée au site B
-        if transport.arrival_B is None:
-            transport.arrival_B = (transport.departure_A + drive_time_AB + 
-                                  transport.breaks_AB * instance.T_break)
+        # Temps de pauses (51)
+        transport.T_pauses = transport.N_pauses * self.instance.T_break
         
-        # 5. Début et fin du déchargement
-        if transport.unload_start_B is None:
-            transport.unload_start_B = transport.arrival_B
-        if transport.unload_end_B is None:
-            transport.unload_end_B = transport.unload_start_B + instance.T_unload_B
+        # Détection des nuits (52) - simplifiée
+        total_operation_time = (transport.T_conduite + transport.T_pauses + 
+                               self.instance.T_load_A + self.instance.T_unload_B)
+        transport.N_nuits = math.floor((total_operation_time - 11) / 24) + 1 if total_operation_time > 11 else 0
         
-        # 6. Si retour à A, calculer les temps de retour
-        if transport.departure_B is not None:
-            # Départ de B
-            if transport.departure_B < transport.unload_end_B:
-                transport.departure_B = transport.unload_end_B
-            
-            # Nombre de pauses pour B→A
-            drive_time_BA = instance.d_BA / instance.V[vtype]
-            if transport.breaks_BA == 0:
-                transport.breaks_BA = math.floor(drive_time_BA / instance.T_drive)
-            
-            # Arrivée à A
-            if transport.arrival_A is None:
-                transport.arrival_A = (transport.departure_B + drive_time_BA + 
-                                      transport.breaks_BA * instance.T_break)
-            
-            # Vérifier si le retour dépasse la journée de travail
-            if transport.arrival_A > instance.T_end:
-                transport.overnight_BA = True
+        # Temps de nuit (53)
+        transport.T_nuit = transport.N_nuits * 13.0  # 13h d'arrêt nocturne
         
-        # Vérifier si le trajet dépasse la journée de travail
-        if transport.unload_end_B > instance.T_end:
-            transport.overnight_AB = True
+        # Temps total (54)
+        transport.T_total = (transport.T_conduite + transport.T_pauses + 
+                            transport.T_nuit + self.instance.T_load_A + self.instance.T_unload_B)
+        
+        # Mettre à jour la durée du véhicule (55)
+        vehicle.duration = max(vehicle.duration, math.ceil(transport.T_total / 8.0))  # 8h de travail par jour
     
-    def total_cost(self):
-        """
-        Calcule le coût total de transport (objectif secondaire)
+    def _update_type_usage(self):
+        """Met à jour les variables u_ℓ"""
+        self.u_types = {}
+        for vtype in self.instance.L.keys():
+            self.u_types[vtype] = any(
+                self.vehicles[(vtype, i)].is_used() 
+                for i in range(1, self.instance.m[vtype] + 1)
+            )
+    
+    def _check_feasibility(self):
+        """Vérifie toutes les contraintes du modèle"""
         
-        Returns:
-            float: Coût total de transport
-        """
-        cost = 0
+        # 1. Contraintes de capacité (43-44)
+        if not self._check_capacity_constraints():
+            return False
+        
+        # 2. Contraintes de satisfaction de la demande (45)
+        if not self._check_demand_satisfaction():
+            return False
+        
+        # 3. Contraintes temporelles (56-58)
+        if not self._check_temporal_constraints():
+            return False
+        
+        # 4. Contraintes de cohérence (28-30)
+        if not self._check_coherence_constraints():
+            return False
+        
+        return True
+    
+    def _check_capacity_constraints(self):
+        """Vérifie les contraintes de capacité (43-44)"""
         for transport in self.transports:
-            # Coût d'utilisation du véhicule + coût de déplacement
-            cost += self.instance.c[transport.vehicle_type] + self.instance.dc
-        
-        return cost
-    
-    def __str__(self):
-        vehicles_used = sum(1 for vehicle in self.vehicles.values() if vehicle.is_used())
-        return f"Solution(transports={len(self.transports)}, véhicules utilisés={vehicles_used}, " \
-               f"fitness={self.fitness}, faisable={self.feasible})"
-    
-    def detailed_str(self):
-        """
-        Retourne une représentation détaillée de la solution
-        
-        Returns:
-            str: Description détaillée de la solution
-        """
-        result = [f"Solution avec {len(self.transports)} transports, fitness={self.fitness}, faisable={self.feasible}"]
-        
-        # Afficher les véhicules utilisés par type
-        vehicles_by_type = {}
-        for (vtype, _), vehicle in self.vehicles.items():
-            if vehicle.is_used():
-                type_name = vehicle.type_name if vehicle.type_name else f"Type {vtype}"
-                if type_name not in vehicles_by_type:
-                    vehicles_by_type[type_name] = []
-                vehicle_info = f"{vehicle.idx}"
-                if vehicle.plate:
-                    vehicle_info = f"{vehicle.plate}"
-                vehicles_by_type[type_name].append(vehicle_info)
-        
-        result.append("\nVéhicules utilisés par type:")
-        for type_name, vehicles in vehicles_by_type.items():
-            result.append(f"- {type_name}: {', '.join(vehicles)} (total: {len(vehicles)})")
-        
-        # Afficher les transports par semaine
-        result.append("\nTransports par semaine:")
-        transports_by_week = {}
-        for transport in self.transports:
-            week = transport.week
-            if week not in transports_by_week:
-                transports_by_week[week] = []
-            transports_by_week[week].append(transport)
-        
-        for week in sorted(transports_by_week.keys()):
-            result.append(f"\nSemaine {week}:")
-            for transport in sorted(transports_by_week[week], key=lambda t: (t.vehicle_type, t.vehicle_idx, t.seq)):
-                vehicle_info = f"Véhicule {transport.vehicle_idx} (type {transport.vehicle_type})"
-                if transport.vehicle_plate:
-                    vehicle_info = f"{transport.vehicle_plate} ({transport.vehicle_type_name})"
-                
-                result.append(f"  - {vehicle_info}: {transport.weight_AB} kg / {transport.volume_AB} m³")
-                
-                # Ajouter les horaires si disponibles
-                times = []
-                if transport.load_start_A is not None:
-                    load_start = format_hour(transport.load_start_A)
-                    times.append(f"Chargement A: {load_start}")
-                if transport.departure_A is not None:
-                    departure = format_hour(transport.departure_A)
-                    times.append(f"Départ A: {departure}")
-                if transport.arrival_B is not None:
-                    arrival = format_hour(transport.arrival_B)
-                    times.append(f"Arrivée B: {arrival}")
-                if transport.departure_B is not None and transport.arrival_A is not None:
-                    departure_b = format_hour(transport.departure_B)
-                    arrival_a = format_hour(transport.arrival_A)
-                    times.append(f"Retour: {departure_b} - {arrival_a}")
-                
-                if times:
-                    result.append(f"    {', '.join(times)}")
-        
-        # Ajouter le coût total
-        result.append(f"\nCoût total: {self.total_cost()}")
-        
-        return "\n".join(result)
-
-
-def format_hour(hour):
-    """
-    Formate une heure décimale en format HH:MM
-    
-    Args:
-        hour: Heure en format décimal (ex: 7.5 pour 7h30)
-        
-    Returns:
-        str: Heure formatée (ex: "07:30")
-    """
-    h = int(hour)
-    m = int((hour - h) * 60)
-    return f"{h:02d}:{m:02d}"
-
-def greedy_initial_solution(instance):
-        """
-        Crée une solution initiale en utilisant une heuristique gloutonne
-        
-        Args:
-            instance: Instance du problème
+            vehicle_key = (transport.vehicle_type, transport.vehicle_idx)
+            vehicle = self.vehicles[vehicle_key]
             
-        Returns:
-            Solution: Solution initiale
-        """
-        solution = Solution(instance)
-        
-        # Pour chaque semaine
-        for week in instance.T:
-            # Initialiser les demandes restantes pour cette semaine (uniquement A→B)
-            remaining_weight_AB = instance.dw_AB[week]
-            remaining_volume_AB = instance.dv_AB[week]
-            
-            # Trier les types de véhicules par ratio (capacité/coût) décroissant
-            vehicle_types = sorted(instance.L.keys(), 
-                                key=lambda vt: (instance.L[vt]["Qw"] + instance.L[vt]["Qv"]) / instance.c[vt], 
-                                reverse=True)
-            
-            # Tant qu'il reste des demandes à satisfaire
-            while remaining_weight_AB > 0 or remaining_volume_AB > 0:
-                vehicle_assigned = False
-                
-                # Essayer chaque type de véhicule
-                for vtype in vehicle_types:
-                    capacity_w = instance.L[vtype]["Qw"]
-                    capacity_v = instance.L[vtype]["Qv"]
-                    
-                    # Vérifier si ce type peut encore satisfaire une partie des demandes
-                    if (remaining_weight_AB > 0 or remaining_volume_AB > 0):
-                        
-                        # Chercher un véhicule disponible de ce type
-                        vehicle_found = False
-                        
-                        # On regarde d'abord les véhicules déjà utilisés cette semaine
-                        vehicles_used_this_week = {}
-                        for t in solution.transports:
-                            if t.week == week and (t.vehicle_type, t.vehicle_idx) not in vehicles_used_this_week:
-                                vehicles_used_this_week[(t.vehicle_type, t.vehicle_idx)] = max(
-                                    [t2.seq for t2 in solution.transports 
-                                    if t2.week == week and t2.vehicle_type == t.vehicle_type and t2.vehicle_idx == t.vehicle_idx]
-                                )
-                        
-                        # D'abord, essayer les véhicules déjà utilisés cette semaine
-                        for (used_vtype, used_vidx), max_seq in sorted(vehicles_used_this_week.items()):
-                            if used_vtype == vtype:
-                                # Vérifier si le véhicule peut faire un transport supplémentaire
-                                # En regardant le dernier transport programmé
-                                last_transports = [t for t in solution.transports 
-                                                if t.week == week and t.vehicle_type == used_vtype 
-                                                and t.vehicle_idx == used_vidx and t.seq == max_seq]
-                                
-                                if last_transports:
-                                    last_transport = last_transports[0]
-                                    
-                                    # Calculer les temps si nécessaire
-                                    if last_transport.arrival_A is None and last_transport.departure_B is not None:
-                                        solution.compute_times_for_transport(last_transport)
-                                    
-                                    # Vérifier si le véhicule peut faire un transport supplémentaire
-                                    # (s'il est de retour au site A et qu'il reste du temps dans la journée)
-                                    next_start_time = (last_transport.arrival_A if last_transport.arrival_A is not None 
-                                                    else instance.T_start)
-                                    
-                                    if next_start_time <= instance.T_end - 2:  # Au moins 2h avant la fin
-                                        # Calculer les quantités à transporter
-                                        weight_to_AB = min(remaining_weight_AB, capacity_w)
-                                        volume_to_AB = min(remaining_volume_AB, capacity_v)
-                                        
-                                        # Créer le transport
-                                        transport = Transport(
-                                            week=week,
-                                            vehicle_idx=used_vidx,
-                                            vehicle_type=vtype,
-                                            weight_AB=weight_to_AB,
-                                            volume_AB=volume_to_AB,
-                                            load_start_A=next_start_time,
-                                            seq=max_seq + 1
-                                        )
-                                        
-                                        # Calculer les temps
-                                        solution.compute_times_for_transport(transport)
-                                        
-                                        # Si le transport est réalisable dans la journée
-                                        if (not transport.overnight_AB or (transport.overnight_AB and transport.unload_end_B <= 
-                                                                        instance.T_start + 24)):
-                                            # Ajouter le départ retour si nécessaire
-                                            transport.departure_B = transport.unload_end_B
-                                            solution.compute_times_for_transport(transport)
-                                            
-                                            # Mettre à jour la solution
-                                            solution.transports.append(transport)
-                                            
-                                            # Mettre à jour les demandes restantes
-                                            remaining_weight_AB -= weight_to_AB
-                                            remaining_volume_AB -= volume_to_AB
-                                            
-                                            vehicle_found = True
-                                            vehicle_assigned = True
-                                            break
-                        
-                        # Si aucun véhicule existant n'a pu être utilisé, chercher un nouveau
-                        if not vehicle_found:
-                            for veh_idx in range(1, instance.m[vtype] + 1):
-                                vehicle_key = (vtype, veh_idx)
-                                
-                                # Vérifier si ce véhicule n'est pas déjà utilisé cette semaine
-                                if week not in solution.vehicles[vehicle_key].weeks_used or vehicle_key not in vehicles_used_this_week:
-                                    # Calculer les quantités à transporter
-                                    weight_to_AB = min(remaining_weight_AB, capacity_w)
-                                    volume_to_AB = min(remaining_volume_AB, capacity_v)
-                                    
-                                    # Créer le transport
-                                    transport = Transport(
-                                        week=week,
-                                        vehicle_idx=veh_idx,
-                                        vehicle_type=vtype,
-                                        weight_AB=weight_to_AB,
-                                        volume_AB=volume_to_AB,
-                                        load_start_A=instance.T_start,  # Commence au début de la journée
-                                        seq=1 if vehicle_key not in vehicles_used_this_week else vehicles_used_this_week[vehicle_key] + 1
-                                    )
-                                    
-                                    # Calculer les temps
-                                    solution.compute_times_for_transport(transport)
-                                    
-                                    # Ajouter le départ retour
-                                    transport.departure_B = transport.unload_end_B
-                                    solution.compute_times_for_transport(transport)
-                                    
-                                    # Mettre à jour la solution
-                                    solution.transports.append(transport)
-                                    solution.vehicles[vehicle_key].weeks_used.add(week)
-                                    
-                                    # Mettre à jour les demandes restantes
-                                    remaining_weight_AB -= weight_to_AB
-                                    remaining_volume_AB -= volume_to_AB
-                                    
-                                    vehicle_found = True
-                                    vehicle_assigned = True
-                                    break
-                        
-                        if vehicle_found:
-                            break
-                
-                # Si aucun véhicule n'a pu être assigné, c'est que la solution est infaisable
-                if not vehicle_assigned:
-                    # Dans ce cas, on crée un transport artificiel avec un véhicule du plus grand type
-                    vtype = max(vehicle_types)
-                    veh_idx = 1  # On prend arbitrairement le premier véhicule
-                    
-                    # Calculer les quantités restantes
-                    weight_to_AB = remaining_weight_AB
-                    volume_to_AB = remaining_volume_AB
-                    
-                    # Créer un transport spécial (qui dépassera les capacités si nécessaire)
-                    transport = Transport(
-                        week=week,
-                        vehicle_idx=veh_idx,
-                        vehicle_type=vtype,
-                        weight_AB=weight_to_AB,
-                        volume_AB=volume_to_AB,
-                        load_start_A=instance.T_start,
-                        seq=1
-                    )
-                    
-                    # Calculer les temps
-                    solution.compute_times_for_transport(transport)
-                    
-                    solution.transports.append(transport)
-                    solution.vehicles[(vtype, veh_idx)].weeks_used.add(week)
-                    
-                    # Mettre à jour les demandes restantes
-                    remaining_weight_AB = 0
-                    remaining_volume_AB = 0
-        
-        # Évaluer la solution
-        solution.evaluate()
-        return solution
-def crossover(parent1, parent2, instance):
-        """
-        Opérateur de croisement qui combine les transports des deux parents
-        
-        Args:
-            parent1: Première solution parent
-            parent2: Deuxième solution parent
-            instance: Instance du problème
-            
-        Returns:
-            Solution: Solution enfant
-        """
-        child = Solution(instance)
-        
-        # Pour chaque semaine, choisir aléatoirement les transports d'un des parents
-        for week in instance.T:
-            parent = parent1 if random.random() < 0.5 else parent2
-            # Copier les transports de cette semaine
-            for transport in parent.transports:
-                if transport.week == week:
-                    # Créer une copie du transport
-                    new_transport = Transport(
-                        week=transport.week,
-                        vehicle_idx=transport.vehicle_idx,
-                        vehicle_type=transport.vehicle_type,
-                        weight_AB=transport.weight_AB,
-                        volume_AB=transport.volume_AB,
-                        load_start_A=transport.load_start_A,
-                        load_end_A=transport.load_end_A,
-                        departure_A=transport.departure_A,
-                        arrival_B=transport.arrival_B,
-                        unload_start_B=transport.unload_start_B,
-                        unload_end_B=transport.unload_end_B,
-                        departure_B=transport.departure_B,
-                        arrival_A=transport.arrival_A,
-                        breaks_AB=transport.breaks_AB,
-                        breaks_BA=transport.breaks_BA,
-                        seq=transport.seq
-                    )
-                    # Ajouter le transport au child
-                    child.transports.append(new_transport)
-                    # Mettre à jour l'utilisation des véhicules
-                    child.vehicles[(transport.vehicle_type, transport.vehicle_idx)].weeks_used.add(week)
-        
-        # Évaluer le child
-        child.evaluate()
-        
-        # Si le child n'est pas faisable, réparer la solution
-        if not child.feasible:
-            repair_solution(child, instance)
-        
-        return child
-
-def repair_solution(solution, instance):
-        """
-        Répare une solution infaisable en ajoutant des transports supplémentaires si nécessaire
-        
-        Args:
-            solution: Solution à réparer
-            instance: Instance du problème
-        """
-        for week in instance.T:
-            # Calculer les quantités déjà transportées cette semaine
-            transported_weight_AB = sum(t.weight_AB for t in solution.transports if t.week == week)
-            transported_volume_AB = sum(t.volume_AB for t in solution.transports if t.week == week)
-            
-            # Calculer les demandes restantes
-            remaining_weight_AB = max(0, instance.dw_AB[week] - transported_weight_AB)
-            remaining_volume_AB = max(0, instance.dv_AB[week] - transported_volume_AB)
-            
-            # S'il reste des demandes à satisfaire
-            if remaining_weight_AB > 0 or remaining_volume_AB > 0:
-                
-                # Chercher un véhicule disponible pour satisfaire les demandes restantes
-                # Préférer les véhicules déjà utilisés pour minimiser le nombre total
-                vehicles_used_this_week = {(t.vehicle_type, t.vehicle_idx) for t in solution.transports if t.week == week}
-                
-                # Trier les véhicules: d'abord ceux déjà utilisés dans d'autres semaines, puis les autres
-                vehicles_by_priority = []
-                
-                # D'abord, les véhicules déjà utilisés dans d'autres semaines (mais pas celle-ci)
-                for (vtype, idx), vehicle in solution.vehicles.items():
-                    if vehicle.is_used() and (vtype, idx) not in vehicles_used_this_week:
-                        vehicles_by_priority.append((vtype, idx))
-                
-                # Ensuite, les véhicules jamais utilisés
-                for (vtype, idx), vehicle in solution.vehicles.items():
-                    if not vehicle.is_used():
-                        vehicles_by_priority.append((vtype, idx))
-                
-                # Trier par capacité décroissante au sein de chaque groupe
-                vehicles_by_priority.sort(key=lambda v: instance.L[v[0]]["Qw"] + instance.L[v[0]]["Qv"], reverse=True)
-                
-                # Essayer d'assigner un véhicule
-                vehicle_assigned = False
-                for vtype, idx in vehicles_by_priority:
-                    capacity_w = instance.L[vtype]["Qw"]
-                    capacity_v = instance.L[vtype]["Qv"]
-                    
-                    # Vérifier si ce véhicule peut satisfaire les demandes restantes
-                    if remaining_weight_AB <= capacity_w and remaining_volume_AB <= capacity_v:
-                        
-                        # Créer un nouveau transport
-                        transport = Transport(
-                            week=week,
-                            vehicle_idx=idx,
-                            vehicle_type=vtype,
-                            weight_AB=remaining_weight_AB,
-                            volume_AB=remaining_volume_AB,
-                            load_start_A=instance.T_start,
-                            seq=1  # Par défaut, premier transport de la journée
-                        )
-                        
-                        # Calculer les temps pour le transport
-                        solution.compute_times_for_transport(transport)
-                        
-                        # Ajouter le transport à la solution
-                        solution.transports.append(transport)
-                        solution.vehicles[(vtype, idx)].weeks_used.add(week)
-                        
-                        vehicle_assigned = True
-                        break
-                
-                # Si aucun véhicule ne peut satisfaire toutes les demandes, utiliser plusieurs véhicules
-                if not vehicle_assigned:
-                    # Trier les types de véhicules par capacité décroissante
-                    vehicle_types = sorted(instance.L.keys(), 
-                                        key=lambda vt: instance.L[vt]["Qw"] + instance.L[vt]["Qv"], 
-                                        reverse=True)
-                    
-                    while remaining_weight_AB > 0 or remaining_volume_AB > 0:
-                        
-                        vehicle_assigned = False
-                        for vtype in vehicle_types:
-                            capacity_w = instance.L[vtype]["Qw"]
-                            capacity_v = instance.L[vtype]["Qv"]
-                            
-                            # Chercher un véhicule disponible de ce type
-                            for idx in range(1, instance.m[vtype] + 1):
-                                if (vtype, idx) not in vehicles_used_this_week:
-                                    # Calculer les quantités à transporter
-                                    weight_to_AB = min(remaining_weight_AB, capacity_w)
-                                    volume_to_AB = min(remaining_volume_AB, capacity_v)
-                                    
-                                    # Créer le transport
-                                    transport = Transport(
-                                        week=week,
-                                        vehicle_idx=idx,
-                                        vehicle_type=vtype,
-                                        weight_AB=weight_to_AB,
-                                        volume_AB=volume_to_AB,
-                                        load_start_A=instance.T_start,
-                                        seq=1  # Par défaut, premier transport de la journée
-                                    )
-                                    
-                                    # Calculer les temps pour le transport
-                                    solution.compute_times_for_transport(transport)
-                                    
-                                    # Ajouter le retour
-                                    transport.departure_B = transport.unload_end_B
-                                    solution.compute_times_for_transport(transport)
-                                    
-                                    # Ajouter le transport à la solution
-                                    solution.transports.append(transport)
-                                    solution.vehicles[(vtype, idx)].weeks_used.add(week)
-                                    
-                                    # Mettre à jour les demandes restantes
-                                    remaining_weight_AB -= weight_to_AB
-                                    remaining_volume_AB -= volume_to_AB
-                                    
-                                    # Marquer le véhicule comme utilisé cette semaine
-                                    vehicles_used_this_week.add((vtype, idx))
-                                    
-                                    vehicle_assigned = True
-                                    break
-                            
-                            if vehicle_assigned:
-                                break
-                        
-                        if not vehicle_assigned:
-                            # Si nous arrivons ici, c'est qu'aucun véhicule supplémentaire n'est disponible
-                            # Utiliser un véhicule déjà assigné pour cette semaine en ajoutant un second transport
-                            
-                            # Trouver un véhicule déjà utilisé cette semaine
-                            used_vehicles = []
-                            for t in solution.transports:
-                                if t.week == week:
-                                    used_vehicles.append((t.vehicle_type, t.vehicle_idx))
-                            
-                            if used_vehicles:
-                                vtype, idx = used_vehicles[0]
-                                capacity_w = instance.L[vtype]["Qw"]
-                                capacity_v = instance.L[vtype]["Qv"]
-                                
-                                # Trouver la dernière séquence pour ce véhicule
-                                last_seq = max([t.seq for t in solution.transports 
-                                            if t.week == week and t.vehicle_type == vtype and t.vehicle_idx == idx])
-                                
-                                # Trouver le dernier transport de ce véhicule
-                                last_transport = None
-                                for t in solution.transports:
-                                    if (t.week == week and t.vehicle_type == vtype and 
-                                        t.vehicle_idx == idx and t.seq == last_seq):
-                                        last_transport = t
-                                        break
-                                
-                                if last_transport:
-                                    # Calculer l'heure de début du nouveau transport
-                                    if last_transport.arrival_A is None:
-                                        solution.compute_times_for_transport(last_transport)
-                                    
-                                    next_start_time = last_transport.arrival_A
-                                    
-                                    # S'assurer que le prochain transport commence dans la journée de travail
-                                    if next_start_time <= instance.T_end - 1:  # Au moins 1h avant la fin
-                                        # Calculer les quantités à transporter
-                                        weight_to_AB = min(remaining_weight_AB, capacity_w)
-                                        volume_to_AB = min(remaining_volume_AB, capacity_v)
-                                        
-                                        # Créer le transport
-                                        transport = Transport(
-                                            week=week,
-                                            vehicle_idx=idx,
-                                            vehicle_type=vtype,
-                                            weight_AB=weight_to_AB,
-                                            volume_AB=volume_to_AB,
-                                            load_start_A=next_start_time,
-                                            seq=last_seq + 1
-                                        )
-                                        
-                                        # Calculer les temps
-                                        solution.compute_times_for_transport(transport)
-                                        
-                                        # Ajouter le retour
-                                        transport.departure_B = transport.unload_end_B
-                                        solution.compute_times_for_transport(transport)
-                                        
-                                        # Ajouter le transport à la solution
-                                        solution.transports.append(transport)
-                                        
-                                        # Mettre à jour les demandes restantes
-                                        remaining_weight_AB -= weight_to_AB
-                                        remaining_volume_AB -= volume_to_AB
-                                    else:
-                                        # Si pas assez de temps, forcer l'utilisation d'un autre véhicule
-                                        # ou arrêter (échec de l'opération de réparation)
-                                        pass
-                            else:
-                                # Si on arrive ici, c'est qu'il n'y a pas de solution possible
-                                break
-        
-        # Réévaluer la solution
-        solution.evaluate()
-
-def mutate(solution, instance, mutation_rate=0.3):
-        """
-        Opérateur de mutation qui modifie certains transports
-        
-        Args:
-            solution: Solution à muter
-            instance: Instance du problème
-            mutation_rate: Probabilité de mutation d'une semaine
-            
-        Returns:
-            Solution: Solution mutée
-        """
-        mutated = copy.deepcopy(solution)
-        
-        # Pour chaque semaine
-        for week in instance.T:
-            # Décider si cette semaine doit être mutée
-            if random.random() < mutation_rate:
-                # Récupérer tous les transports de cette semaine
-                week_transports = [t for t in mutated.transports if t.week == week]
-                
-                # Si pas de transports cette semaine, passer à la suivante
-                if not week_transports:
-                    continue
-                
-                # Choisir une opération de mutation
-                operations = ["split", "reassign", "replace_vehicle"]
-                op = random.choice(operations)
-                
-                if op == "split" and len(week_transports) > 0:
-                    # Diviser un transport en deux
-                    t = random.choice(week_transports)
-                    
-                    # Vérifier s'il y a quelque chose à diviser
-                    if t.weight_AB > 0 or t.volume_AB > 0:
-                        
-                        # Chercher un véhicule non utilisé cette semaine
-                        unused_vehicles = []
-                        for (vtype, idx), vehicle in mutated.vehicles.items():
-                            if week not in vehicle.weeks_used:
-                                unused_vehicles.append((vtype, idx))
-                        
-                        if unused_vehicles:
-                            # Choisir un véhicule au hasard
-                            vtype, idx = random.choice(unused_vehicles)
-                            
-                            # Décider comment diviser la charge (au hasard entre 30% et 70%)
-                            split_ratio = 0.3 + 0.4 * random.random()
-                            
-                            # Créer les deux nouveaux transports
-                            t1 = Transport(
-                                week=week,
-                                vehicle_idx=t.vehicle_idx,
-                                vehicle_type=t.vehicle_type,
-                                weight_AB=t.weight_AB * (1 - split_ratio),
-                                volume_AB=t.volume_AB * (1 - split_ratio),
-                                load_start_A=t.load_start_A,
-                                seq=t.seq
-                            )
-                            
-                            t2 = Transport(
-                                week=week,
-                                vehicle_idx=idx,
-                                vehicle_type=vtype,
-                                weight_AB=t.weight_AB * split_ratio,
-                                volume_AB=t.volume_AB * split_ratio,
-                                load_start_A=instance.T_start,
-                                seq=1
-                            )
-                            
-                            # Calculer les temps pour les transports
-                            mutated.compute_times_for_transport(t1)
-                            mutated.compute_times_for_transport(t2)
-                            
-                            # Ajouter les retours
-                            t1.departure_B = t1.unload_end_B
-                            t2.departure_B = t2.unload_end_B
-                            mutated.compute_times_for_transport(t1)
-                            mutated.compute_times_for_transport(t2)
-                            
-                            # Remplacer l'ancien transport par les deux nouveaux
-                            mutated.transports = [trans for trans in mutated.transports if trans != t]
-                            mutated.transports.extend([t1, t2])
-                            
-                            # Mettre à jour les semaines d'utilisation des véhicules
-                            mutated.vehicles[(vtype, idx)].weeks_used.add(week)
-                
-                elif op == "reassign" and week_transports:
-                    # Réaffecter un transport à un autre véhicule
-                    t = random.choice(week_transports)
-                    
-                    # Chercher un véhicule non utilisé cette semaine
-                    unused_vehicles = []
-                    for (vtype, idx), vehicle in mutated.vehicles.items():
-                        if week not in vehicle.weeks_used and (vtype, idx) != (t.vehicle_type, t.vehicle_idx):
-                            unused_vehicles.append((vtype, idx))
-                    
-                    if unused_vehicles:
-                        # Choisir un véhicule au hasard
-                        vtype, idx = random.choice(unused_vehicles)
-                        
-                        # Vérifier si le nouveau véhicule a suffisamment de capacité
-                        capacity_w = instance.L[vtype]["Qw"]
-                        capacity_v = instance.L[vtype]["Qv"]
-                        
-                        if t.weight_AB <= capacity_w and t.volume_AB <= capacity_v:
-                            
-                            # Créer un nouveau transport avec le nouveau véhicule
-                            new_t = Transport(
-                                week=week,
-                                vehicle_idx=idx,
-                                vehicle_type=vtype,
-                                weight_AB=t.weight_AB,
-                                volume_AB=t.volume_AB,
-                                load_start_A=t.load_start_A,
-                                seq=1
-                            )
-                            
-                            # Calculer les temps
-                            mutated.compute_times_for_transport(new_t)
-                            
-                            # Ajouter le retour
-                            new_t.departure_B = new_t.unload_end_B
-                            mutated.compute_times_for_transport(new_t)
-                            
-                            # Remplacer l'ancien transport par le nouveau
-                            mutated.transports = [trans for trans in mutated.transports if trans != t]
-                            mutated.transports.append(new_t)
-                            
-                            # Mettre à jour les semaines d'utilisation des véhicules
-                            mutated.vehicles[(t.vehicle_type, t.vehicle_idx)].weeks_used.discard(week)
-                            mutated.vehicles[(vtype, idx)].weeks_used.add(week)
-                
-                elif op == "replace_vehicle" and week_transports:
-                    # Remplacer un véhicule par un autre du même type ou d'un autre type
-                    t = random.choice(week_transports)
-                    
-                    # Déterminer les types de véhicules possibles (avec capacité suffisante)
-                    possible_types = []
-                    for vtype in instance.L.keys():
-                        if t.weight_AB <= instance.L[vtype]["Qw"] and t.volume_AB <= instance.L[vtype]["Qv"]:
-                            possible_types.append(vtype)
-                    
-                    if possible_types and possible_types != [t.vehicle_type]:
-                        # Choisir un type différent si possible
-                        new_type = random.choice([vt for vt in possible_types if vt != t.vehicle_type] or possible_types)
-                        
-                        # Trouver un véhicule de ce type non utilisé cette semaine
-                        available_vehicles = []
-                        for idx in range(1, instance.m[new_type] + 1):
-                            if week not in mutated.vehicles[(new_type, idx)].weeks_used:
-                                available_vehicles.append(idx)
-                        
-                        if available_vehicles:
-                            new_idx = random.choice(available_vehicles)
-                            
-                            # Créer un nouveau transport avec le nouveau véhicule
-                            new_t = Transport(
-                                week=week,
-                                vehicle_idx=new_idx,
-                                vehicle_type=new_type,
-                                weight_AB=t.weight_AB,
-                                volume_AB=t.volume_AB,
-                                load_start_A=t.load_start_A,
-                                seq=1
-                            )
-                            
-                            # Calculer les temps
-                            mutated.compute_times_for_transport(new_t)
-                            
-                            # Ajouter le retour
-                            new_t.departure_B = new_t.unload_end_B
-                            mutated.compute_times_for_transport(new_t)
-                            
-                            # Remplacer l'ancien transport par le nouveau
-                            mutated.transports = [trans for trans in mutated.transports if trans != t]
-                            mutated.transports.append(new_t)
-                            
-                            # Mettre à jour les semaines d'utilisation des véhicules
-                            mutated.vehicles[(t.vehicle_type, t.vehicle_idx)].weeks_used.discard(week)
-                            mutated.vehicles[(new_type, new_idx)].weeks_used.add(week)
-        
-        # Réévaluer la solution mutée
-        mutated.evaluate()
-        
-        # Si la solution n'est pas faisable, la réparer
-        if not mutated.feasible:
-            repair_solution(mutated, instance)
-        
-        return mutated
-
-def local_search(solution, instance, max_iterations=50, no_improvement_limit=10):
-        """
-        Effectue une recherche locale pour améliorer la solution
-        
-        Args:
-            solution: Solution initiale
-            instance: Instance du problème
-            max_iterations: Nombre maximum d'itérations
-            no_improvement_limit: Nombre d'itérations sans amélioration avant arrêt
-            
-        Returns:
-            Solution: Solution améliorée
-        """
-        current = copy.deepcopy(solution)
-        best = copy.deepcopy(solution)
-        best_fitness = best.fitness
-        no_improvement_count = 0
-        
-        for iteration in range(max_iterations):
-            # Essayer différentes opérations de voisinage
-            # 1. Consolidation de véhicules
-            improved = consolidate_vehicles(current, instance)
-            if improved and improved.fitness < current.fitness:
-                current = improved
-                if current.fitness < best_fitness:
-                    best = copy.deepcopy(current)
-                    best_fitness = best.fitness
-                    no_improvement_count = 0
-                continue
-            
-            # 2. Réaffectation de charge
-            improved = reassign_load(current, instance)
-            if improved and improved.fitness < current.fitness:
-                current = improved
-                if current.fitness < best_fitness:
-                    best = copy.deepcopy(current)
-                    best_fitness = best.fitness
-                    no_improvement_count = 0
-                continue
-            
-            # 3. Changement de type de véhicule
-            improved = change_vehicle_type(current, instance)
-            if improved and improved.fitness < current.fitness:
-                current = improved
-                if current.fitness < best_fitness:
-                    best = copy.deepcopy(current)
-                    best_fitness = best.fitness
-                    no_improvement_count = 0
-                continue
-            
-            # Si aucune amélioration n'a été trouvée, incrémenter le compteur
-            no_improvement_count += 1
-            
-            # Si trop d'itérations sans amélioration, arrêter
-            if no_improvement_count >= no_improvement_limit:
-                break
-        
-        return best
-
-def consolidate_vehicles(solution, instance):
-        """
-        Tente de consolider les charges de plusieurs véhicules pour en utiliser moins
-        
-        Args:
-            solution: Solution à améliorer
-            instance: Instance du problème
-            
-        Returns:
-            Solution: Solution améliorée ou None si pas d'amélioration possible
-        """
-        improved = copy.deepcopy(solution)
-        
-        # Pour chaque semaine
-        for week in instance.T:
-            # Récupérer tous les transports de cette semaine
-            week_transports = [t for t in improved.transports if t.week == week]
-            
-            # Parcourir tous les transports de cette semaine
-            for i in range(len(week_transports)):
-                if week_transports[i] is None:  # Si le transport a déjà été fusionné
-                    continue
-                    
-                t1 = week_transports[i]
-                
-                # Chercher un autre transport qui pourrait être fusionné avec celui-ci
-                for j in range(i+1, len(week_transports)):
-                    if week_transports[j] is None:  # Si le transport a déjà été fusionné
-                        continue
-                        
-                    t2 = week_transports[j]
-                    
-                    # Vérifier si les deux transports peuvent être fusionnés
-                    # (même type de véhicule ou un autre type disponible avec capacité suffisante)
-                    can_merge = False
-                    merged_vehicle_type = None
-                    merged_vehicle_idx = None
-                    
-                    # Cas 1: même type de véhicule, fusionner dans l'un des deux véhicules
-                    if t1.vehicle_type == t2.vehicle_type:
-                        capacity_w = instance.L[t1.vehicle_type]["Qw"]
-                        capacity_v = instance.L[t1.vehicle_type]["Qv"]
-                        
-                        if (t1.weight_AB + t2.weight_AB <= capacity_w and
-                            t1.volume_AB + t2.volume_AB <= capacity_v):
-                            can_merge = True
-                            merged_vehicle_type = t1.vehicle_type
-                            merged_vehicle_idx = t1.vehicle_idx
-                    
-                    # Cas 2: différents types de véhicules, chercher un véhicule avec capacité suffisante
-                    else:
-                        for vtype in instance.L.keys():
-                            capacity_w = instance.L[vtype]["Qw"]
-                            capacity_v = instance.L[vtype]["Qv"]
-                            
-                            if (t1.weight_AB + t2.weight_AB <= capacity_w and
-                                t1.volume_AB + t2.volume_AB <= capacity_v):
-                                
-                                # Chercher un véhicule disponible de ce type
-                                for idx in range(1, instance.m[vtype] + 1):
-                                    if (vtype != t1.vehicle_type or idx != t1.vehicle_idx) and \
-                                    (vtype != t2.vehicle_type or idx != t2.vehicle_idx) and \
-                                    week not in improved.vehicles[(vtype, idx)].weeks_used:
-                                        can_merge = True
-                                        merged_vehicle_type = vtype
-                                        merged_vehicle_idx = idx
-                                        break
-                                
-                                if can_merge:
-                                    break
-                    
-                    if can_merge:
-                        # Fusionner les deux transports
-                        merged_transport = Transport(
-                            week=week,
-                            vehicle_idx=merged_vehicle_idx,
-                            vehicle_type=merged_vehicle_type,
-                            weight_AB=t1.weight_AB + t2.weight_AB,
-                            volume_AB=t1.volume_AB + t2.volume_AB,
-                            load_start_A=min(t1.load_start_A, t2.load_start_A) if t2.load_start_A is not None else t1.load_start_A,
-                            seq=1
-                        )
-                        
-                        # Calculer les temps pour le nouveau transport
-                        improved.compute_times_for_transport(merged_transport)
-                        
-                        # Ajouter le retour
-                        merged_transport.departure_B = merged_transport.unload_end_B
-                        improved.compute_times_for_transport(merged_transport)
-                        
-                        # Supprimer les anciens transports et ajouter le nouveau
-                        improved.transports = [t for t in improved.transports if t != t1 and t != t2]
-                        improved.transports.append(merged_transport)
-                        
-                        # Mettre à jour les semaines d'utilisation des véhicules
-                        improved.vehicles[(t1.vehicle_type, t1.vehicle_idx)].weeks_used.discard(week)
-                        improved.vehicles[(t2.vehicle_type, t2.vehicle_idx)].weeks_used.discard(week)
-                        improved.vehicles[(merged_vehicle_type, merged_vehicle_idx)].weeks_used.add(week)
-                                
-                        # Marquer comme fusionnés
-                        week_transports[i] = None
-                        week_transports[j] = None
-                                
-                        # Sortir des boucles
-                        break
-                    
-                if week_transports[i] is None:  # Si fusion réussie, passer au prochain transport
-                    break
-        
-        # Évaluer la solution améliorée
-        improved.evaluate()
-        
-        # Retourner la solution améliorée si elle est meilleure ou la même
-        if improved.feasible and improved.fitness <= solution.fitness:
-            return improved
-        else:
-            return None
-
-def reassign_load(solution, instance):
-        """
-        Tente de réaffecter des charges entre véhicules pour mieux utiliser les capacités
-        
-        Args:
-            solution: Solution à améliorer
-            instance: Instance du problème
-            
-        Returns:
-            Solution: Solution améliorée ou None si pas d'amélioration possible
-        """
-        improved = copy.deepcopy(solution)
-        
-        # Pour chaque semaine
-        for week in instance.T:
-            # Récupérer tous les transports de cette semaine
-            week_transports = [t for t in improved.transports if t.week == week]
-            
-            # Parcourir toutes les paires de transports
-            for i in range(len(week_transports)):
-                t1 = week_transports[i]
-                
-                for j in range(len(week_transports)):
-                    if i == j:
-                        continue
-                    
-                    t2 = week_transports[j]
-                    
-                    # Vérifier si une réaffectation est possible
-                    # (par exemple, transférer une partie de la charge de t1 à t2)
-                    if t1.weight_AB > 0 and t1.volume_AB > 0:
-                        # Vérifier si t2 a de la capacité restante
-                        capacity_w_t2 = instance.L[t2.vehicle_type]["Qw"] - t2.weight_AB
-                        capacity_v_t2 = instance.L[t2.vehicle_type]["Qv"] - t2.volume_AB
-                        
-                        if capacity_w_t2 > 0 and capacity_v_t2 > 0:
-                            # Calculer la quantité à transférer (au plus 50%)
-                            transfer_ratio = min(0.5, min(capacity_w_t2 / t1.weight_AB, capacity_v_t2 / t1.volume_AB))
-                            
-                            if transfer_ratio > 0.1:  # Transférer au moins 10%
-                                weight_to_transfer = t1.weight_AB * transfer_ratio
-                                volume_to_transfer = t1.volume_AB * transfer_ratio
-                                
-                                # Mettre à jour les charges
-                                t1.weight_AB -= weight_to_transfer
-                                t1.volume_AB -= volume_to_transfer
-                                t2.weight_AB += weight_to_transfer
-                                t2.volume_AB += volume_to_transfer
-                                
-                                # Recalculer les temps pour les deux transports
-                                improved.compute_times_for_transport(t1)
-                                improved.compute_times_for_transport(t2)
-        
-        # Évaluer la solution améliorée
-        improved.evaluate()
-        
-        # Vérifier si la solution est meilleure
-        if improved.feasible and improved.fitness <= solution.fitness:
-            return improved
-        else:
-            return None
-
-def change_vehicle_type(solution, instance):
-        """
-        Tente de remplacer un véhicule par un autre type qui serait plus adapté
-        
-        Args:
-            solution: Solution à améliorer
-            instance: Instance du problème
-            
-        Returns:
-            Solution: Solution améliorée ou None si pas d'amélioration possible
-        """
-        improved = copy.deepcopy(solution)
-        
-        # Pour chaque semaine
-        for week in instance.T:
-            # Récupérer tous les transports de cette semaine par véhicule
-            transports_by_vehicle = {}
-            for t in improved.transports:
-                if t.week == week:
-                    key = (t.vehicle_type, t.vehicle_idx)
-                    if key not in transports_by_vehicle:
-                        transports_by_vehicle[key] = []
-                    transports_by_vehicle[key].append(t)
-            
-            # Pour chaque véhicule utilisé cette semaine
-            for (vtype, vidx), transports in transports_by_vehicle.items():
-                # Calculer la charge totale de ce véhicule
-                total_weight = sum(t.weight_AB for t in transports)
-                total_volume = sum(t.volume_AB for t in transports)
-                
-                # Chercher un type de véhicule plus adapté
-                for new_type in instance.L.keys():
-                    if new_type != vtype:
-                        # Vérifier si le nouveau type peut contenir toutes les charges
-                        if (total_weight <= instance.L[new_type]["Qw"] and 
-                            total_volume <= instance.L[new_type]["Qv"]):
-                            
-                            # Vérifier s'il y a un véhicule disponible du nouveau type
-                            available_vehicles = []
-                            for i in range(1, instance.m[new_type] + 1):
-                                # Vérifier si ce véhicule est disponible cette semaine
-                                if week not in improved.vehicles[(new_type, i)].weeks_used:
-                                    available_vehicles.append(i)
-                            
-                            if available_vehicles:
-                                # Sélectionner un véhicule disponible
-                                new_idx = min(available_vehicles)
-                                
-                                # Calculer le coût avant et après changement
-                                cost_before = instance.c[vtype]
-                                cost_after = instance.c[new_type]
-                                
-                                # Si le coût diminue ou reste le même, faire le changement
-                                if cost_after <= cost_before:
-                                    # Mettre à jour tous les transports de ce véhicule
-                                    for t in transports:
-                                        t.vehicle_type = new_type
-                                        t.vehicle_idx = new_idx
-                                        
-                                        # Recalculer les temps
-                                        improved.compute_times_for_transport(t)
-                                    
-                                    # Mettre à jour l'utilisation des véhicules
-                                    improved.vehicles[(vtype, vidx)].weeks_used.discard(week)
-                                    improved.vehicles[(new_type, new_idx)].weeks_used.add(week)
-        
-        # Évaluer la solution améliorée
-        improved.evaluate()
-        
-        # Vérifier si la solution est meilleure
-        if improved.feasible and improved.fitness <= solution.fitness:
-            return improved
-        else:
-            return None
-
-def balance_loads(solution, instance):
-        """
-        Tente de mieux équilibrer les charges entre les semaines pour réduire le nombre de véhicules
-        
-        Args:
-            solution: Solution à améliorer
-            instance: Instance du problème
-            
-        Returns:
-            Solution: Solution améliorée ou None si pas d'amélioration possible
-        """
-        improved = copy.deepcopy(solution)
-        
-        # Calculer l'utilisation des véhicules par semaine
-        vehicles_by_week = {}
-        for week in instance.T:
-            vehicles_by_week[week] = set()
-            for t in improved.transports:
-                if t.week == week:
-                    vehicles_by_week[week].add((t.vehicle_type, t.vehicle_idx))
-        
-        # Identifier les semaines avec peu de véhicules et les semaines chargées
-        light_weeks = sorted(instance.T, key=lambda w: len(vehicles_by_week[w]))
-        heavy_weeks = sorted(instance.T, key=lambda w: len(vehicles_by_week[w]), reverse=True)
-        
-        # Essayer de déplacer des charges des semaines chargées vers les semaines légères
-        for heavy_week in heavy_weeks[:3]:  # Essayer avec les 3 semaines les plus chargées
-            for light_week in light_weeks[:3]:  # Essayer avec les 3 semaines les moins chargées
-                if heavy_week == light_week:
-                    continue
-                    
-                # Vérifier si la semaine légère a des véhicules disponibles
-                heavy_vehicles = vehicles_by_week[heavy_week]
-                light_vehicles = vehicles_by_week[light_week]
-                
-                # Trouver des véhicules utilisés dans la semaine chargée mais pas dans la légère
-                for vtype, vidx in heavy_vehicles:
-                    if (vtype, vidx) not in light_vehicles:
-                        # Ce véhicule pourrait être utilisé dans la semaine légère
-                        # Chercher un transport de la semaine chargée qu'on pourrait déplacer
-                        for t in improved.transports:
-                            if t.week == heavy_week and t.vehicle_type == vtype and t.vehicle_idx == vidx:
-                                # Vérifier si ce transport peut être déplacé vers la semaine légère
-                                # (c'est une heuristique simple, on vérifie juste les capacités)
-                                can_move = True
-                                
-                                if can_move:
-                                    # Déplacer le transport vers la semaine légère
-                                    t.week = light_week
-                                    
-                                    # Mettre à jour l'utilisation des véhicules
-                                    improved.vehicles[(vtype, vidx)].weeks_used.add(light_week)
-                                    
-                                    # Vérifier si c'était le seul transport de ce véhicule dans la semaine chargée
-                                    remaining_transports = [t2 for t2 in improved.transports 
-                                                        if t2.week == heavy_week and 
-                                                        t2.vehicle_type == vtype and 
-                                                        t2.vehicle_idx == vidx]
-                                    
-                                    if not remaining_transports:
-                                        improved.vehicles[(vtype, vidx)].weeks_used.discard(heavy_week)
-                                        vehicles_by_week[heavy_week].discard((vtype, vidx))
-                                    
-                                    # Ajouter à la liste des véhicules de la semaine légère
-                                    vehicles_by_week[light_week].add((vtype, vidx))
-                                    
-                                    # Réévaluer si c'est faisable
-                                    improved.evaluate()
-                                    if not improved.feasible:
-                                        # Si non faisable, réparer la solution
-                                        repair_solution(improved, instance)
-                                        
-                                    # Vérifier si on a réduit le nombre total de véhicules
-                                    if improved.fitness < solution.fitness:
-                                        return improved
-        
-        return None
-def memetic_algorithm(instance, population_size=20, generations=100, mutation_rate=0.3, local_search_freq=5):
-        """
-        Algorithme mémétique pour résoudre le problème de transport
-        
-        Args:
-            instance: Instance du problème
-            population_size: Taille de la population
-            generations: Nombre de générations
-            mutation_rate: Taux de mutation
-            local_search_freq: Fréquence d'application de la recherche locale (toutes les x générations)
-            
-        Returns:
-            Solution: Meilleure solution trouvée
-        """
-        # Générer la population initiale
-        population = []
-        for _ in range(population_size):
-            solution = greedy_initial_solution(instance)
-            population.append(solution)
-        
-        # Évaluer la population initiale
-        for solution in population:
-            solution.evaluate()
-        
-        # Meilleure solution trouvée
-        best_solution = min(population, key=lambda s: s.fitness)
-        
-        # Boucle principale de l'algorithme
-        for gen in range(generations):
-            # Afficher la progression
-            if gen % 10 == 0:
-                print(f"Génération {gen}/{generations}, meilleure fitness: {best_solution.fitness}")
-            
-            # Appliquer la recherche locale périodiquement
-            if gen % local_search_freq == 0:
-                # Appliquer la recherche locale sur une partie de la population
-                for i in range(min(5, population_size)):
-                    # Sélectionner un individu aléatoire
-                    index = random.randint(0, population_size - 1)
-                    # Appliquer la recherche locale
-                    improved = local_search(population[index], instance)
-                    # Remplacer si amélioré
-                    if improved.fitness < population[index].fitness:
-                        population[index] = improved
-                        # Mettre à jour la meilleure solution si nécessaire
-                        if improved.fitness < best_solution.fitness:
-                            best_solution = copy.deepcopy(improved)
-            
-            # Créer une nouvelle génération
-            new_population = []
-            
-            # Élitisme: garder les 2 meilleures solutions
-            sorted_population = sorted(population, key=lambda s: s.fitness)
-            new_population.extend(copy.deepcopy(sorted_population[:2]))
-            
-            # Remplir le reste de la population avec des enfants
-            while len(new_population) < population_size:
-                # Sélectionner deux parents
-                parent1 = tournament_selection(population)
-                parent2 = tournament_selection(population)
-                
-                # Croisement
-                child = crossover(parent1, parent2, instance)
-                
-                # Mutation
-                if random.random() < mutation_rate:
-                    child = mutate(child, instance)
-                
-                # Ajouter l'enfant à la nouvelle population
-                new_population.append(child)
-            
-            # Remplacer l'ancienne population
-            population = new_population
-            
-            # Mettre à jour la meilleure solution
-            current_best = min(population, key=lambda s: s.fitness)
-            if current_best.fitness < best_solution.fitness:
-                best_solution = copy.deepcopy(current_best)
-        
-        # Appliquer une dernière recherche locale à la meilleure solution
-        final_solution = local_search(best_solution, instance)
-        if final_solution.fitness < best_solution.fitness:
-            best_solution = final_solution
-        
-        return best_solution
-
-def tournament_selection(population, tournament_size=3):
-        """
-        Sélection par tournoi
-        
-        Args:
-            population: Population actuelle
-            tournament_size: Taille du tournoi
-            
-        Returns:
-            Solution: Solution sélectionnée
-        """
-        # Sélectionner aléatoirement des individus pour le tournoi
-        tournament = random.sample(population, tournament_size)
-        
-        # Retourner le meilleur
-        return min(tournament, key=lambda s: s.fitness)
-
-def save_solution(solution, filename):
-        """
-        Sauvegarde une solution dans un fichier JSON
-        
-        Args:
-            solution: Solution à sauvegarder
-            filename: Nom du fichier
-        """
-        # Convertir la solution en dictionnaire
-        solution_dict = {
-            "fitness": solution.fitness,
-            "feasible": solution.feasible,
-            "vehicles_used": sum(1 for v in solution.vehicles.values() if v.is_used()),
-            "transports": []
-        }
-        
-        # Ajouter les transports
-        for t in solution.transports:
-            transport_dict = {
-                "week": t.week,
-                "vehicle_type": t.vehicle_type,
-                "vehicle_idx": t.vehicle_idx,
-                "weight_AB": t.weight_AB,
-                "volume_AB": t.volume_AB,
-                "load_start_A": t.load_start_A,
-                "load_end_A": t.load_end_A,
-                "departure_A": t.departure_A,
-                "arrival_B": t.arrival_B,
-                "unload_start_B": t.unload_start_B,
-                "unload_end_B": t.unload_end_B,
-                "departure_B": t.departure_B,
-                "arrival_A": t.arrival_A,
-                "breaks_AB": t.breaks_AB,
-                "breaks_BA": t.breaks_BA,
-                "seq": t.seq
-            }
-            solution_dict["transports"].append(transport_dict)
-        
-        # Écrire dans le fichier
-        with open(filename, 'w') as f:
-            json.dump(solution_dict, f, indent=4)
-        
-        print(f"Solution sauvegardée dans le fichier {filename}")
-
-def export_to_ms_project_csv(solution, filename):
-    """
-    Exporte une solution au format CSV compatible avec MS Project
-    
-    Args:
-        solution: Solution à exporter
-        filename: Nom du fichier CSV
-    """
-    import csv
-    from datetime import datetime, timedelta
-    
-    # Définir la date de début du projet (par défaut: aujourd'hui)
-    start_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    
-    # En-têtes du CSV compatibles avec MS Project
-    headers = [
-        "ID", "Name", "Duration", "Start", "Finish", "Predecessors", 
-        "Resource Names", "Notes", "% Complete", "Priority"
-    ]
-    
-    # Créer la liste des tâches
-    tasks = []
-    
-    # Ajouter une tâche de projet principale
-    tasks.append({
-        "ID": 1,
-        "Name": f"Plan de transport ({len(solution.transports)} opérations)",
-        "Duration": f"{len(solution.instance.T)}w",  # Durée en semaines
-        "Start": start_date.strftime("%Y-%m-%d"),
-        "Finish": (start_date + timedelta(weeks=len(solution.instance.T))).strftime("%Y-%m-%d"),
-        "Predecessors": "",
-        "Resource Names": "",
-        "Notes": "Plan de transport généré automatiquement",
-        "% Complete": 0,
-        "Priority": "Normal"
-    })
-    
-    task_id = 2
-    
-    # Ajouter une tâche récapitulative pour chaque semaine
-    for week in solution.instance.T:
-        week_start = start_date + timedelta(weeks=week-1)
-        week_end = start_date + timedelta(weeks=week)
-        week_transports = [t for t in solution.transports if t.week == week]
-        
-        if not week_transports:
-            continue
-            
-        # Tâche récapitulative pour la semaine
-        tasks.append({
-            "ID": task_id,
-            "Name": f"Semaine {week}",
-            "Duration": "1w",
-            "Start": week_start.strftime("%Y-%m-%d"),
-            "Finish": week_end.strftime("%Y-%m-%d"),
-            "Predecessors": "",
-            "Resource Names": "",
-            "Notes": f"Transports de la semaine {week}",
-            "% Complete": 0,
-            "Priority": "Normal"
-        })
-        
-        week_task_id = task_id
-        task_id += 1
-        
-        # Trier les transports par véhicule et séquence
-        week_transports.sort(key=lambda t: (t.vehicle_type, t.vehicle_idx, t.seq))
-        
-        # Regrouper par véhicule
-        vehicles_in_week = {}
-        for t in week_transports:
-            key = (t.vehicle_type, t.vehicle_idx)
-            if key not in vehicles_in_week:
-                vehicles_in_week[key] = []
-            vehicles_in_week[key].append(t)
-        
-        # Pour chaque véhicule utilisé dans la semaine
-        for (vtype, vidx), vehicle_transports in vehicles_in_week.items():
-            # Récupérer l'immatriculation et le type du véhicule
-            vehicle_plate = solution.instance.get_vehicle_plate(vtype, vidx) if hasattr(solution.instance, "get_vehicle_plate") else f"V{vtype}-{vidx}"
-            vehicle_type_name = solution.instance.get_vehicle_type_name(vtype) if hasattr(solution.instance, "get_vehicle_type_name") else f"Type {vtype}"
-            
-            # Calculer les heures pour les transports sans horaires définis
-            for transport in vehicle_transports:
-                if (transport.load_end_A is None or transport.departure_A is None or 
-                    transport.arrival_B is None or transport.unload_start_B is None or 
-                    transport.unload_end_B is None):
-                    solution.compute_times_for_transport(transport)
-            
-            # Tâche récapitulative pour le véhicule
-            tasks.append({
-                "ID": task_id,
-                "Name": f"Véhicule {vehicle_plate} ({vehicle_type_name})",
-                "Duration": "1d",  # Durée d'une journée (approximative)
-                "Start": week_start.strftime("%Y-%m-%d"),
-                "Finish": week_start.strftime("%Y-%m-%d"),
-                "Predecessors": week_task_id,
-                "Resource Names": vehicle_plate,
-                "Notes": f"Opérations du véhicule {vehicle_plate} pour la semaine {week}",
-                "% Complete": 0,
-                "Priority": "Normal"
-            })
-            
-            vehicle_task_id = task_id
-            task_id += 1
-            
-            prev_task_id = None
-            
-            # Pour chaque transport du véhicule
-            for transport in vehicle_transports:
-                # Convertir les heures en format datetime
-                base_date = week_start.date()
-                
-                # Fonction pour convertir une heure décimale en format HH:MM
-                def format_project_time(hour_decimal, base_date):
-                    hours = int(hour_decimal)
-                    minutes = int((hour_decimal - hours) * 60)
-                    dt = datetime.combine(base_date, datetime.min.time())
-                    dt = dt.replace(hour=hours, minute=minutes)
-                    return dt.strftime("%Y-%m-%d %H:%M")
-                
-                # Calculer la durée des opérations en minutes (pour MS Project)
-                def calc_duration_minutes(start_time, end_time):
-                    return int((end_time - start_time) * 60)
-                
-                # 1. Chargement au site A
-                load_duration_minutes = calc_duration_minutes(transport.load_start_A, transport.load_end_A)
-                tasks.append({
-                    "ID": task_id,
-                    "Name": f"Chargement (SEQ {transport.seq})",
-                    "Duration": f"{load_duration_minutes}m",
-                    "Start": format_project_time(transport.load_start_A, base_date),
-                    "Finish": format_project_time(transport.load_end_A, base_date),
-                    "Predecessors": f"{vehicle_task_id}{';' + str(prev_task_id) if prev_task_id else ''}",
-                    "Resource Names": vehicle_plate,
-                    "Notes": f"Chargement de {transport.weight_AB:.1f} kg / {transport.volume_AB:.1f} m³",
-                    "% Complete": 0,
-                    "Priority": "Normal"
-                })
-                
-                loading_task_id = task_id
-                task_id += 1
-                
-                # 2. Trajet A → B
-                travel_AB_duration_minutes = calc_duration_minutes(transport.departure_A, transport.arrival_B)
-                tasks.append({
-                    "ID": task_id,
-                    "Name": f"Trajet A→B (SEQ {transport.seq})",
-                    "Duration": f"{travel_AB_duration_minutes}m",
-                    "Start": format_project_time(transport.departure_A, base_date),
-                    "Finish": format_project_time(transport.arrival_B, base_date),
-                    "Predecessors": loading_task_id,
-                    "Resource Names": vehicle_plate,
-                    "Notes": f"Transport A→B avec {transport.breaks_AB} pauses",
-                    "% Complete": 0,
-                    "Priority": "Normal"
-                })
-                
-                travel_AB_task_id = task_id
-                task_id += 1
-                
-                # 3. Déchargement au site B
-                unload_duration_minutes = calc_duration_minutes(transport.unload_start_B, transport.unload_end_B)
-                tasks.append({
-                    "ID": task_id,
-                    "Name": f"Déchargement (SEQ {transport.seq})",
-                    "Duration": f"{unload_duration_minutes}m",
-                    "Start": format_project_time(transport.unload_start_B, base_date),
-                    "Finish": format_project_time(transport.unload_end_B, base_date),
-                    "Predecessors": travel_AB_task_id,
-                    "Resource Names": vehicle_plate,
-                    "Notes": f"Déchargement de {transport.weight_AB:.1f} kg / {transport.volume_AB:.1f} m³",
-                    "% Complete": 0,
-                    "Priority": "Normal"
-                })
-                
-                unload_task_id = task_id
-                task_id += 1
-                
-                # 4. Trajet B → A (si présent)
-                if transport.departure_B is not None and transport.arrival_A is not None:
-                    travel_BA_duration_minutes = calc_duration_minutes(transport.departure_B, transport.arrival_A)
-                    tasks.append({
-                        "ID": task_id,
-                        "Name": f"Retour B→A (SEQ {transport.seq})",
-                        "Duration": f"{travel_BA_duration_minutes}m",
-                        "Start": format_project_time(transport.departure_B, base_date),
-                        "Finish": format_project_time(transport.arrival_A, base_date),
-                        "Predecessors": unload_task_id,
-                        "Resource Names": vehicle_plate,
-                        "Notes": f"Retour B→A avec {transport.breaks_BA} pauses",
-                        "% Complete": 0,
-                        "Priority": "Normal"
-                    })
-                    prev_task_id = task_id
-                else:
-                    prev_task_id = unload_task_id
-                
-                task_id += 1
-    
-    # Écrire dans le fichier CSV
-    with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=headers)
-        writer.writeheader()
-        for task in tasks:
-            writer.writerow(task)
-    
-    print(f"Solution exportée au format MS Project CSV dans {filename}")
-
-def visualize_solution(solution, instance):
-        """
-        Visualise la solution avec matplotlib
-        
-        Args:
-            solution: Solution à visualiser
-            instance: Instance du problème
-        """
-        try:
-            import matplotlib.pyplot as plt # type: ignore
-            import matplotlib.patches as patches # type: ignore
-            import numpy as np
-        except ImportError:
-            print("Matplotlib non disponible, visualisation impossible")
-            return
-        
-        # Configurer le graphique
-        fig, ax = plt.subplots(figsize=(15, 10))
-        
-        # Couleurs pour les différents types de véhicules
-        # Couleurs pour les différents types de véhicules
-        colors = {
-            1: 'lightblue',
-            2: 'lightgreen',
-            # Ajoutez d'autres types si nécessaire
-        }
-
-        # Couleur par défaut pour les types de véhicules non définis
-        default_vehicle_color = 'gray'
-        
-        # Pour chaque semaine
-        for week in instance.T:
-            # Récupérer les transports de cette semaine
-            week_transports = [t for t in solution.transports if t.week == week]
-            
-            # Trier par véhicule et séquence
-            week_transports.sort(key=lambda t: (t.vehicle_type, t.vehicle_idx, t.seq))
-            
-            # Afficher chaque transport
-            y_pos = week
-            for i, transport in enumerate(week_transports):
-                # Calculer les positions temporelles
-                if transport.load_start_A is None or transport.arrival_A is None:
-                    solution.compute_times_for_transport(transport)
-                
-                # Calculer la largeur de chaque bloc
-                load_width = transport.load_end_A - transport.load_start_A
-                travel_AB_width = transport.arrival_B - transport.departure_A
-                unload_width = transport.unload_end_B - transport.unload_start_B
-                
-                if transport.departure_B is not None:
-                    travel_BA_width = transport.arrival_A - transport.departure_B
-                else:
-                    travel_BA_width = 0
-                
-                # Dessiner les blocs
-                # Chargement
-                ax.add_patch(
-                    patches.Rectangle(
-                        (transport.load_start_A, y_pos - 0.3),
-                        load_width,
-                        0.6,
-                        facecolor=colors.get(transport.vehicle_type, default_vehicle_color),
-                        alpha=0.7,
-                        edgecolor='black'
-                    )
-                )
-                ax.text(transport.load_start_A + load_width/2, y_pos, 
-                    f"Load\n{transport.weight_AB:.1f}kg/{transport.volume_AB:.1f}m³", 
-                    ha='center', va='center', fontsize=8)
-                
-                # Trajet A→B
-                ax.add_patch(
-                    patches.Rectangle(
-                        (transport.departure_A, y_pos - 0.3),
-                        travel_AB_width,
-                        0.6,
-                        facecolor='lightcoral',
-                        alpha=0.7,
-                        edgecolor='black'
-                    )
-                )
-                ax.text(transport.departure_A + travel_AB_width/2, y_pos, 
-                    f"A→B\n{transport.breaks_AB} pauses", 
-                    ha='center', va='center', fontsize=8)
-                
-                # Déchargement
-                ax.add_patch(
-                    patches.Rectangle(
-                        (transport.unload_start_B, y_pos - 0.3),
-                        unload_width,
-                        0.6,
-                        facecolor=colors[transport.vehicle_type],
-                        alpha=0.7,
-                        edgecolor='black'
-                    )
-                )
-                ax.text(transport.unload_start_B + unload_width/2, y_pos, 
-                    "Unload", 
-                    ha='center', va='center', fontsize=8)
-                
-                # Trajet B→A (si retour)
-                if transport.departure_B is not None:
-                    ax.add_patch(
-                        patches.Rectangle(
-                            (transport.departure_B, y_pos - 0.3),
-                            travel_BA_width,
-                            0.6,
-                            facecolor='lightsalmon',
-                            alpha=0.7,
-                            edgecolor='black'
-                        )
-                    )
-                    ax.text(transport.departure_B + travel_BA_width/2, y_pos, 
-                        f"B→A\n{transport.breaks_BA} pauses", 
-                        ha='center', va='center', fontsize=8)
-                
-                # Étiquette pour le véhicule
-                ax.text(instance.T_start - 1, y_pos, 
-                    f"V{transport.vehicle_type}-{transport.vehicle_idx} #{transport.seq}", 
-                    ha='right', va='center', fontsize=10)
-        
-        # Configurer les axes
-        ax.set_xlim(instance.T_start - 2, instance.T_end + 2)
-        ax.set_ylim(0, len(instance.T) + 1)
-        ax.set_yticks(range(1, len(instance.T) + 1))
-        ax.set_yticklabels([f"Semaine {w}" for w in instance.T])
-        ax.set_xlabel('Heure de la journée')
-        ax.set_ylabel('Semaine')
-        ax.set_title(f'Planning des transports (Véhicules utilisés: {solution.fitness})')
-        
-        # Ajouter une grille
-        ax.grid(True, linestyle='--', alpha=0.6)
-        
-        # Ajouter une légende
-        legend_elements = [
-            patches.Patch(facecolor='lightblue', alpha=0.7, edgecolor='black', label='Véhicule Type 1'),
-            patches.Patch(facecolor='lightgreen', alpha=0.7, edgecolor='black', label='Véhicule Type 2'),
-            patches.Patch(facecolor='lightcoral', alpha=0.7 , edgecolor='black', label='Trajet A→B'),
-            patches.Patch(facecolor='lightsalmon', alpha=0.7, edgecolor='black', label='Trajet B→A')
-        ]
-
-
-def repair_solution(solution, instance):
-        """
-        Répare une solution non faisable en ajoutant des transports manquants
-        
-        Args:
-            solution: Solution à réparer
-            instance: Instance du problème
-        """
-        # Pour chaque semaine, vérifier si toutes les demandes sont satisfaites
-        for week in instance.T:
-            # Calculer les quantités déjà transportées cette semaine
-            transported_weight_AB = sum(t.weight_AB for t in solution.transports if t.week == week)
-            transported_volume_AB = sum(t.volume_AB for t in solution.transports if t.week == week)
-            
-            # Calculer les demandes restantes
-            remaining_weight_AB = max(0, instance.dw_AB[week] - transported_weight_AB)
-            remaining_volume_AB = max(0, instance.dv_AB[week] - transported_volume_AB)
-            
-            # S'il reste des demandes à satisfaire
-            if remaining_weight_AB > 0 or remaining_volume_AB > 0:
-                
-                # Chercher un véhicule disponible pour satisfaire les demandes restantes
-                # Préférer les véhicules déjà utilisés pour minimiser le nombre total
-                vehicles_used_this_week = {(t.vehicle_type, t.vehicle_idx) for t in solution.transports if t.week == week}
-                
-                # Trier les véhicules: d'abord ceux déjà utilisés dans d'autres semaines, puis les autres
-                vehicles_by_priority = []
-                
-                # D'abord, les véhicules déjà utilisés dans d'autres semaines (mais pas celle-ci)
-                for (vtype, idx), vehicle in solution.vehicles.items():
-                    if vehicle.is_used() and (vtype, idx) not in vehicles_used_this_week:
-                        vehicles_by_priority.append((vtype, idx))
-                
-                # Ensuite, les véhicules jamais utilisés
-                for (vtype, idx), vehicle in solution.vehicles.items():
-                    if not vehicle.is_used():
-                        vehicles_by_priority.append((vtype, idx))
-                
-                # Trier par capacité décroissante au sein de chaque groupe
-                vehicles_by_priority.sort(key=lambda v: instance.L[v[0]]["Qw"] + instance.L[v[0]]["Qv"], reverse=True)
-                
-                # Essayer d'assigner un véhicule
-                vehicle_assigned = False
-                for vtype, idx in vehicles_by_priority:
-                    capacity_w = instance.L[vtype]["Qw"]
-                    capacity_v = instance.L[vtype]["Qv"]
-                    
-                    # Vérifier si ce véhicule peut satisfaire les demandes restantes
-                    if remaining_weight_AB <= capacity_w and remaining_volume_AB <= capacity_v:
-                        
-                        # Créer un nouveau transport
-                        transport = Transport(
-                            week=week,
-                            vehicle_idx=idx,
-                            vehicle_type=vtype,
-                            weight_AB=remaining_weight_AB,
-                            volume_AB=remaining_volume_AB,
-                            load_start_A=instance.T_start,
-                            seq=1  # Par défaut, premier transport de la journée
-                        )
-                        
-                        # Calculer les temps pour le transport
-                        solution.compute_times_for_transport(transport)
-                        
-                        # Ajouter le retour
-                        transport.departure_B = transport.unload_end_B
-                        solution.compute_times_for_transport(transport)
-                        
-                        # Ajouter le transport à la solution
-                        solution.transports.append(transport)
-                        solution.vehicles[(vtype, idx)].weeks_used.add(week)
-                        
-                        vehicle_assigned = True
-                        break
-                
-                # Si aucun véhicule ne peut satisfaire toutes les demandes, utiliser plusieurs véhicules
-                if not vehicle_assigned:
-                    # Trier les types de véhicules par capacité décroissante
-                    vehicle_types = sorted(instance.L.keys(), 
-                                        key=lambda vt: instance.L[vt]["Qw"] + instance.L[vt]["Qv"], 
-                                        reverse=True)
-                    
-                    while remaining_weight_AB > 0 or remaining_volume_AB > 0:
-                        
-                        vehicle_assigned = False
-                        for vtype in vehicle_types:
-                            capacity_w = instance.L[vtype]["Qw"]
-                            capacity_v = instance.L[vtype]["Qv"]
-                            
-                            # Chercher un véhicule disponible de ce type
-                            for idx in range(1, instance.m[vtype] + 1):
-                                if (vtype, idx) not in vehicles_used_this_week:
-                                    # Calculer les quantités à transporter
-                                    weight_to_AB = min(remaining_weight_AB, capacity_w)
-                                    volume_to_AB = min(remaining_volume_AB, capacity_v)
-                                    
-                                    # Créer le transport
-                                    transport = Transport(
-                                        week=week,
-                                        vehicle_idx=idx,
-                                        vehicle_type=vtype,
-                                        weight_AB=weight_to_AB,
-                                        volume_AB=volume_to_AB,
-                                        load_start_A=instance.T_start,
-                                        seq=1  # Par défaut, premier transport de la journée
-                                    )
-                                    
-                                    # Calculer les temps pour le transport
-                                    solution.compute_times_for_transport(transport)
-                                    
-                                    # Ajouter le retour
-                                    transport.departure_B = transport.unload_end_B
-                                    solution.compute_times_for_transport(transport)
-                                    
-                                    # Ajouter le transport à la solution
-                                    solution.transports.append(transport)
-                                    solution.vehicles[(vtype, idx)].weeks_used.add(week)
-                                    
-                                    # Mettre à jour les demandes restantes
-                                    remaining_weight_AB -= weight_to_AB
-                                    remaining_volume_AB -= volume_to_AB
-                                    
-                                    # Marquer le véhicule comme utilisé cette semaine
-                                    vehicles_used_this_week.add((vtype, idx))
-                                    
-                                    vehicle_assigned = True
-                                    break
-                            
-                            if vehicle_assigned:
-                                break
-                        
-                        if not vehicle_assigned:
-                            # Si nous arrivons ici, c'est qu'aucun véhicule supplémentaire n'est disponible
-                            # Utiliser un véhicule déjà assigné pour cette semaine en ajoutant un second transport
-                            
-                            # Trouver un véhicule déjà utilisé cette semaine
-                            used_vehicles = []
-                            for t in solution.transports:
-                                if t.week == week:
-                                    used_vehicles.append((t.vehicle_type, t.vehicle_idx))
-                            
-                            if used_vehicles:
-                                vtype, idx = used_vehicles[0]
-                                capacity_w = instance.L[vtype]["Qw"]
-                                capacity_v = instance.L[vtype]["Qv"]
-                                
-                                # Trouver la dernière séquence pour ce véhicule
-                                last_seq = max([t.seq for t in solution.transports 
-                                            if t.week == week and t.vehicle_type == vtype and t.vehicle_idx == idx])
-                                
-                                # Trouver le dernier transport de ce véhicule
-                                last_transport = None
-                                for t in solution.transports:
-                                    if (t.week == week and t.vehicle_type == vtype and 
-                                        t.vehicle_idx == idx and t.seq == last_seq):
-                                        last_transport = t
-                                        break
-                                
-                                if last_transport:
-                                    # Calculer l'heure de début du nouveau transport
-                                    if last_transport.arrival_A is None:
-                                        solution.compute_times_for_transport(last_transport)
-                                    
-                                    next_start_time = last_transport.arrival_A
-                                    
-                                    # S'assurer que le prochain transport commence dans la journée de travail
-                                    if next_start_time <= instance.T_end - 1:  # Au moins 1h avant la fin
-                                        # Calculer les quantités à transporter
-                                        weight_to_AB = min(remaining_weight_AB, capacity_w)
-                                        volume_to_AB = min(remaining_volume_AB, capacity_v)
-                                        
-                                        # Créer le transport
-                                        transport = Transport(
-                                            week=week,
-                                            vehicle_idx=idx,
-                                            vehicle_type=vtype,
-                                            weight_AB=weight_to_AB,
-                                            volume_AB=volume_to_AB,
-                                            load_start_A=next_start_time,
-                                            seq=last_seq + 1
-                                        )
-                                        
-                                        # Calculer les temps
-                                        solution.compute_times_for_transport(transport)
-                                        
-                                        # Ajouter le retour
-                                        transport.departure_B = transport.unload_end_B
-                                        solution.compute_times_for_transport(transport)
-                                        
-                                        # Ajouter le transport à la solution
-                                        solution.transports.append(transport)
-                                        
-                                        # Mettre à jour les demandes restantes
-                                        remaining_weight_AB -= weight_to_AB
-                                        remaining_volume_AB -= volume_to_AB
-                                    else:
-                                        # Si pas assez de temps, forcer l'utilisation d'un autre véhicule
-                                        # ou arrêter (échec de l'opération de réparation)
-                                        pass
-                            else:
-                                # Si on arrive ici, c'est qu'il n'y a pas de solution possible
-                                break
-        
-        # Réévaluer la solution réparée
-        solution.evaluate()
-        
-        # Vérifier que la solution est maintenant faisable
-        if not solution.feasible:
-            print("ATTENTION: La solution n'a pas pu être réparée correctement!")
-
-def visualize_gantt(solution, instance, filename=None):
-    """
-    Visualise la solution sous forme de diagramme de Gantt
-    
-    Args:
-        solution: Solution à visualiser
-        instance: Instance du problème
-        filename: Nom du fichier pour sauvegarder le diagramme (optionnel)
-    """
-    try:
-        import matplotlib.pyplot as plt # type: ignore
-        import matplotlib.patches as patches # type: ignore
-        import matplotlib.colors as mcolors # type: ignore
-        import numpy as np
-    except ImportError:
-        print("Matplotlib non disponible, visualisation impossible")
-        return
-    
-    # Configuration du style
-    plt.style.use('ggplot')
-    
-    # Récupérer toutes les semaines où il y a des transports
-    weeks = sorted(set(t.week for t in solution.transports))
-    
-    # Calculer la hauteur de la figure en fonction du nombre de semaines
-    fig_height = max(10, 2 + len(weeks) * 2)
-    
-    # Configurer la figure
-    fig, ax = plt.subplots(figsize=(20, fig_height))
-    
-    # Palette de couleurs pour les différents types de véhicules
-    # Utiliser des couleurs distinctes pour une meilleure visibilité
-    import matplotlib.colors as mcolors
-
-# Palette de couleurs pour les différents types de véhicules
-    vehicle_colors = {
-        1: 'lightblue',
-        2: 'lightgreen',
-        # Ajoutez d'autres types si nécessaire
-    }
-
-    # Générer dynamiquement des couleurs pour les types non définis
-    def get_vehicle_color(vtype):
-        if vtype not in vehicle_colors:
-            # Générer une couleur unique pour ce type
-            color_list = list(colors.TABLEAU_COLORS.values())
-            vehicle_colors[vtype] = color_list[vtype % len(color_list)]
-        return vehicle_colors[vtype]
-    
-    # Couleurs pour les différentes activités
-    activity_colors = {
-        'loading': 'lightblue',
-        'travel_AB': 'lightcoral',
-        'unloading': 'lightgreen',
-        'travel_BA': 'lightsalmon',
-        'break': 'yellow'
-    }
-    
-    # Pour le tracking des positions verticales
-    y_positions = {}
-    max_y = 0
-    
-    # Pour chaque semaine
-    for week_idx, week in enumerate(weeks):
-        # Récupérer les transports de cette semaine
-        week_transports = [t for t in solution.transports if t.week == week]
-        
-        # Trier par véhicule et séquence
-        week_transports.sort(key=lambda t: (t.vehicle_type, t.vehicle_idx, t.seq))
-        
-        # Grouper par véhicule
-        vehicles_in_week = set((t.vehicle_type, t.vehicle_idx) for t in week_transports)
-        
-        # Pour chaque véhicule dans cette semaine
-        for i, (vtype, vidx) in enumerate(sorted(vehicles_in_week)):
-            # Position verticale de ce véhicule
-            y_pos = max_y + 1
-            y_positions[(week, vtype, vidx)] = y_pos
-            max_y = y_pos
-            
-            # Récupérer les transports pour ce véhicule cette semaine
-            veh_transports = [t for t in week_transports 
-                             if t.vehicle_type == vtype and t.vehicle_idx == vidx]
-            veh_transports.sort(key=lambda t: t.seq)
-            
-            # Étiquette pour le véhicule
-            vehicle_label = f"S{week}-V{vtype}-{vidx}"
-            ax.text(instance.T_start - 1, y_pos, vehicle_label, 
-                   ha='right', va='center', fontsize=10, fontweight='bold')
-            
-            # Dessiner une ligne horizontale pour ce véhicule
-            ax.axhline(y=y_pos, color='gray', linestyle='-', alpha=0.3)
-            
-            # Afficher chaque transport
-            for transport in veh_transports:
-                # S'assurer que les temps sont calculés
-                if transport.load_start_A is None or transport.arrival_A is None:
-                    solution.compute_times_for_transport(transport)
-                
-                # Couleur de base pour ce type de véhicule
-                base_color = get_vehicle_color(transport.vehicle_type)
-                
-                # Chargement
-                load_width = transport.load_end_A - transport.load_start_A
-                ax.add_patch(
-                    patches.Rectangle(
-                        (transport.load_start_A, y_pos - 0.4),
-                        load_width,
-                        0.8,
-                        facecolor=activity_colors['loading'],
-                        alpha=0.8,
-                        edgecolor='black',
-                        linewidth=1
-                    )
-                )
-                ax.text(transport.load_start_A + load_width/2, y_pos, 
-                       f"Load #{transport.seq}\n{transport.weight_AB:.1f}kg/{transport.volume_AB:.1f}m³", 
-                       ha='center', va='center', fontsize=8)
-                
-                # Trajet A→B avec pauses
-                travel_AB_width = transport.arrival_B - transport.departure_A
-                ax.add_patch(
-                    patches.Rectangle(
-                        (transport.departure_A, y_pos - 0.4),
-                        travel_AB_width,
-                        0.8,
-                        facecolor=activity_colors['travel_AB'],
-                        alpha=0.8,
-                        edgecolor='black',
-                        linewidth=1
-                    )
-                )
-                
-                # Représenter les pauses pendant le trajet A→B si présentes
-                if transport.breaks_AB > 0:
-                    # Calculer la durée de conduite continue
-                    drive_time = instance.d_AB / instance.V[transport.vehicle_type]
-                    segment_time = instance.T_drive
-                    break_time = instance.T_break
-                    
-                    # Calculer l'heure de chaque pause
-                    current_time = transport.departure_A
-                    for b in range(transport.breaks_AB):
-                        pause_start = current_time + segment_time
-                        ax.add_patch(
-                            patches.Rectangle(
-                                (pause_start, y_pos - 0.4),
-                                break_time,
-                                0.8,
-                                facecolor=activity_colors['break'],
-                                alpha=0.8,
-                                edgecolor='black',
-                                linewidth=1,
-                                hatch='///'
-                            )
-                        )
-                        current_time = pause_start + break_time
-                
-                ax.text(transport.departure_A + travel_AB_width/2, y_pos, 
-                       f"A→B\n{transport.breaks_AB} pauses", 
-                       ha='center', va='center', fontsize=8)
-                
-                # Déchargement
-                unload_width = transport.unload_end_B - transport.unload_start_B
-                ax.add_patch(
-                    patches.Rectangle(
-                        (transport.unload_start_B, y_pos - 0.4),
-                        unload_width,
-                        0.8,
-                        facecolor=activity_colors['unloading'],
-                        alpha=0.8,
-                        edgecolor='black',
-                        linewidth=1
-                    )
-                )
-                ax.text(transport.unload_start_B + unload_width/2, y_pos, 
-                       "Unload", 
-                       ha='center', va='center', fontsize=8)
-                
-                # Trajet B→A si retour
-                if transport.departure_B is not None and transport.arrival_A is not None:
-                    travel_BA_width = transport.arrival_A - transport.departure_B
-                    ax.add_patch(
-                        patches.Rectangle(
-                            (transport.departure_B, y_pos - 0.4),
-                            travel_BA_width,
-                            0.8,
-                            facecolor=activity_colors['travel_BA'],
-                            alpha=0.8,
-                            edgecolor='black',
-                            linewidth=1
-                        )
-                    )
-                    
-                    # Représenter les pauses pendant le trajet B→A si présentes
-                    if transport.breaks_BA > 0:
-                        drive_time = instance.d_BA / instance.V[transport.vehicle_type]
-                        segment_time = instance.T_drive
-                        break_time = instance.T_break
-                        
-                        current_time = transport.departure_B
-                        for b in range(transport.breaks_BA):
-                            pause_start = current_time + segment_time
-                            ax.add_patch(
-                                patches.Rectangle(
-                                    (pause_start, y_pos - 0.4),
-                                    break_time,
-                                    0.8,
-                                    facecolor=activity_colors['break'],
-                                    alpha=0.8,
-                                    edgecolor='black',
-                                    linewidth=1,
-                                    hatch='///'
-                                )
-                            )
-                            current_time = pause_start + break_time
-                    
-                    ax.text(transport.departure_B + travel_BA_width/2, y_pos, 
-                           f"B→A\n{transport.breaks_BA} pauses", 
-                           ha='center', va='center', fontsize=8)
-    
-    # Ajouter les heures de travail en arrière-plan
-    ax.axvspan(instance.T_start, instance.T_end, alpha=0.1, color='green')
-    
-    # Configurer les axes
-    ax.set_xlim(instance.T_start - 2, instance.T_end + 2)
-    ax.set_ylim(0, max_y + 1)
-    
-    # Ajouter des lignes pour les heures
-    for hour in range(int(instance.T_start), int(instance.T_end) + 1):
-        ax.axvline(x=hour, color='gray', linestyle='--', alpha=0.5)
-        
-    # Ajouter des lignes pour les demi-heures
-    for hour in range(int(instance.T_start), int(instance.T_end) + 1):
-        ax.axvline(x=hour + 0.5, color='gray', linestyle=':', alpha=0.3)
-    
-    # Configurer les étiquettes d'axe
-    ax.set_xlabel('Heure de la journée', fontsize=12)
-    ax.set_ylabel('Véhicules par semaine', fontsize=12)
-    ax.set_title('Diagramme de Gantt des transports', fontsize=14, fontweight='bold')
-    
-    # Créer une échelle d'heures pour l'axe X
-    hour_ticks = list(range(int(instance.T_start) - 1, int(instance.T_end) + 2))
-    ax.set_xticks(hour_ticks)
-    ax.set_xticklabels([f"{h}:00" for h in hour_ticks], rotation=45)
-    
-    # Ajouter une légende
-    legend_elements = [
-        patches.Patch(facecolor=activity_colors['loading'], alpha=0.8, edgecolor='black', label='Chargement'),
-        patches.Patch(facecolor=activity_colors['travel_AB'], alpha=0.8, edgecolor='black', label='Trajet A→B'),
-        patches.Patch(facecolor=activity_colors['unloading'], alpha=0.8, edgecolor='black', label='Déchargement'),
-        patches.Patch(facecolor=activity_colors['travel_BA'], alpha=0.8, edgecolor='black', label='Trajet B→A'),
-        patches.Patch(facecolor=activity_colors['break'], alpha=0.8, edgecolor='black', hatch='///', label='Pause')
-    ]
-    for vtype, color in vehicle_colors.items():
-        legend_elements.append(
-            patches.Patch(facecolor=color, alpha=0.8, edgecolor='black', 
-                        label=f'Véhicule Type {vtype}')
-        )
-    
-    ax.legend(handles=legend_elements, loc='upper center', 
-             bbox_to_anchor=(0.5, -0.05), fancybox=True, shadow=True, ncol=3)
-    
-    # Ajouter des informations sur la solution
-    vehicles_used = sum(1 for v in solution.vehicles.values() if v.is_used())
-    info_text = (f"Solution: {vehicles_used} véhicules distincts utilisés\n"
-                f"Transports totaux: {len(solution.transports)}\n"
-                f"Faisabilité: {'Oui' if solution.feasible else 'Non'}")
-    
-    plt.figtext(0.02, 0.02, info_text, fontsize=10, 
-               bbox=dict(facecolor='white', alpha=0.8, boxstyle='round,pad=0.5'))
-    
-    # Ajuster la mise en page
-    plt.tight_layout()
-    plt.subplots_adjust(bottom=0.15)
-    
-    # Sauvegarder le diagramme si un nom de fichier est spécifié
-    if filename:
-        plt.savefig(filename, dpi=300, bbox_inches='tight')
-        print(f"Diagramme Gantt sauvegardé dans {filename}")
-    
-    # Afficher le diagramme
-    plt.show()
-def is_optimal(solution, instance):
-        """
-        Vérifie si une solution est optimale (ou proche de l'optimal) en utilisant une borne inférieure simple
-        
-        Args:
-            solution: Solution à évaluer
-            instance: Instance du problème
-            
-        Returns:
-            bool: True si la solution est potentiellement optimale
-        """
-        # Calcul d'une borne inférieure simple: le nombre minimum de véhicules pour la semaine la plus chargée
-        min_vehicles_needed = float('inf')
-        
-        # Pour chaque semaine, calculer le nombre minimum de véhicules théoriques nécessaires
-        for week in instance.T:
-            # Demandes totales pour cette semaine
-            week_weight = instance.dw_AB[week]
-            week_volume = instance.dv_AB[week]
-            
-            # Calculer combien de véhicules de chaque type seraient nécessaires pour cette semaine
-            vehicles_needed_by_type = {}
-            for vtype in instance.L.keys():
-                # Nombre de véhicules basé sur le poids
-                veh_by_weight = math.ceil(week_weight / instance.L[vtype]["Qw"])
-                # Nombre de véhicules basé sur le volume
-                veh_by_volume = math.ceil(week_volume / instance.L[vtype]["Qv"])
-                # Prendre le maximum des deux
-                vehicles_needed_by_type[vtype] = max(veh_by_weight, veh_by_volume)
-            
-            # Considérer la stratégie optimale: utiliser d'abord les véhicules les plus grands
-            vehicles_sorted = sorted(instance.L.keys(), 
-                                key=lambda vt: instance.L[vt]["Qw"] + instance.L[vt]["Qv"], 
-                                reverse=True)
-            
-            # Calculer le nombre minimal de véhicules nécessaires en utilisant cette stratégie
-            remaining_weight = week_weight
-            remaining_volume = week_volume
-            vehicles_count = 0
-            
-            for vtype in vehicles_sorted:
-                veh_capacity_w = instance.L[vtype]["Qw"]
-                veh_capacity_v = instance.L[vtype]["Qv"]
-                veh_available = instance.m[vtype]
-                
-                for _ in range(veh_available):
-                    if remaining_weight <= 0 and remaining_volume <= 0:
-                        break
-                        
-                    # Ce véhicule peut transporter tout ou partie de ce qui reste
-                    weight_transported = min(remaining_weight, veh_capacity_w)
-                    volume_transported = min(remaining_volume, veh_capacity_v)
-                    
-                    if weight_transported > 0 or volume_transported > 0:
-                        remaining_weight -= weight_transported
-                        remaining_volume -= volume_transported
-                        vehicles_count += 1
-                    else:
-                        break
-            
-            # Si après avoir utilisé tous les véhicules disponibles, il reste des demandes
-            # c'est que la solution est infaisable
-            if remaining_weight > 0 or remaining_volume > 0:
-                print(f"Semaine {week}: Demandes trop élevées pour la flotte disponible!")
+            # Contrainte de poids (43)
+            total_weight = transport.total_weight(self.instance)
+            if total_weight > vehicle.weight_capacity:
                 return False
             
-            # Mettre à jour le minimum de véhicules nécessaires sur toutes les semaines
-            min_vehicles_needed = min(min_vehicles_needed, vehicles_count)
+            # Contrainte de volume (44)
+            total_volume = transport.total_volume(self.instance)
+            if total_volume > vehicle.volume_capacity:
+                return False
         
-        # Compter le nombre de véhicules distincts utilisés dans la solution
-        vehicles_used = sum(1 for vehicle in solution.vehicles.values() if vehicle.is_used())
-        
-        print(f"\nBorne inférieure théorique: {min_vehicles_needed} véhicule(s)")
-        print(f"Véhicules distincts utilisés: {vehicles_used}")
-        
-        # La solution est optimale si elle utilise exactement le nombre minimum de véhicules
-        return vehicles_used <= min_vehicles_needed
-def main():
-    """
-    Fonction principale pour exécuter l'algorithme de transport.
-    """
-    # Créer une instance du problème
-    instance = Instance()
+        return True
     
-    # Afficher les informations de l'instance
-    print("Instance créée avec succès :")
-    print(f"Nombre de semaines : {len(instance.T)}")
-    print(f"Types de véhicules disponibles : {instance.L}")
-    print(f"Nombre de véhicules par type : {instance.m}")
-    print("\nDemandes hebdomadaires :")
+    def _check_demand_satisfaction(self):
+        """Vérifie la satisfaction de la demande (45)"""
+        # Calculer les quantités transportées par semaine
+        transported_by_week = defaultdict(lambda: defaultdict(float))
+        
+        for transport in self.transports:
+            week = transport.week
+            for product_id, quantity in transport.products_transported.items():
+                transported_by_week[week][product_id] += quantity
+        
+        # Vérifier contre les demandes de l'instance
+        for week in self.instance.T:
+            # Convertir les demandes poids/volume en quantités de produits
+            # (simplification pour l'instant - utilise les demandes en poids/volume directement)
+            required_weight = self.instance.dw_AB[week]
+            required_volume = self.instance.dv_AB[week]
+            
+            transported_weight = sum(
+                quantity * getattr(self.instance, 'product_weights', {}).get(pid, 1.0)
+                for pid, quantity in transported_by_week[week].items()
+            )
+            
+            transported_volume = sum(
+                quantity * getattr(self.instance, 'product_volumes', {}).get(pid, 1.0)
+                for pid, quantity in transported_by_week[week].items()
+            )
+            
+            if transported_weight < required_weight or transported_volume < required_volume:
+                return False
+        
+        return True
+    
+    def _check_temporal_constraints(self):
+        """Vérifie les contraintes temporelles (56-58)"""
+        Hmax = 7.0  # 7 jours par semaine maximum
+        
+        for vehicle in self.vehicles.values():
+            if vehicle.is_used():
+                # Contrainte (56): δ = 1 ⟺ τ ≤ Hmax
+                vehicle.delta = vehicle.duration <= Hmax
+                
+                # Calcul du nombre de véhicules nécessaires (57)
+                if vehicle.delta:
+                    vehicle.num_units_used = 1
+                else:
+                    vehicle.num_units_used = math.ceil(vehicle.duration / Hmax)
+                
+                # Durée réelle ajustée (58)
+                vehicle.duration = min(vehicle.duration, Hmax)
+        
+        return True
+    
+    def _check_coherence_constraints(self):
+        """Vérifie les contraintes de cohérence (28-30)"""
+        M = 1000  # Grande constante
+        
+        for vtype in self.instance.L.keys():
+            vehicles_of_type = [self.vehicles[(vtype, i)] for i in range(1, self.instance.m[vtype] + 1)]
+            
+            # Contrainte (28): u_ℓ ≥ x_{ℓ,k}
+            type_used = self.u_types[vtype]
+            for vehicle in vehicles_of_type:
+                if vehicle.is_used() and not type_used:
+                    return False
+            
+            # Contrainte (29): u_ℓ ≤ Σ x_{ℓ,k}
+            if type_used and not any(v.is_used() for v in vehicles_of_type):
+                return False
+            
+            # Contrainte (30): n_{ℓ,k} ≤ M × x_{ℓ,k}
+            for vehicle in vehicles_of_type:
+                if vehicle.num_units_used > M and not vehicle.is_used():
+                    return False
+        
+        return True
+    
+    def _calculate_objective(self):
+        """
+        Calcule la fonction objectif (39): coûts fixes + coûts variables
+        """
+        total_cost = 0.0
+        
+        for vehicle in self.vehicles.values():
+            if vehicle.is_used():
+                vtype = vehicle.type
+                
+                # Coût fixe: n_{ℓ,k} × τ_{ℓ,k} × F_ℓ
+                fixed_cost = (vehicle.num_units_used * vehicle.duration * 
+                             self.instance.c[vtype])
+                
+                # Coût variable: m_{ℓ,k} × n_{ℓ,k} × (2D - D/n_{ℓ,k}) × G_ℓ
+                # Pour simplifier, on utilise G_ℓ = dc (coût de déplacement)
+                if vehicle.num_units_used > 0:
+                    variable_cost = (vehicle.num_trips * vehicle.num_units_used * 
+                                   (2 * self.instance.d_AB - self.instance.d_AB / vehicle.num_units_used) * 
+                                   self.instance.dc)
+                else:
+                    variable_cost = 0
+                
+                total_cost += fixed_cost + variable_cost
+        
+        self.total_cost = total_cost
+        return total_cost
+    
+    def __str__(self):
+        vehicles_used = sum(1 for v in self.vehicles.values() if v.is_used())
+        return f"MC_Solution(transports={len(self.transports)}, véhicules={vehicles_used}, " \
+               f"coût={self.total_cost:.2f}, faisable={self.feasible})"
+
+def mc_greedy_initial_solution(instance):
+    """
+    Génère une solution initiale gloutonne pour MC-SVRP-TC
+    Adapte l'approche existante au nouveau modèle
+    """
+    solution = MC_Solution(instance)
+    
+    # Pour chaque semaine
     for week in instance.T:
-        print(f"Semaine {week}: A→B: {instance.dw_AB[week]} kg, {instance.dv_AB[week]} m³")
+        # Demandes restantes (simplification: utilise poids/volume global)
+        remaining_weight = instance.dw_AB[week]
+        remaining_volume = instance.dv_AB[week]
+        
+        # Tant qu'il reste des demandes
+        while remaining_weight > 0 or remaining_volume > 0:
+            # Sélectionner le meilleur véhicule disponible
+            best_vehicle = None
+            best_efficiency = 0
+            
+            for (vtype, idx), vehicle in solution.vehicles.items():
+                if week not in vehicle.weeks_used:
+                    # Calculer l'efficacité (capacité / coût)
+                    capacity = vehicle.weight_capacity + vehicle.volume_capacity
+                    cost = instance.c[vtype]
+                    efficiency = capacity / cost if cost > 0 else 0
+                    
+                    # Vérifier si le véhicule peut satisfaire une partie des demandes
+                    can_handle_weight = vehicle.weight_capacity >= min(remaining_weight, vehicle.weight_capacity)
+                    can_handle_volume = vehicle.volume_capacity >= min(remaining_volume, vehicle.volume_capacity)
+                    
+                    if (can_handle_weight or can_handle_volume) and efficiency > best_efficiency:
+                        best_efficiency = efficiency
+                        best_vehicle = (vtype, idx)
+            
+            if best_vehicle is None:
+                # Aucun véhicule disponible - utiliser le premier disponible
+                for (vtype, idx), vehicle in solution.vehicles.items():
+                    if week not in vehicle.weeks_used:
+                        best_vehicle = (vtype, idx)
+                        break
+            
+            if best_vehicle is None:
+                # Aucun véhicule disponible du tout - forcer l'utilisation
+                best_vehicle = list(solution.vehicles.keys())[0]
+            
+            # Créer un transport avec ce véhicule
+            vtype, idx = best_vehicle
+            vehicle = solution.vehicles[best_vehicle]
+            
+            # Calculer les quantités à transporter
+            weight_to_transport = min(remaining_weight, vehicle.weight_capacity)
+            volume_to_transport = min(remaining_volume, vehicle.volume_capacity)
+            
+            # Créer un transport simplifié (sans produits détaillés pour l'instant)
+            transport = MC_Transport(
+                week=week,
+                vehicle_idx=idx,
+                vehicle_type=vtype,
+                products_transported={"generic": max(weight_to_transport, volume_to_transport)},
+                trip_sequence=len([t for t in solution.transports 
+                                 if t.week == week and t.vehicle_type == vtype and t.vehicle_idx == idx]) + 1,
+                instance=instance
+            )
+            
+            # Ajouter le transport
+            solution.transports.append(transport)
+            vehicle.weeks_used.add(week)
+            
+            # Mettre à jour les demandes restantes
+            remaining_weight = max(0, remaining_weight - weight_to_transport)
+            remaining_volume = max(0, remaining_volume - volume_to_transport)
     
-    # Résoudre le problème avec l'algorithme mémétique
-    print("\nExécution de l'algorithme mémétique...")
-    start_time = time.time()
-    best_solution = memetic_algorithm(instance)
-    end_time = time.time()
+    # Évaluer la solution
+    solution.evaluate()
+    return solution
+
+def mc_crossover(parent1, parent2, instance):
+    """
+    Croisement adapté pour MC-SVRP-TC
+    Combine les affectations de véhicules des deux parents
+    """
+    child = MC_Solution(instance)
     
-    # Afficher les résultats
-    print("\nMeilleure solution trouvée :")
-    print(best_solution.detailed_str())
+    # Pour chaque semaine, choisir les transports d'un parent
+    for week in instance.T:
+        source_parent = parent1 if random.random() < 0.5 else parent2
+        
+        # Copier les transports de cette semaine
+        week_transports = [t for t in source_parent.transports if t.week == week]
+        for transport in week_transports:
+            new_transport = MC_Transport(
+                week=transport.week,
+                vehicle_idx=transport.vehicle_idx,
+                vehicle_type=transport.vehicle_type,
+                products_transported=copy.deepcopy(transport.products_transported),
+                trip_sequence=transport.trip_sequence,
+                instance=instance
+            )
+            child.transports.append(new_transport)
     
-    # Sauvegarder la solution dans un fichier
-    save_solution(best_solution, "best_solution.json")
-    visualize_gantt(best_solution, instance, filename="gantt_diagram.png")
-    # Visualiser la solution
-    visualize_solution(best_solution, instance)
+    # Évaluer et réparer si nécessaire
+    child.evaluate()
+    if not child.feasible:
+        mc_repair_solution(child, instance)
     
-    # Vérifier si la solution est optimale
-    optimal = is_optimal(best_solution, instance)
-    print(f"\nLa solution est-elle optimale ? {'Oui' if optimal else 'Non'}")
+    return child
+
+def mc_repair_solution(solution, instance):
+    """
+    Répare une solution infaisable selon les contraintes MC-SVRP-TC
+    """
+    # Implémenter la réparation selon les contraintes spécifiques
+    for week in instance.T:
+        # Vérifier les demandes non satisfaites
+        week_transports = [t for t in solution.transports if t.week == week]
+        
+        # Calculer les quantités transportées
+        total_weight = sum(t.total_weight(instance) for t in week_transports)
+        total_volume = sum(t.total_volume(instance) for t in week_transports)
+        
+        # Si déficit, ajouter des transports
+        remaining_weight = max(0, instance.dw_AB[week] - total_weight)
+        remaining_volume = max(0, instance.dv_AB[week] - total_volume)
+        
+        if remaining_weight > 0 or remaining_volume > 0:
+            # Trouver un véhicule disponible
+            for (vtype, idx), vehicle in solution.vehicles.items():
+                if week not in vehicle.weeks_used:
+                    # Créer un transport de réparation
+                    repair_transport = MC_Transport(
+                        week=week,
+                        vehicle_idx=idx,
+                        vehicle_type=vtype,
+                        products_transported={"repair": max(remaining_weight, remaining_volume)},
+                        instance=instance
+                    )
+                    solution.transports.append(repair_transport)
+                    break
     
-    print(f"\nTemps d'exécution : {end_time - start_time:.2f} secondes")
+    solution.evaluate()
+
+def mc_mutate(solution, instance, mutation_rate=0.3):
+    """
+    Mutation adaptée pour MC-SVRP-TC
+    """
+    mutated = copy.deepcopy(solution)
+    
+    for week in instance.T:
+        if random.random() < mutation_rate:
+            week_transports = [t for t in mutated.transports if t.week == week]
+            
+            if week_transports:
+                # Choisir une opération de mutation
+                operations = ["reassign_vehicle", "split_transport", "merge_transports"]
+                operation = random.choice(operations)
+                
+                if operation == "reassign_vehicle":
+                    # Réaffecter un transport à un autre véhicule
+                    transport = random.choice(week_transports)
+                    
+                    # Trouver un véhicule alternatif
+                    available_vehicles = [
+                        (vtype, idx) for (vtype, idx), vehicle in mutated.vehicles.items()
+                        if week not in vehicle.weeks_used and (vtype, idx) != (transport.vehicle_type, transport.vehicle_idx)
+                    ]
+                    
+                    if available_vehicles:
+                        new_vtype, new_idx = random.choice(available_vehicles)
+                        new_vehicle = mutated.vehicles[(new_vtype, new_idx)]
+                        
+                        # Vérifier la capacité
+                        if (transport.total_weight(instance) <= new_vehicle.weight_capacity and
+                            transport.total_volume(instance) <= new_vehicle.volume_capacity):
+                            
+                            # Effectuer la réaffectation
+                            transport.vehicle_type = new_vtype
+                            transport.vehicle_idx = new_idx
+    
+    mutated.evaluate()
+    if not mutated.feasible:
+        mc_repair_solution(mutated, instance)
+    
+    return mutated
+
+def mc_local_search(solution, instance, max_iterations=50):
+    """
+    Recherche locale adaptée pour MC-SVRP-TC
+    """
+    current = copy.deepcopy(solution)
+    best = copy.deepcopy(solution)
+    
+    for iteration in range(max_iterations):
+        improved = False
+        
+        # Essayer différentes améliorations locales
+        # 1. Consolidation de véhicules
+        consolidated = mc_consolidate_vehicles(current, instance)
+        if consolidated and consolidated.fitness < current.fitness:
+            current = consolidated
+            if current.fitness < best.fitness:
+                best = copy.deepcopy(current)
+            improved = True
+        
+        # 2. Optimisation des affectations
+        optimized = mc_optimize_assignments(current, instance)
+        if optimized and optimized.fitness < current.fitness:
+            current = optimized
+            if current.fitness < best.fitness:
+                best = copy.deepcopy(current)
+            improved = True
+        
+        if not improved:
+            break
+    
+    return best
+
+def mc_consolidate_vehicles(solution, instance):
+    """
+    Consolide les véhicules pour réduire les coûts
+    """
+    improved = copy.deepcopy(solution)
+    
+    # Logique de consolidation spécifique au modèle MC-SVRP-TC
+    # (À implémenter selon les besoins spécifiques)
+    
+    improved.evaluate()
+    return improved if improved.fitness < solution.fitness else None
+
+def mc_optimize_assignments(solution, instance):
+    """
+    Optimise les affectations de produits aux véhicules
+    """
+    improved = copy.deepcopy(solution)
+    
+    # Logique d'optimisation des affectations
+    # (À implémenter selon les besoins spécifiques)
+    
+    improved.evaluate()
+    return improved if improved.fitness < solution.fitness else None
+
+def mc_memetic_algorithm(instance, population_size=20, generations=100, mutation_rate=0.3, 
+                        local_search_freq=5):
+    """
+    Algorithme mémétique principal pour MC-SVRP-TC
+    """
+    print("Démarrage de l'algorithme mémétique MC-SVRP-TC...")
+    
+    # Générer la population initiale
+    population = []
+    for i in range(population_size):
+        if i % 5 == 0:
+            print(f"Génération solution initiale {i+1}/{population_size}")
+        solution = mc_greedy_initial_solution(instance)
+        population.append(solution)
+    
+    # Trouver la meilleure solution initiale
+    best_solution = min(population, key=lambda s: s.fitness)
+    print(f"Meilleure solution initiale: {best_solution}")
+    
+    # Boucle principale
+    for gen in range(generations):
+        if gen % 10 == 0:
+            print(f"Génération {gen}/{generations}, meilleur coût: {best_solution.fitness:.2f}")
+        
+        # Recherche locale périodique
+        if gen % local_search_freq == 0:
+            for i in range(min(3, population_size)):
+                improved = mc_local_search(population[i], instance)
+                if improved.fitness < population[i].fitness:
+                    population[i] = improved
+                    if improved.fitness < best_solution.fitness:
+                        best_solution = copy.deepcopy(improved)
+        
+        # Nouvelle génération
+        new_population = []
+        
+        # Élitisme
+        sorted_pop = sorted(population, key=lambda s: s.fitness)
+        new_population.extend([copy.deepcopy(s) for s in sorted_pop[:2]])
+        
+        # Génération d'enfants
+        while len(new_population) < population_size:
+            parent1 = tournament_selection(population)
+            parent2 = tournament_selection(population)
+            
+            child = mc_crossover(parent1, parent2, instance)
+            
+            if random.random() < mutation_rate:
+                child = mc_mutate(child, instance)
+            
+            new_population.append(child)
+        
+        population = new_population
+        
+        # Mise à jour de la meilleure solution
+        current_best = min(population, key=lambda s: s.fitness)
+        if current_best.fitness < best_solution.fitness:
+            best_solution = copy.deepcopy(current_best)
+    
+    # Recherche locale finale
+    final_solution = mc_local_search(best_solution, instance, max_iterations=100)
+    if final_solution.fitness < best_solution.fitness:
+        best_solution = final_solution
+    
+    print(f"Solution finale: {best_solution}")
     return best_solution
 
-def export_solution_to_msproject_csv(solution, filename):
+def tournament_selection(population, tournament_size=3):
+    """Sélection par tournoi"""
+    tournament = random.sample(population, min(tournament_size, len(population)))
+    return min(tournament, key=lambda s: s.fitness)
+
+# Fonction principale d'exécution
+def run_mc_svrp_algorithm(id_client, cible_longitude, cible_latitude):
     """
-    Exporte une solution dans un fichier CSV compatible avec MS Project.
-    
-    Format MS Project: chaque tâche est représentée sur une ligne avec:
-    - ID: identifiant unique de la tâche
-    - Nom: nom de la tâche
-    - Durée: durée de la tâche (format: 1h, 30mn, etc.)
-    - Début: date et heure de début (format YYYY-MM-DD HH:MM)
-    - Fin: date et heure de fin (format YYYY-MM-DD HH:MM)
-    - Prédécesseurs: relations de dépendance
-    - Ressources: ressources assignées à la tâche
+    Exécute l'algorithme mémétique MC-SVRP-TC avec les données de la base
     
     Args:
-        solution: Solution à exporter
-        filename: Nom du fichier CSV
+        id_client: ID du client
+        cible_longitude: Longitude de destination
+        cible_latitude: Latitude de destination
+    
+    Returns:
+        MC_Solution: Meilleure solution trouvée
     """
-    import csv
-    from datetime import datetime, timedelta
-    
-    # Date de référence pour le projet (commencer un lundi)
-    reference_date = datetime.today()
-    # Ajuster pour commencer un lundi
-    days_to_monday = (0 - reference_date.weekday()) % 7
-    if days_to_monday > 0:
-        reference_date += timedelta(days=days_to_monday)
-    
-    # Ouvrir le fichier CSV en mode écriture
-    with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
-        # Créer le writer CSV
-        writer = csv.writer(csvfile, delimiter=';')
+    try:
+        print("="*60)
+        print("ALGORITHME MÉMÉTIQUE MC-SVRP-TC")
+        print("="*60)
         
-        # Écrire l'en-tête
-        writer.writerow(["ID", "Nom", "Durée", "Début", "Fin", "Prédécesseurs", "Ressources"])
+        # Créer l'instance avec vos données existantes
+        print("Chargement des données...")
+        instance = Instance(id_client, cible_longitude, cible_latitude)
         
-        # ID de tâche initial
-        task_id = 1
+        print(f"Instance créée:")
+        print(f"- Client ID: {id_client}")
+        print(f"- Distance A-B: {instance.d_AB} km")
+        print(f"- Types de véhicules: {len(instance.L)}")
+        print(f"- Véhicules disponibles: {sum(instance.m.values())}")
+        print(f"- Horizon: {len(instance.T)} semaines")
         
-        # Écrire une ligne pour le projet global
-        writer.writerow([task_id, "Projet de transport", "", 
-                         reference_date.strftime("%Y-%m-%d %H:%M"), "", "", ""])
-        project_id = task_id
-        task_id += 1
+        # Affichage des demandes
+        total_weight = sum(instance.dw_AB.values())
+        total_volume = sum(instance.dv_AB.values())
+        print(f"- Demande totale: {total_weight:.1f} kg, {total_volume:.1f} m³")
         
-        # Pour chaque semaine, créer un groupe de tâches
-        week_tasks = {}
-        for week in solution.instance.T:
-            # Créer une tâche pour la semaine
-            week_start = reference_date + timedelta(days=(week-1)*7)
-            week_end = week_start + timedelta(days=6)
-            
-            writer.writerow([task_id, f"Semaine {week}", f"{7}j", 
-                            week_start.strftime("%Y-%m-%d %H:%M"), 
-                            week_end.strftime("%Y-%m-%d %H:%M"), 
-                            project_id, ""])
-            
-            week_tasks[week] = task_id
-            task_id += 1
+        # Exécuter l'algorithme mémétique
+        start_time = time.time()
+        best_solution = mc_memetic_algorithm(
+            instance=instance,
+            population_size=15,  # Taille réduite pour plus de rapidité
+            generations=50,      # Nombre de générations adapté
+            mutation_rate=0.25,
+            local_search_freq=5
+        )
+        end_time = time.time()
         
-        # Pour chaque transport
-        transport_tasks = {}
-        for transport in solution.transports:
-            week = transport.week
-            vtype = transport.vehicle_type
-            vidx = transport.vehicle_idx
-            seq = transport.seq
-            
-            # Date pour ce transport (jour de la semaine = le lundi de cette semaine)
-            transport_date = reference_date + timedelta(days=(week-1)*7)
-            
-            # Si les heures ne sont pas définies, calculer ces valeurs
-            if transport.load_start_A is None:
-                solution.compute_times_for_transport(transport)
-            
-            # Obtenir la plaque d'immatriculation et le type du véhicule s'ils sont disponibles
-            vehicle_name = ""
-            if hasattr(transport, 'vehicle_plate') and transport.vehicle_plate:
-                vehicle_name = transport.vehicle_plate
-            else:
-                vehicle_name = f"Véhicule {vtype}-{vidx}"
-            
-            vehicle_type_name = ""
-            if hasattr(transport, 'vehicle_type_name') and transport.vehicle_type_name:
-                vehicle_type_name = transport.vehicle_type_name
-            else:
-                vehicle_type_name = f"Type {vtype}"
-            
-            # Ressource (véhicule)
-            resource = f"{vehicle_name} ({vehicle_type_name})"
-            
-            # 1. Tâche: Chargement au site A
-            load_start_time = transport_date + timedelta(hours=transport.load_start_A)
-            load_end_time = transport_date + timedelta(hours=transport.load_end_A)
-            load_duration = (transport.load_end_A - transport.load_start_A) * 60  # en minutes
-            
-            writer.writerow([task_id, f"Chargement {week}.{vtype}.{vidx}.{seq} - Site A", 
-                            f"{int(load_duration)}mn", 
-                            load_start_time.strftime("%Y-%m-%d %H:%M"), 
-                            load_end_time.strftime("%Y-%m-%d %H:%M"), 
-                            week_tasks[week], resource])
-            
-            load_task_id = task_id
-            task_id += 1
-            
-            # 2. Tâche: Trajet A→B
-            travel_AB_start_time = transport_date + timedelta(hours=transport.departure_A)
-            travel_AB_end_time = transport_date + timedelta(hours=transport.arrival_B)
-            travel_AB_duration = (transport.arrival_B - transport.departure_A) * 60  # en minutes
-            
-            writer.writerow([task_id, f"Trajet A→B {week}.{vtype}.{vidx}.{seq}", 
-                            f"{int(travel_AB_duration)}mn", 
-                            travel_AB_start_time.strftime("%Y-%m-%d %H:%M"), 
-                            travel_AB_end_time.strftime("%Y-%m-%d %H:%M"), 
-                            load_task_id, resource])
-            
-            travel_AB_task_id = task_id
-            task_id += 1
-            
-            # 3. Tâche: Déchargement au site B
-            unload_start_time = transport_date + timedelta(hours=transport.unload_start_B)
-            unload_end_time = transport_date + timedelta(hours=transport.unload_end_B)
-            unload_duration = (transport.unload_end_B - transport.unload_start_B) * 60  # en minutes
-            
-            writer.writerow([task_id, f"Déchargement {week}.{vtype}.{vidx}.{seq} - Site B", 
-                            f"{int(unload_duration)}mn", 
-                            unload_start_time.strftime("%Y-%m-%d %H:%M"), 
-                            unload_end_time.strftime("%Y-%m-%d %H:%M"), 
-                            travel_AB_task_id, resource])
-            
-            unload_task_id = task_id
-            task_id += 1
-            
-            # 4. Trajet retour B→A (s'il existe)
-            if transport.departure_B is not None and transport.arrival_A is not None:
-                travel_BA_start_time = transport_date + timedelta(hours=transport.departure_B)
-                travel_BA_end_time = transport_date + timedelta(hours=transport.arrival_A)
-                travel_BA_duration = (transport.arrival_A - transport.departure_B) * 60  # en minutes
-                
-                writer.writerow([task_id, f"Trajet B→A {week}.{vtype}.{vidx}.{seq}", 
-                                f"{int(travel_BA_duration)}mn", 
-                                travel_BA_start_time.strftime("%Y-%m-%d %H:%M"), 
-                                travel_BA_end_time.strftime("%Y-%m-%d %H:%M"), 
-                                unload_task_id, resource])
-                
-                transport_tasks[(week, vtype, vidx, seq)] = task_id
-                task_id += 1
-            else:
-                transport_tasks[(week, vtype, vidx, seq)] = unload_task_id
-    
-    print(f"Solution exportée au format MS Project dans le fichier {filename}")
-    return filename
+        print("\n" + "="*60)
+        print("RÉSULTATS FINAUX")
+        print("="*60)
+        print(f"Temps d'exécution: {end_time - start_time:.2f} secondes")
+        print(f"Solution: {best_solution}")
+        
+        if best_solution.feasible:
+            print("\n✅ SOLUTION FAISABLE TROUVÉE")
+            print_detailed_solution(best_solution, instance)
+        else:
+            print("\n❌ Aucune solution faisable trouvée")
+            print("Vérifiez les contraintes et les capacités des véhicules")
+        
+        return best_solution
+        
+    except Exception as e:
+        print(f"Erreur lors de l'exécution: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
 
+def print_detailed_solution(solution, instance):
+    """
+    Affiche les détails de la solution trouvée
+    
+    Args:
+        solution: Solution MC-SVRP-TC
+        instance: Instance du problème
+    """
+    print(f"\n📊 ANALYSE DE LA SOLUTION")
+    print("-" * 40)
+    
+    # Statistiques générales
+    vehicles_used = sum(1 for v in solution.vehicles.values() if v.is_used())
+    print(f"Nombre de véhicules utilisés: {vehicles_used}")
+    print(f"Coût total: {solution.total_cost:.2f}")
+    print(f"Nombre de transports: {len(solution.transports)}")
+    
+    # Répartition par type de véhicule
+    print(f"\n🚛 VÉHICULES PAR TYPE")
+    print("-" * 40)
+    vehicles_by_type = {}
+    for (vtype, idx), vehicle in solution.vehicles.items():
+        if vehicle.is_used():
+            type_name = vehicle.type_name or f"Type {vtype}"
+            if type_name not in vehicles_by_type:
+                vehicles_by_type[type_name] = []
+            vehicles_by_type[type_name].append(vehicle)
+    
+    for type_name, vehicles in vehicles_by_type.items():
+        print(f"{type_name}: {len(vehicles)} véhicule(s)")
+        for vehicle in vehicles:
+            plate = vehicle.plate or f"V{vehicle.idx}"
+            print(f"  - {plate}: {len(vehicle.weeks_used)} semaines, "
+                  f"{vehicle.num_trips} voyages, {vehicle.duration:.1f}j")
+    
+    # Planning par semaine
+    print(f"\n📅 PLANNING PAR SEMAINE")
+    print("-" * 40)
+    for week in sorted(instance.T):
+        week_transports = [t for t in solution.transports if t.week == week]
+        if week_transports:
+            print(f"\nSemaine {week}: {len(week_transports)} transport(s)")
+            
+            # Grouper par véhicule
+            transports_by_vehicle = {}
+            for transport in week_transports:
+                vehicle_key = (transport.vehicle_type, transport.vehicle_idx)
+                if vehicle_key not in transports_by_vehicle:
+                    transports_by_vehicle[vehicle_key] = []
+                transports_by_vehicle[vehicle_key].append(transport)
+            
+            for (vtype, vidx), transports in transports_by_vehicle.items():
+                vehicle = solution.vehicles[(vtype, vidx)]
+                vehicle_name = vehicle.plate or f"V{vidx} ({vehicle.type_name})"
+                
+                total_weight = sum(t.total_weight(instance) for t in transports)
+                total_volume = sum(t.total_volume(instance) for t in transports)
+                
+                print(f"  {vehicle_name}: {len(transports)} voyage(s)")
+                print(f"    Charge: {total_weight:.1f}kg / {total_volume:.1f}m³")
+                print(f"    Capacité: {vehicle.weight_capacity:.1f}kg / {vehicle.volume_capacity:.1f}m³")
+                
+                # Détails temporels
+                total_time = sum(t.T_total for t in transports)
+                print(f"    Temps total: {total_time:.1f}h")
+    
+    # Vérification des demandes
+    print(f"\n✅ VÉRIFICATION DES DEMANDES")
+    print("-" * 40)
+    for week in instance.T:
+        required_weight = instance.dw_AB[week]
+        required_volume = instance.dv_AB[week]
+        
+        if required_weight > 0 or required_volume > 0:
+            week_transports = [t for t in solution.transports if t.week == week]
+            transported_weight = sum(t.total_weight(instance) for t in week_transports)
+            transported_volume = sum(t.total_volume(instance) for t in week_transports)
+            
+            weight_status = "✅" if transported_weight >= required_weight else "❌"
+            volume_status = "✅" if transported_volume >= required_volume else "❌"
+            
+            print(f"Semaine {week}:")
+            print(f"  Poids: {transported_weight:.1f}/{required_weight:.1f}kg {weight_status}")
+            print(f"  Volume: {transported_volume:.1f}/{required_volume:.1f}m³ {volume_status}")
+
+def save_mc_solution(solution, instance, filename="mc_svrp_solution.json"):
+    """
+    Sauvegarde la solution MC-SVRP-TC dans un fichier JSON
+    
+    Args:
+        solution: Solution à sauvegarder
+        instance: Instance du problème
+        filename: Nom du fichier
+    """
+    solution_data = {
+        "metadata": {
+            "client_id": instance.id_client,
+            "distance_AB": instance.d_AB,
+            "total_cost": solution.total_cost,
+            "feasible": solution.feasible,
+            "vehicles_used": sum(1 for v in solution.vehicles.values() if v.is_used()),
+            "total_transports": len(solution.transports)
+        },
+        "vehicles": [],
+        "transports": [],
+        "weekly_summary": {}
+    }
+    
+    # Sauvegarder les véhicules utilisés
+    for (vtype, idx), vehicle in solution.vehicles.items():
+        if vehicle.is_used():
+            vehicle_data = {
+                "type": vtype,
+                "index": idx,
+                "plate": vehicle.plate,
+                "type_name": vehicle.type_name,
+                "weight_capacity": vehicle.weight_capacity,
+                "volume_capacity": vehicle.volume_capacity,
+                "weeks_used": list(vehicle.weeks_used),
+                "num_trips": vehicle.num_trips,
+                "duration": vehicle.duration,
+                "num_units_used": vehicle.num_units_used
+            }
+            solution_data["vehicles"].append(vehicle_data)
+    
+    # Sauvegarder les transports
+    for transport in solution.transports:
+        transport_data = {
+            "week": transport.week,
+            "vehicle_type": transport.vehicle_type,
+            "vehicle_index": transport.vehicle_idx,
+            "trip_sequence": transport.trip_sequence,
+            "products_transported": transport.products_transported,
+            "total_weight": transport.total_weight(instance),
+            "total_volume": transport.total_volume(instance),
+            "T_conduite": transport.T_conduite,
+            "T_pauses": transport.T_pauses,
+            "T_nuit": transport.T_nuit,
+            "T_total": transport.T_total,
+            "N_pauses": transport.N_pauses,
+            "N_nuits": transport.N_nuits
+        }
+        solution_data["transports"].append(transport_data)
+    
+    # Résumé par semaine
+    for week in instance.T:
+        week_transports = [t for t in solution.transports if t.week == week]
+        if week_transports:
+            vehicles_used = set((t.vehicle_type, t.vehicle_idx) for t in week_transports)
+            total_weight = sum(t.total_weight(instance) for t in week_transports)
+            total_volume = sum(t.total_volume(instance) for t in week_transports)
+            
+            solution_data["weekly_summary"][str(week)] = {
+                "transports": len(week_transports),
+                "vehicles": len(vehicles_used),
+                "total_weight": total_weight,
+                "total_volume": total_volume,
+                "demand_weight": instance.dw_AB[week],
+                "demand_volume": instance.dv_AB[week]
+            }
+    
+    # Écrire le fichier
+    try:
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump(solution_data, f, indent=2, ensure_ascii=False)
+        print(f"\n💾 Solution sauvegardée dans: {filename}")
+    except Exception as e:
+        print(f"Erreur lors de la sauvegarde: {e}")
+
+def export_to_excel(solution, instance, filename="mc_svrp_planning.xlsx"):
+    """
+    Exporte la solution vers un fichier Excel pour analyse
+    
+    Args:
+        solution: Solution MC-SVRP-TC
+        instance: Instance du problème
+        filename: Nom du fichier Excel
+    """
+    try:
+        import pandas as pd
+        
+        # Données des véhicules
+        vehicles_data = []
+        for (vtype, idx), vehicle in solution.vehicles.items():
+            if vehicle.is_used():
+                vehicles_data.append({
+                    'Type': vtype,
+                    'Index': idx,
+                    'Immatriculation': vehicle.plate or f'V{idx}',
+                    'Type_Nom': vehicle.type_name or f'Type {vtype}',
+                    'Capacité_Poids': vehicle.weight_capacity,
+                    'Capacité_Volume': vehicle.volume_capacity,
+                    'Semaines_Utilisées': len(vehicle.weeks_used),
+                    'Nombre_Voyages': vehicle.num_trips,
+                    'Durée_Jours': vehicle.duration,
+                    'Unités_Utilisées': vehicle.num_units_used
+                })
+        
+        # Données des transports
+        transports_data = []
+        for transport in solution.transports:
+            vehicle = solution.vehicles[(transport.vehicle_type, transport.vehicle_idx)]
+            transports_data.append({
+                'Semaine': transport.week,
+                'Véhicule_Type': transport.vehicle_type,
+                'Véhicule_Index': transport.vehicle_idx,
+                'Immatriculation': vehicle.plate or f'V{transport.vehicle_idx}',
+                'Séquence': transport.trip_sequence,
+                'Poids_Total': transport.total_weight(instance),
+                'Volume_Total': transport.total_volume(instance),
+                'Temps_Conduite': transport.T_conduite,
+                'Temps_Pauses': transport.T_pauses,
+                'Temps_Nuit': transport.T_nuit,
+                'Temps_Total': transport.T_total,
+                'Nombre_Pauses': transport.N_pauses,
+                'Nombre_Nuits': transport.N_nuits
+            })
+        
+        # Résumé par semaine
+        weekly_data = []
+        for week in instance.T:
+            week_transports = [t for t in solution.transports if t.week == week]
+            vehicles_used = set((t.vehicle_type, t.vehicle_idx) for t in week_transports)
+            
+            total_weight = sum(t.total_weight(instance) for t in week_transports)
+            total_volume = sum(t.total_volume(instance) for t in week_transports)
+            
+            weekly_data.append({
+                'Semaine': week,
+                'Nombre_Transports': len(week_transports),
+                'Nombre_Véhicules': len(vehicles_used),
+                'Poids_Transporté': total_weight,
+                'Volume_Transporté': total_volume,
+                'Demande_Poids': instance.dw_AB[week],
+                'Demande_Volume': instance.dv_AB[week],
+                'Satisfaction_Poids': total_weight >= instance.dw_AB[week],
+                'Satisfaction_Volume': total_volume >= instance.dv_AB[week]
+            })
+        
+        # Création du fichier Excel
+        with pd.ExcelWriter(filename, engine='openpyxl') as writer:
+            # Feuille véhicules
+            pd.DataFrame(vehicles_data).to_excel(
+                writer, sheet_name='Véhicules', index=False
+            )
+            
+            # Feuille transports
+            pd.DataFrame(transports_data).to_excel(
+                writer, sheet_name='Transports', index=False
+            )
+            
+            # Feuille résumé hebdomadaire
+            pd.DataFrame(weekly_data).to_excel(
+                writer, sheet_name='Résumé_Hebdomadaire', index=False
+            )
+            
+            # Feuille récapitulatif
+            summary_data = [{
+                'Métrique': 'Coût Total',
+                'Valeur': solution.total_cost
+            }, {
+                'Métrique': 'Véhicules Utilisés',
+                'Valeur': sum(1 for v in solution.vehicles.values() if v.is_used())
+            }, {
+                'Métrique': 'Nombre de Transports',
+                'Valeur': len(solution.transports)
+            }, {
+                'Métrique': 'Solution Faisable',
+                'Valeur': 'Oui' if solution.feasible else 'Non'
+            }, {
+                'Métrique': 'Distance A-B (km)',
+                'Valeur': instance.d_AB
+            }, {
+                'Métrique': 'Client ID',
+                'Valeur': instance.id_client
+            }]
+            
+            pd.DataFrame(summary_data).to_excel(
+                writer, sheet_name='Récapitulatif', index=False
+            )
+        
+        print(f"📊 Données exportées vers: {filename}")
+        
+    except ImportError:
+        print("⚠️  Pandas non disponible pour l'export Excel")
+    except Exception as e:
+        print(f"Erreur lors de l'export Excel: {e}")
+
+# Test et démonstration
 if __name__ == "__main__":
-    import math  # Ajout de l'import math nécessaire pour la fonction is_optimal
+    print("🧪 Test de l'algorithme MC-SVRP-TC")
     
-    # Exécuter la fonction principale
-    best_solution = main()
+    # Exemple d'utilisation (remplacez par vos vraies données)
+    test_client_id = 1
+    test_longitude = 3.0
+    test_latitude = 36.0
     
-    # Section ajoutée: Export en CSV compatible avec MS Project
-    print("\nExport en CSV compatible avec MS Project...")
-    csv_filename = "plan_transport_msproject.csv"
-    export_solution_to_msproject_csv(best_solution, csv_filename)
-    print(f"Le fichier CSV a été généré avec succès: {csv_filename}")
+    try:
+        solution = run_mc_svrp_algorithm(test_client_id, test_longitude, test_latitude)
+        
+        if solution and solution.feasible:
+            # Sauvegarder les résultats
+            save_mc_solution(solution, solution.instance)
+            export_to_excel(solution, solution.instance)
+            
+            print("\n🎉 Algorithme exécuté avec succès!")
+        else:
+            print("❌ Échec de l'exécution ou solution non faisable")
+            
+    except Exception as e:
+        print(f"❌ Erreur lors du test: {e}")
+        import traceback
+        traceback.print_exc()

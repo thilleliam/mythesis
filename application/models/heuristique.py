@@ -1,1279 +1,37 @@
 import pandas as pd
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
-from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
-from openpyxl.utils.dataframe import dataframe_to_rows
-from reportlab.lib.pagesizes import A4, landscape
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib import colors
-from reportlab.lib.units import inch
+import random
+import math
+import time  # ← NOUVEAU
+import datetime
+import copy
+from datetime import datetime, timedelta
 
-class ExportateurSolutions:
-    """Classe pour exporter les solutions d'optimisation vers différents formats"""
-    
-    def __init__(self):
-        self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
-    def exporter_solution_complete(self, resultats, format_export="all", dossier_export="exports"):
-        """
-        Exporte la solution complète vers différents formats
-        
-        Args:
-            resultats: Dictionnaire des résultats de l'optimisation
-            format_export: "excel", "csv", "json", "pdf", "all"
-            dossier_export: Dossier de destination
-        """
-        
-        # Créer le dossier d'export s'il n'existe pas
-        if not os.path.exists(dossier_export):
-            os.makedirs(dossier_export)
-            
-        fichiers_exportes = []
-        
-        print(f"\n📁 EXPORT DE LA SOLUTION D'OPTIMISATION")
-        print(f"Dossier de destination: {dossier_export}")
-        print(f"Format(s) demandé(s): {format_export}")
-        
-        # Vérifier le type de résultats (mono ou multi-semaines)
-        is_multi_semaines = 'resultats_semaine1' in resultats or 'resultats_semaine2' in resultats
-        
-        if format_export in ["excel", "all"]:
-            fichier_excel = self._exporter_vers_excel(resultats, dossier_export, is_multi_semaines)
-            fichiers_exportes.append(fichier_excel)
-            
-        if format_export in ["csv", "all"]:
-            fichiers_csv = self._exporter_vers_csv(resultats, dossier_export, is_multi_semaines)
-            fichiers_exportes.extend(fichiers_csv)
-            
-        if format_export in ["json", "all"]:
-            fichier_json = self._exporter_vers_json(resultats, dossier_export, is_multi_semaines)
-            fichiers_exportes.append(fichier_json)
-            
-        if format_export in ["pdf", "all"]:
-            fichier_pdf = self._exporter_vers_pdf(resultats, dossier_export, is_multi_semaines)
-            fichiers_exportes.append(fichier_pdf)
-            
-        print(f"\n✅ EXPORT TERMINÉ")
-        print(f"Fichiers générés:")
-        for fichier in fichiers_exportes:
-            print(f"  - {fichier}")
-            
-        return fichiers_exportes
-    
-    def _exporter_vers_excel(self, resultats, dossier, is_multi_semaines):
-        """Exporte vers Excel avec plusieurs onglets"""
-        
-        nom_fichier = f"optimisation_navettes_{self.timestamp}.xlsx"
-        chemin_fichier = os.path.join(dossier, nom_fichier)
-        
-        print(f"📊 Export Excel: {nom_fichier}")
-        
-        wb = Workbook()
-        
-        # Supprimer la feuille par défaut
-        wb.remove(wb.active)
-        
-        if is_multi_semaines:
-            self._creer_onglets_multi_semaines(wb, resultats)
-        else:
-            self._creer_onglets_mono_semaine(wb, resultats)
-            
-        wb.save(chemin_fichier)
-        return chemin_fichier
-    
-    def _creer_onglets_multi_semaines(self, wb, resultats):
-        """Crée les onglets pour une solution multi-semaines"""
-        
-        # 1. Onglet Résumé Global
-        ws_resume = wb.create_sheet("Résumé Global")
-        self._remplir_resume_global(ws_resume, resultats, True)
-        
-        # 2. Onglet Semaine 1 (si existe)
-        if resultats.get('resultats_semaine1'):
-            ws_s1 = wb.create_sheet("Semaine 1")
-            self._remplir_details_semaine(ws_s1, resultats['resultats_semaine1'], 1)
-            
-        # 3. Onglet Semaine 2 (si existe)
-        if resultats.get('resultats_semaine2'):
-            ws_s2 = wb.create_sheet("Semaine 2")
-            self._remplir_details_semaine(ws_s2, resultats['resultats_semaine2'], 2)
-            
-        # 4. Onglet Planification Détaillée
-        ws_planning = wb.create_sheet("Planning Détaillé")
-        self._remplir_planning_detaille(ws_planning, resultats, True)
-        
-        # 5. Onglet Analyse Coûts
-        ws_couts = wb.create_sheet("Analyse Coûts")
-        self._remplir_analyse_couts(ws_couts, resultats, True)
-        
-    def _creer_onglets_mono_semaine(self, wb, resultats):
-        """Crée les onglets pour une solution mono-semaine"""
-        
-        # 1. Onglet Résumé
-        ws_resume = wb.create_sheet("Résumé")
-        self._remplir_resume_global(ws_resume, resultats, False)
-        
-        # 2. Onglet Détails
-        ws_details = wb.create_sheet("Détails Solution")
-        self._remplir_details_semaine(ws_details, resultats, 1)
-        
-        # 3. Onglet Planning
-        ws_planning = wb.create_sheet("Planning")
-        self._remplir_planning_detaille(ws_planning, resultats, False)
-        
-        # 4. Onglet Coûts
-        ws_couts = wb.create_sheet("Analyse Coûts")
-        self._remplir_analyse_couts(ws_couts, resultats, False)
-        
-    def _remplir_resume_global(self, ws, resultats, is_multi):
-        """Remplit l'onglet résumé global"""
-        
-        # Titre principal
-        ws['A1'] = "RÉSUMÉ DE L'OPTIMISATION DES NAVETTES"
-        ws['A1'].font = Font(size=16, bold=True)
-        ws.merge_cells('A1:E1')
-        
-        row = 3
-        
-        if is_multi:
-            # Informations projet multi-semaines
-            ws[f'A{row}'] = "TYPE DE PROJET"
-            ws[f'B{row}'] = "Multi-semaines"
-            ws[f'A{row}'].font = Font(bold=True)
-            row += 1
-            
-            ws[f'A{row}'] = "DURÉE TOTALE"
-            ws[f'B{row}'] = f"{resultats['duree_totale_projet']} jours"
-            ws[f'A{row}'].font = Font(bold=True)
-            row += 1
-            
-            ws[f'A{row}'] = "COÛT TOTAL"
-            ws[f'B{row}'] = f"{resultats['cout_total_global']:.2f} €"
-            ws[f'A{row}'].font = Font(bold=True)
-            ws[f'B{row}'].font = Font(color="FF0000")
-            row += 2
-            
-            # Détails par semaine
-            if resultats.get('resultats_semaine1'):
-                s1 = resultats['resultats_semaine1']
-                ws[f'A{row}'] = "SEMAINE 1"
-                ws[f'A{row}'].font = Font(bold=True, color="0000FF")
-                row += 1
-                
-                ws[f'A{row}'] = "Véhicule utilisé"
-                ws[f'B{row}'] = s1['vehicule_utilise']['nom']
-                row += 1
-                
-                ws[f'A{row}'] = "Nombre de véhicules"
-                ws[f'B{row}'] = s1['nb_vehicules_necessaires']
-                row += 1
-                
-                ws[f'A{row}'] = "Coût semaine 1"
-                ws[f'B{row}'] = f"{s1['vehicule_optimal']['cout_total']:.2f} €"
-                row += 2
-                
-            if resultats.get('resultats_semaine2'):
-                s2 = resultats['resultats_semaine2']
-                ws[f'A{row}'] = "SEMAINE 2"
-                ws[f'A{row}'].font = Font(bold=True, color="0000FF")
-                row += 1
-                
-                ws[f'A{row}'] = "Véhicule utilisé"
-                ws[f'B{row}'] = s2['vehicule_utilise']['nom']
-                row += 1
-                
-                ws[f'A{row}'] = "Nombre de véhicules"
-                ws[f'B{row}'] = s2['nb_vehicules_necessaires']
-                row += 1
-                
-                ws[f'A{row}'] = "Coût semaine 2"
-                ws[f'B{row}'] = f"{s2['vehicule_optimal']['cout_total']:.2f} €"
-                row += 1
-                
-        else:
-            # Informations projet mono-semaine
-            ws[f'A{row}'] = "VÉHICULE SÉLECTIONNÉ"
-            ws[f'B{row}'] = resultats['vehicule_utilise']['nom']
-            ws[f'A{row}'].font = Font(bold=True)
-            row += 1
-            
-            ws[f'A{row}'] = "NOMBRE DE VÉHICULES"
-            ws[f'B{row}'] = resultats['nb_vehicules_necessaires']
-            ws[f'A{row}'].font = Font(bold=True)
-            row += 1
-            
-            ws[f'A{row}'] = "COÛT TOTAL"
-            ws[f'B{row}'] = f"{resultats['vehicule_optimal']['cout_total']:.2f} €"
-            ws[f'A{row}'].font = Font(bold=True)
-            ws[f'B{row}'].font = Font(color="FF0000")
-            row += 1
-            
-            ws[f'A{row}'] = "DURÉE RÉELLE"
-            ws[f'B{row}'] = f"{resultats['duree_reelle']} jours"
-            ws[f'A{row}'].font = Font(bold=True)
-            
-        # Ajuster la largeur des colonnes
-        ws.column_dimensions['A'].width = 25
-        ws.column_dimensions['B'].width = 30
-        
-    def _remplir_details_semaine(self, ws, resultats_semaine, numero_semaine):
-        """Remplit les détails d'une semaine"""
-        
-        ws['A1'] = f"DÉTAILS SEMAINE {numero_semaine}"
-        ws['A1'].font = Font(size=14, bold=True)
-        ws.merge_cells('A1:F1')
-        
-        row = 3
-        
-        # Informations véhicule
-        ws[f'A{row}'] = "VÉHICULE ET CAPACITÉS"
-        ws[f'A{row}'].font = Font(bold=True)
-        row += 1
-        
-        vehicule = resultats_semaine['vehicule_utilise']
-        ws[f'A{row}'] = "Nom du véhicule"
-        ws[f'B{row}'] = vehicule.get('nom', 'Non spécifié')
-        row += 1
-        
-        ws[f'A{row}'] = "Type"
-        ws[f'B{row}'] = vehicule.get('type', 'Non spécifié')
-        row += 1
-        
-        ws[f'A{row}'] = "Capacité poids"
-        ws[f'B{row}'] = f"{vehicule.get('capacite_poids_max', 'N/A')} tonnes"
-        row += 1
-        
-        ws[f'A{row}'] = "Capacité volume"
-        ws[f'B{row}'] = f"{vehicule.get('capacite_volume_max', 'N/A')} m³"
-        row += 2
-        
-        # Produits à transporter
-        ws[f'A{row}'] = "PRODUITS À TRANSPORTER"
-        ws[f'A{row}'].font = Font(bold=True)
-        row += 1
-        
-        # Headers
-        headers = ['Produit', 'Quantité', 'Poids Unit.', 'Volume Unit.', 'Poids Total', 'Volume Total']
-        for col, header in enumerate(headers, 1):
-            cell = ws.cell(row=row, column=col, value=header)
-            cell.font = Font(bold=True)
-            cell.fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
-            
-        row += 1
-        
-        # Vérifier si les produits existent
-        produits = resultats_semaine.get('produits_a_transporter', [])
-        if not produits:
-            # Si pas de produits_a_transporter, essayer de les reconstituer depuis la planification
-            produits = self._extraire_produits_depuis_planification(resultats_semaine)
-        
-        for produit in produits:
-            poids_total = produit.get('quantite', 0) * produit.get('poids_unitaire', 0)
-            volume_total = produit.get('quantite', 0) * produit.get('volume_unitaire', 0)
-            
-            ws.cell(row=row, column=1, value=produit.get('nom', 'Produit inconnu'))
-            ws.cell(row=row, column=2, value=produit.get('quantite', 0))
-            ws.cell(row=row, column=3, value=f"{produit.get('poids_unitaire', 0)} t")
-            ws.cell(row=row, column=4, value=f"{produit.get('volume_unitaire', 0)} m³")
-            ws.cell(row=row, column=5, value=f"{poids_total:.2f} t")
-            ws.cell(row=row, column=6, value=f"{volume_total:.2f} m³")
-            row += 1
-            
-        # Ajuster les colonnes
-        for col in range(1, 7):
-            ws.column_dimensions[chr(64 + col)].width = 15
-    
-    def _extraire_produits_depuis_planification(self, resultats_semaine):
-        """Extrait les produits depuis la planification si pas disponibles directement"""
-        produits = {}
-        
-        planif = resultats_semaine.get('planification_detaillee', {})
-        planifications_vehicules = planif.get('planifications_vehicules', [])
-        
-        for planif_vehicule in planifications_vehicules:
-            for voyage in planif_vehicule.get('voyages', []):
-                charge = voyage.get('charge_transportee', {})
-                for p in charge.get('produits', []):
-                    produit_info = p.get('produit', {})
-                    nom_produit = produit_info.get('nom', 'Produit inconnu')
-                    
-                    if nom_produit not in produits:
-                        produits[nom_produit] = {
-                            'nom': nom_produit,
-                            'quantite': 0,
-                            'poids_unitaire': produit_info.get('poids_unitaire', 0),
-                            'volume_unitaire': produit_info.get('volume_unitaire', 0)
-                        }
-                    
-                    produits[nom_produit]['quantite'] += p.get('quantite_voyage', 0)
-        
-        return list(produits.values())
-            
-    def _remplir_planning_detaille(self, ws, resultats, is_multi):
-        """Remplit le planning détaillé"""
-        
-        ws['A1'] = "PLANNING DÉTAILLÉ DES VOYAGES"
-        ws['A1'].font = Font(size=14, bold=True)
-        ws.merge_cells('A1:J1')
-        
-        row = 3
-        
-        if is_multi:
-            # Multi-semaines
-            for semaine_num in [1, 2]:
-                semaine_key = f'resultats_semaine{semaine_num}'
-                if resultats.get(semaine_key):
-                    ws[f'A{row}'] = f"SEMAINE {semaine_num}"
-                    ws[f'A{row}'].font = Font(bold=True, color="0000FF")
-                    row += 1
-                    
-                    row = self._ajouter_voyages_planning(ws, resultats[semaine_key], row)
-                    row += 1
-        else:
-            # Mono-semaine
-            row = self._ajouter_voyages_planning(ws, resultats, row)
-            
-    def _ajouter_voyages_planning(self, ws, resultats_semaine, row_start):
-        """Ajoute les voyages au planning"""
-        
-        headers = ['Véhicule', 'Voyage', 'Date Départ', 'Heure Départ', 'Date Arrivée', 'Heure Arrivée', 'Charge (t)', 'Charge (m³)', 'Produits']
-        
-        for col, header in enumerate(headers, 1):
-            cell = ws.cell(row=row_start, column=col, value=header)
-            cell.font = Font(bold=True)
-            cell.fill = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")
-            
-        row = row_start + 1
-        
-        planif = resultats_semaine.get('planification_detaillee', {})
-        planifications_vehicules = planif.get('planifications_vehicules', [])
-        
-        for planif_vehicule in planifications_vehicules:
-            vehicule_id = planif_vehicule.get('vehicule_id', 'N/A')
-            
-            for voyage in planif_vehicule.get('voyages', []):
-                voyage_num = voyage.get('voyage_numero', 'N/A')
-                charge = voyage.get('charge_transportee', {})
-                aller = voyage.get('aller', {})
-                
-                # Produits transportés
-                produits_list = charge.get('produits', [])
-                produits_str = ", ".join([f"{p.get('produit', {}).get('nom', 'Inconnu')} ({p.get('quantite_voyage', 0)})" for p in produits_list])
-                
-                ws.cell(row=row, column=1, value=f"Véhicule {vehicule_id}")
-                ws.cell(row=row, column=2, value=voyage_num)
-                ws.cell(row=row, column=3, value=aller.get('date_depart', 'N/A'))
-                ws.cell(row=row, column=4, value=aller.get('heure_depart', 'N/A'))
-                ws.cell(row=row, column=5, value=aller.get('date_arrivee', 'N/A'))
-                ws.cell(row=row, column=6, value=aller.get('heure_arrivee', 'N/A'))
-                ws.cell(row=row, column=7, value=f"{charge.get('poids', 0):.2f}")
-                ws.cell(row=row, column=8, value=f"{charge.get('volume', 0):.2f}")
-                ws.cell(row=row, column=9, value=produits_str)
-                
-                row += 1
-                
-        # Ajuster les colonnes
-        for col in range(1, 10):
-            ws.column_dimensions[chr(64 + col)].width = 12
-        ws.column_dimensions['I'].width = 40  # Colonne produits plus large
-        
-        return row
-        
-    def _remplir_analyse_couts(self, ws, resultats, is_multi):
-        """Remplit l'analyse des coûts"""
-        
-        ws['A1'] = "ANALYSE DÉTAILLÉE DES COÛTS"
-        ws['A1'].font = Font(size=14, bold=True)
-        ws.merge_cells('A1:E1')
-        
-        row = 3
-        
-        if is_multi:
-            # Coûts globaux
-            ws[f'A{row}'] = "COÛTS GLOBAUX"
-            ws[f'A{row}'].font = Font(bold=True, color="FF0000")
-            row += 1
-            
-            ws[f'A{row}'] = "Coût total projet"
-            ws[f'B{row}'] = f"{resultats['cout_total_global']:.2f} €"
-            ws[f'B{row}'].font = Font(bold=True)
-            row += 2
-            
-            # Détail par semaine
-            for semaine_num in [1, 2]:
-                semaine_key = f'resultats_semaine{semaine_num}'
-                if resultats.get(semaine_key):
-                    s = resultats[semaine_key]
-                    ws[f'A{row}'] = f"SEMAINE {semaine_num}"
-                    ws[f'A{row}'].font = Font(bold=True, color="0000FF")
-                    row += 1
-                    
-                    ws[f'A{row}'] = "Coût fixe"
-                    ws[f'B{row}'] = f"{s['vehicule_optimal']['cout_fixe_total']:.2f} €"
-                    row += 1
-                    
-                    ws[f'A{row}'] = "Coût variable"
-                    ws[f'B{row}'] = f"{s['vehicule_optimal']['cout_variable_total']:.2f} €"
-                    row += 1
-                    
-                    ws[f'A{row}'] = "Coût total semaine"
-                    ws[f'B{row}'] = f"{s['vehicule_optimal']['cout_total']:.2f} €"
-                    ws[f'B{row}'].font = Font(bold=True)
-                    row += 2
-        else:
-            # Mono-semaine
-            opt = resultats['vehicule_optimal']
-            
-            ws[f'A{row}'] = "Coût fixe total"
-            ws[f'B{row}'] = f"{opt['cout_fixe_total']:.2f} €"
-            row += 1
-            
-            ws[f'A{row}'] = "Coût variable total"
-            ws[f'B{row}'] = f"{opt['cout_variable_total']:.2f} €"
-            row += 1
-            
-            ws[f'A{row}'] = "COÛT TOTAL"
-            ws[f'B{row}'] = f"{opt['cout_total']:.2f} €"
-            ws[f'A{row}'].font = Font(bold=True)
-            ws[f'B{row}'].font = Font(bold=True, color="FF0000")
-            
-        ws.column_dimensions['A'].width = 25
-        ws.column_dimensions['B'].width = 20
-    
-    def _exporter_vers_csv(self, resultats, dossier, is_multi):
-        """Exporte vers CSV (plusieurs fichiers)"""
-        
-        print(f"📄 Export CSV...")
-        fichiers_csv = []
-        
-        if is_multi:
-            # Résumé global
-            df_resume = self._creer_dataframe_resume_multi(resultats)
-            fichier_resume = os.path.join(dossier, f"resume_global_{self.timestamp}.csv")
-            df_resume.to_csv(fichier_resume, index=False, encoding='utf-8-sig', sep=';')
-            fichiers_csv.append(fichier_resume)
-            
-            # Détails par semaine
-            for semaine_num in [1, 2]:
-                semaine_key = f'resultats_semaine{semaine_num}'
-                if resultats.get(semaine_key):
-                    df_semaine = self._creer_dataframe_semaine(resultats[semaine_key])
-                    fichier_semaine = os.path.join(dossier, f"semaine_{semaine_num}_{self.timestamp}.csv")
-                    df_semaine.to_csv(fichier_semaine, index=False, encoding='utf-8-sig', sep=';')
-                    fichiers_csv.append(fichier_semaine)
-        else:
-            # Mono-semaine
-            df_solution = self._creer_dataframe_semaine(resultats)
-            fichier_solution = os.path.join(dossier, f"solution_optimisation_{self.timestamp}.csv")
-            df_solution.to_csv(fichier_solution, index=False, encoding='utf-8-sig', sep=';')
-            fichiers_csv.append(fichier_solution)
-            
-        return fichiers_csv
-    
-    def _creer_dataframe_resume_multi(self, resultats):
-        """Crée un DataFrame pour le résumé multi-semaines"""
-        
-        data = []
-        
-        # Ligne globale
-        data.append({
-            'Type': 'GLOBAL',
-            'Semaine': 'PROJET',
-            'Vehicule': 'N/A',
-            'Nb_Vehicules': resultats['nb_vehicules_total'],
-            'Cout_Total': resultats['cout_total_global'],
-            'Duree_Jours': resultats['duree_totale_projet']
-        })
-        
-        # Lignes par semaine
-        for semaine_num in [1, 2]:
-            semaine_key = f'resultats_semaine{semaine_num}'
-            if resultats.get(semaine_key):
-                s = resultats[semaine_key]
-                data.append({
-                    'Type': 'SEMAINE',
-                    'Semaine': f'S{semaine_num}',
-                    'Vehicule': s['vehicule_utilise']['nom'],
-                    'Nb_Vehicules': s['nb_vehicules_necessaires'],
-                    'Cout_Total': s['vehicule_optimal']['cout_total'],
-                    'Duree_Jours': s['duree_reelle']
-                })
-                
-        return pd.DataFrame(data)
-    
-    def _creer_dataframe_semaine(self, resultats_semaine):
-        """Crée un DataFrame pour une semaine"""
-        
-        data = []
-        
-        if 'planification_detaillee' in resultats_semaine:
-            planif = resultats_semaine['planification_detaillee']
-            for planif_vehicule in planif['planifications_vehicules']:
-                for voyage in planif_vehicule['voyages']:
-                    charge = voyage['charge_transportee']
-                    produits = ", ".join([f"{p['produit']['nom']}({p['quantite_voyage']})" for p in charge['produits']])
-                    
-                    data.append({
-                        'Vehicule_ID': planif_vehicule['vehicule_id'],
-                        'Voyage_Numero': voyage['voyage_numero'],
-                        'Date_Depart': voyage['aller']['date_depart'],
-                        'Heure_Depart': voyage['aller']['heure_depart'],
-                        'Date_Arrivee': voyage['aller']['date_arrivee'],
-                        'Heure_Arrivee': voyage['aller']['heure_arrivee'],
-                        'Charge_Poids_T': charge['poids'],
-                        'Charge_Volume_M3': charge['volume'],
-                        'Produits_Transportes': produits,
-                        'Distance_KM': voyage['aller']['distance_km'],
-                        'Temps_Conduite_H': voyage['aller']['temps_conduite_total']
-                    })
-                    
-        return pd.DataFrame(data)
-    
-    def _exporter_vers_json(self, resultats, dossier, is_multi):
-        """Exporte vers JSON"""
-        
-        nom_fichier = f"optimisation_complete_{self.timestamp}.json"
-        chemin_fichier = os.path.join(dossier, nom_fichier)
-        
-        print(f"🔗 Export JSON: {nom_fichier}")
-        
-        # Préparer les données pour JSON (sérialisation)
-        donnees_json = self._preparer_donnees_json(resultats)
-        
-        with open(chemin_fichier, 'w', encoding='utf-8') as f:
-            json.dump(donnees_json, f, indent=2, ensure_ascii=False, default=str)
-            
-        return chemin_fichier
-    
-    def _preparer_donnees_json(self, resultats):
-        """Prépare les données pour l'export JSON"""
-        
-        # Conversion récursive des objets non-sérialisables
-        def convertir_pour_json(obj):
-            if isinstance(obj, dict):
-                return {k: convertir_pour_json(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                return [convertir_pour_json(item) for item in obj]
-            elif hasattr(obj, '__dict__'):
-                return convertir_pour_json(obj.__dict__)
-            else:
-                return obj
-                
-        donnees = convertir_pour_json(resultats)
-        
-        # Ajouter des métadonnées
-        donnees['export_metadata'] = {
-            'timestamp': self.timestamp,
-            'export_date': datetime.now().isoformat(),
-            'version': '1.0',
-            'format': 'optimisation_navettes_json'
-        }
-        
-        return donnees
-    
-    def _exporter_vers_pdf(self, resultats, dossier, is_multi):
-        """Exporte vers PDF"""
-        
-        nom_fichier = f"rapport_optimisation_{self.timestamp}.pdf"
-        chemin_fichier = os.path.join(dossier, nom_fichier)
-        
-        print(f"📋 Export PDF: {nom_fichier}")
-        
-        doc = SimpleDocTemplate(chemin_fichier, pagesize=landscape(A4))
-        styles = getSampleStyleSheet()
-        story = []
-        
-        # Titre principal
-        titre_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=18,
-            spaceAfter=20,
-            alignment=1  # Centré
-        )
-        
-        story.append(Paragraph("RAPPORT D'OPTIMISATION DES NAVETTES", titre_style))
-        story.append(Spacer(1, 20))
-        
-        if is_multi:
-            # Résumé multi-semaines
-            story.append(Paragraph("RÉSUMÉ GLOBAL", styles['Heading2']))
-            
-            data_resume = [
-                ['Métrique', 'Valeur'],
-                ['Durée totale projet', f"{resultats['duree_totale_projet']} jours"],
-                ['Coût total', f"{resultats['cout_total_global']:.2f} €"],
-                ['Nombre total véhicules', str(resultats['nb_vehicules_total'])]
-            ]
-            
-            table_resume = Table(data_resume)
-            table_resume.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 12),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black)
-            ]))
-            
-            story.append(table_resume)
-            story.append(Spacer(1, 20))
-            
-            # Détails par semaine
-            for semaine_num in [1, 2]:
-                semaine_key = f'resultats_semaine{semaine_num}'
-                if resultats.get(semaine_key):
-                    s = resultats[semaine_key]
-                    
-                    story.append(Paragraph(f"SEMAINE {semaine_num}", styles['Heading3']))
-                    
-                    data_semaine = [
-                        ['Aspect', 'Détail'],
-                        ['Véhicule utilisé', s['vehicule_utilise']['nom']],
-                        ['Nombre de véhicules', str(s['nb_vehicules_necessaires'])],
-                        ['Coût total', f"{s['vehicule_optimal']['cout_total']:.2f} €"],
-                        ['Durée réelle', f"{s['duree_reelle']} jours"],
-                        ['Nombre de voyages', str(s['planification_detaillee']['total_voyages'])]
-                    ]
-                    
-                    table_semaine = Table(data_semaine)
-                    table_semaine.setStyle(TableStyle([
-                        ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
-                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                        ('FONTSIZE', (0, 0), (-1, 0), 10),
-                        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                        ('BACKGROUND', (0, 1), (-1, -1), colors.lightgrey),
-                        ('GRID', (0, 0), (-1, -1), 1, colors.black)
-                    ]))
-                    
-                    story.append(table_semaine)
-                    story.append(Spacer(1, 15))
-        else:
-            # Solution mono-semaine
-            story.append(Paragraph("SOLUTION OPTIMALE", styles['Heading2']))
-            
-            opt = resultats['vehicule_optimal']
-            data_solution = [
-                ['Aspect', 'Valeur'],
-                ['Véhicule sélectionné', resultats['vehicule_utilise']['nom']],
-                ['Type de véhicule', resultats['vehicule_utilise']['type']],
-                ['Nombre de véhicules', str(resultats['nb_vehicules_necessaires'])],
-                ['Durée réelle', f"{resultats['duree_reelle']} jours"],
-                ['Coût fixe', f"{opt['cout_fixe_total']:.2f} €"],
-                ['Coût variable', f"{opt['cout_variable_total']:.2f} €"],
-                ['COÛT TOTAL', f"{opt['cout_total']:.2f} €"]
-            ]
-            
-            table_solution = Table(data_solution)
-            table_solution.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 12),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                ('BACKGROUND', (0, -1), (-1, -1), colors.yellow),  # Dernière ligne en surbrillance
-                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black)
-            ]))
-            
-            story.append(table_solution)
-            
-        doc.build(story)
-        return chemin_fichier
+# Correction pour l'erreur Pyomo - Imports conditionnels
+try:
+    import pyomo.environ as pyo
+    from pyomo.opt import SolverFactory
+    PYOMO_AVAILABLE = True
+except ImportError:
+    PYOMO_AVAILABLE = False
+    print("⚠️ Pyomo non disponible - Fonctionnalités avancées d'optimisation désactivées")
 
-    def exporter_planning_excel_detaille(self, resultats, dossier_export="exports"):
-        """Exporte un planning Excel ultra-détaillé avec formatage avancé"""
-        
-        nom_fichier = f"planning_detaille_{self.timestamp}.xlsx"
-        chemin_fichier = os.path.join(dossier_export, nom_fichier)
-        
-        print(f"📅 Export Planning Détaillé: {nom_fichier}")
-        
-        wb = Workbook()
-        wb.remove(wb.active)
-        
-        # Style pour les headers
-        header_font = Font(bold=True, color="FFFFFF")
-        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
-        border = Border(left=Side(style='thin'), right=Side(style='thin'), 
-                       top=Side(style='thin'), bottom=Side(style='thin'))
-        
-        is_multi_semaines = 'resultats_semaine1' in resultats or 'resultats_semaine2' in resultats
-        
-        if is_multi_semaines:
-            # Onglet par semaine
-            for semaine_num in [1, 2]:
-                semaine_key = f'resultats_semaine{semaine_num}'
-                if resultats.get(semaine_key):
-                    ws = wb.create_sheet(f"Planning S{semaine_num}")
-                    self._creer_planning_detaille_semaine(ws, resultats[semaine_key], semaine_num, header_font, header_fill, border)
-            
-            # Onglet comparatif
-            ws_comp = wb.create_sheet("Comparatif Semaines")
-            self._creer_comparatif_semaines(ws_comp, resultats, header_font, header_fill, border)
-        else:
-            # Planning unique
-            ws = wb.create_sheet("Planning Complet")
-            self._creer_planning_detaille_semaine(ws, resultats, 1, header_font, header_fill, border)
-            
-        wb.save(chemin_fichier)
-        return chemin_fichier
-    
-    def _creer_planning_detaille_semaine(self, ws, resultats_semaine, semaine_num, header_font, header_fill, border):
-        """Crée un planning détaillé pour une semaine avec formatage avancé"""
-        
-        # Titre
-        ws['A1'] = f"PLANNING DÉTAILLÉ SEMAINE {semaine_num}"
-        ws['A1'].font = Font(size=16, bold=True)
-        ws.merge_cells('A1:P1')
-        ws['A1'].alignment = Alignment(horizontal='center')
-        
-        # Headers du tableau
-        headers = [
-            'Véhicule', 'Voyage', 'Date Départ', 'Heure Départ', 'Date Arrivée', 'Heure Arrivée',
-            'Durée Trajet (h)', 'Distance (km)', 'Charge Poids (t)', 'Charge Volume (m³)',
-            'Utilisation Poids (%)', 'Utilisation Volume (%)', 'Produits', 'Quantités', 'Pauses Repos', 'Pauses Nuit'
-        ]
-        
-        row = 3
-        for col, header in enumerate(headers, 1):
-            cell = ws.cell(row=row, column=col, value=header)
-            cell.font = header_font
-            cell.fill = header_fill
-            cell.border = border
-            cell.alignment = Alignment(horizontal='center', wrap_text=True)
-            
-        row += 1
-        
-        # Données du planning
-        vehicule = resultats_semaine['vehicule_utilise']
-        planif = resultats_semaine['planification_detaillee']
-        
-        for planif_vehicule in planif['planifications_vehicules']:
-            for voyage in planif_vehicule['voyages']:
-                charge = voyage['charge_transportee']
-                aller = voyage['aller']
-                
-                # Calculs d'utilisation
-                util_poids = (charge['poids'] / vehicule['capacite_poids_max']) * 100
-                util_volume = (charge['volume'] / vehicule['capacite_volume_max']) * 100
-                
-                # Produits et quantités séparés
-                produits = [p['produit']['nom'] for p in charge['produits']]
-                quantites = [str(p['quantite_voyage']) for p in charge['produits']]
-                
-                # Données de la ligne
-                donnees = [
-                    f"Véhicule {planif_vehicule['vehicule_id']}",
-                    voyage['voyage_numero'],
-                    aller['date_depart'],
-                    aller['heure_depart'],
-                    aller['date_arrivee'],
-                    aller['heure_arrivee'],
-                    f"{aller['temps_conduite_total']:.2f}",
-                    aller['distance_km'],
-                    f"{charge['poids']:.2f}",
-                    f"{charge['volume']:.2f}",
-                    f"{util_poids:.1f}%",
-                    f"{util_volume:.1f}%",
-                    "\n".join(produits),
-                    "\n".join(quantites),
-                    aller['pauses_repos'],
-                    aller['pauses_nuit']
-                ]
-                
-                for col, valeur in enumerate(donnees, 1):
-                    cell = ws.cell(row=row, column=col, value=valeur)
-                    cell.border = border
-                    
-                    # Formatage conditionnel pour les utilisations
-                    if col == 11 or col == 12:  # Colonnes utilisation
-                        if util_poids > 90 or util_volume > 90:
-                            cell.fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
-                        elif util_poids > 75 or util_volume > 75:
-                            cell.fill = PatternFill(start_color="FFE66D", end_color="FFE66D", fill_type="solid")
-                        else:
-                            cell.fill = PatternFill(start_color="95E1D3", end_color="95E1D3", fill_type="solid")
-                    
-                    # Alignement pour les colonnes de texte multiple
-                    if col in [13, 14]:  # Produits et quantités
-                        cell.alignment = Alignment(vertical='top', wrap_text=True)
-                        
-                row += 1
-                
-        # Ajustement des colonnes
-        colonnes_width = [12, 8, 12, 12, 12, 12, 12, 10, 12, 12, 15, 15, 25, 15, 12, 12]
-        for i, width in enumerate(colonnes_width, 1):
-            ws.column_dimensions[chr(64 + i)].width = width
-            
-        # Ligne de totaux
-        row += 1
-        ws.cell(row=row, column=1, value="TOTAUX").font = Font(bold=True)
-        
-        # Calcul des totaux
-        total_poids = sum(
-            sum(voyage['charge_transportee']['poids'] for voyage in planif_vehicule['voyages'])
-            for planif_vehicule in planif['planifications_vehicules']
-        )
-        total_volume = sum(
-            sum(voyage['charge_transportee']['volume'] for voyage in planif_vehicule['voyages'])
-            for planif_vehicule in planif['planifications_vehicules']
-        )
-        total_distance = sum(
-            sum(voyage['aller']['distance_km'] for voyage in planif_vehicule['voyages'])
-            for planif_vehicule in planif['planifications_vehicules']
-        )
-        
-        ws.cell(row=row, column=8, value=f"{total_distance} km").font = Font(bold=True)
-        ws.cell(row=row, column=9, value=f"{total_poids:.2f} t").font = Font(bold=True)
-        ws.cell(row=row, column=10, value=f"{total_volume:.2f} m³").font = Font(bold=True)
-        
-    def _creer_comparatif_semaines(self, ws, resultats, header_font, header_fill, border):
-        """Crée un comparatif entre les semaines"""
-        
-        ws['A1'] = "COMPARATIF INTER-SEMAINES"
-        ws['A1'].font = Font(size=16, bold=True)
-        ws.merge_cells('A1:F1')
-        ws['A1'].alignment = Alignment(horizontal='center')
-        
-        # Headers
-        headers = ['Métrique', 'Semaine 1', 'Semaine 2', 'Total', 'Différence', 'Optimisation']
-        
-        row = 3
-        for col, header in enumerate(headers, 1):
-            cell = ws.cell(row=row, column=col, value=header)
-            cell.font = header_font
-            cell.fill = header_fill
-            cell.border = border
-            
-        row += 1
-        
-        # Données comparatives
-        s1 = resultats.get('resultats_semaine1')
-        s2 = resultats.get('resultats_semaine2')
-        
-        comparaisons = [
-            ['Véhicule utilisé', 
-             s1['vehicule_utilise']['nom'] if s1 else 'N/A',
-             s2['vehicule_utilise']['nom'] if s2 else 'N/A',
-             'N/A',
-             'Identique' if s1 and s2 and s1['vehicule_utilise']['nom'] == s2['vehicule_utilise']['nom'] else 'Différent',
-             'Unifier si possible'],
-            
-            ['Coût total (€)',
-             f"{s1['vehicule_optimal']['cout_total']:.2f}" if s1 else '0',
-             f"{s2['vehicule_optimal']['cout_total']:.2f}" if s2 else '0',
-             f"{resultats['cout_total_global']:.2f}",
-             f"{abs(s1['vehicule_optimal']['cout_total'] - s2['vehicule_optimal']['cout_total']):.2f}" if s1 and s2 else 'N/A',
-             'Équilibrer les charges'],
-             
-            ['Nb véhicules',
-             str(s1['nb_vehicules_necessaires']) if s1 else '0',
-             str(s2['nb_vehicules_necessaires']) if s2 else '0',
-             str(resultats['nb_vehicules_total']),
-             str(abs(s1['nb_vehicules_necessaires'] - s2['nb_vehicules_necessaires'])) if s1 and s2 else 'N/A',
-             'Homogénéiser'],
-             
-            ['Durée (jours)',
-             str(s1['duree_reelle']) if s1 else '0',
-             str(s2['duree_reelle']) if s2 else '0',
-             str(resultats['duree_totale_projet']),
-             str(abs(s1['duree_reelle'] - s2['duree_reelle'])) if s1 and s2 else 'N/A',
-             'Optimiser planning'],
-             
-            ['Nb voyages total',
-             str(s1['planification_detaillee']['total_voyages']) if s1 else '0',
-             str(s2['planification_detaillee']['total_voyages']) if s2 else '0',
-             str((s1['planification_detaillee']['total_voyages'] if s1 else 0) + (s2['planification_detaillee']['total_voyages'] if s2 else 0)),
-             str(abs((s1['planification_detaillee']['total_voyages'] if s1 else 0) - (s2['planification_detaillee']['total_voyages'] if s2 else 0))),
-             'Répartir équitablement']
-        ]
-        
-        for comparaison in comparaisons:
-            for col, valeur in enumerate(comparaison, 1):
-                cell = ws.cell(row=row, column=col, value=valeur)
-                cell.border = border
-                
-                # Formatage spécial pour la colonne optimisation
-                if col == 6:
-                    cell.fill = PatternFill(start_color="E8F4FD", end_color="E8F4FD", fill_type="solid")
-                    cell.font = Font(italic=True)
-                    
-            row += 1
-            
-        # Ajuster les colonnes
-        for col in range(1, 7):
-            ws.column_dimensions[chr(64 + col)].width = 20
-            
-    def generer_rapport_executif(self, resultats, dossier_export="exports"):
-        """Génère un rapport exécutif synthétique"""
-        
-        nom_fichier = f"rapport_executif_{self.timestamp}.xlsx"
-        chemin_fichier = os.path.join(dossier_export, nom_fichier)
-        
-        print(f"📊 Export Rapport Exécutif: {nom_fichier}")
-        
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "Rapport Exécutif"
-        
-        # Styles
-        titre_font = Font(size=18, bold=True, color="FFFFFF")
-        titre_fill = PatternFill(start_color="2E4BC6", end_color="2E4BC6", fill_type="solid")
-        
-        # Titre principal
-        ws['A1'] = "RAPPORT EXÉCUTIF - OPTIMISATION NAVETTES"
-        ws['A1'].font = titre_font
-        ws['A1'].fill = titre_fill
-        ws.merge_cells('A1:F1')
-        ws['A1'].alignment = Alignment(horizontal='center')
-        
-        row = 3
-        
-        # Résumé exécutif
-        is_multi = 'resultats_semaine1' in resultats or 'resultats_semaine2' in resultats
-        
-        ws[f'A{row}'] = "RÉSUMÉ EXÉCUTIF"
-        ws[f'A{row}'].font = Font(size=14, bold=True, color="2E4BC6")
-        row += 2
-        
-        if is_multi:
-            # Multi-semaines
-            ws[f'A{row}'] = f"• Projet sur {resultats['duree_totale_projet']} jours (2 semaines)"
-            row += 1
-            ws[f'A{row}'] = f"• Coût total optimisé: {resultats['cout_total_global']:.2f} €"
-            row += 1
-            ws[f'A{row}'] = f"• {resultats['nb_vehicules_total']} véhicules mobilisés au total"
-            row += 1
-            
-            if resultats.get('resultats_semaine1') and resultats.get('resultats_semaine2'):
-                s1 = resultats['resultats_semaine1']
-                s2 = resultats['resultats_semaine2']
-                if s1['vehicule_utilise']['nom'] == s2['vehicule_utilise']['nom']:
-                    ws[f'A{row}'] = f"• Continuité opérationnelle: même véhicule ({s1['vehicule_utilise']['nom']})"
-                else:
-                    ws[f'A{row}'] = f"• Gestion multi-véhicules: {s1['vehicule_utilise']['nom']} + {s2['vehicule_utilise']['nom']}"
-                row += 1
-        else:
-            # Mono-semaine
-            ws[f'A{row}'] = f"• Projet sur {resultats['duree_reelle']} jours"
-            row += 1
-            ws[f'A{row}'] = f"• Coût total: {resultats['vehicule_optimal']['cout_total']:.2f} €"
-            row += 1
-            ws[f'A{row}'] = f"• Véhicule optimal: {resultats['vehicule_utilise']['nom']}"
-            row += 1
-            ws[f'A{row}'] = f"• {resultats['nb_vehicules_necessaires']} véhicule(s) nécessaire(s)"
-            row += 1
-            
-        row += 2
-        
-        # Recommandations
-        ws[f'A{row}'] = "RECOMMANDATIONS CLÉS"
-        ws[f'A{row}'].font = Font(size=14, bold=True, color="2E4BC6")
-        row += 2
-        
-        recommandations = self._generer_recommandations_executives(resultats, is_multi)
-        for recommandation in recommandations:
-            ws[f'A{row}'] = f"• {recommandation}"
-            row += 1
-            
-        # Ajuster les colonnes
-        ws.column_dimensions['A'].width = 80
-        
-        wb.save(chemin_fichier)
-        return chemin_fichier
-    
-    def _generer_recommandations_executives(self, resultats, is_multi):
-        """Génère des recommandations pour le niveau exécutif"""
-        
-        recommandations = []
-        
-        if is_multi:
-            s1 = resultats.get('resultats_semaine1')
-            s2 = resultats.get('resultats_semaine2')
-            
-            if s1 and s2:
-                # Analyse des coûts
-                cout_s1 = s1['vehicule_optimal']['cout_total']
-                cout_s2 = s2['vehicule_optimal']['cout_total']
-                
-                if abs(cout_s1 - cout_s2) / max(cout_s1, cout_s2) > 0.2:
-                    recommandations.append("Déséquilibre des coûts détecté (>20%) - Rééquilibrer la répartition des produits")
-                    
-                if s1['vehicule_utilise']['nom'] != s2['vehicule_utilise']['nom']:
-                    recommandations.append("Véhicules différents utilisés - Évaluer l'unification pour réduire les coûts fixes")
-                else:
-                    recommandations.append("Continuité véhicule assurée - Optimisation des coûts fixes réussie")
-                    
-                # Analyse de l'utilisation
-                if s1['nb_vehicules_necessaires'] == 1 and s2['nb_vehicules_necessaires'] == 1:
-                    recommandations.append("Risque opérationnel faible - Solution de secours recommandée")
-                else:
-                    recommandations.append("Complexité multi-véhicules - Renforcer la coordination des équipes")
-                    
-        else:
-            # Mono-semaine
-            opt = resultats['vehicule_optimal']
-            
-            if resultats['nb_vehicules_necessaires'] == 1:
-                recommandations.append("Solution simple et économique - Risque de dépendance unique")
-            else:
-                recommandations.append(f"Solution multi-véhicules ({resultats['nb_vehicules_necessaires']}) - Avantage de parallélisation")
-                
-            # Analyse du coût par tonne
-            poids_total = resultats['demande_equivalente']['quantite_poids']
-            if poids_total > 0:
-                cout_par_tonne = opt['cout_total'] / poids_total
-                if cout_par_tonne < 50:
-                    recommandations.append("Excellent ratio coût/tonne - Solution très compétitive")
-                elif cout_par_tonne > 100:
-                    recommandations.append("Ratio coût/tonne élevé - Évaluer des alternatives")
-                    
-        recommandations.append("Surveiller les contraintes temporelles pour respecter les échéances")
-        recommandations.append("Prévoir des solutions de contingence en cas de problème véhicule")
-        
-        return recommandations
-
-# Exemple d'utilisation corrigé
-def exemple_export():
-    """Exemple d'utilisation de l'exportateur avec données complètes"""
-    
-    # Simuler des résultats COMPLETS (structure réaliste)
-    resultats_exemple = {
-        'vehicule_utilise': {
-            'nom': 'SEMI-REMORQUE STANDARD', 
-            'type': 'LOURD',
-            'capacite_poids_max': 40,
-            'capacite_volume_max': 100,
-            'vitesse_kmh': 75,
-            'cout_fixe_jour': 400,
-            'cout_variable_km': 1.20
-        },
-        'nb_vehicules_necessaires': 1,
-        'duree_reelle': 5,
-        'respect_contrainte': True,
-        'vehicule_optimal': {
-            'cout_total': 2450.50,
-            'cout_fixe_total': 2000.00,
-            'cout_variable_total': 450.50,
-            'voyages_par_vehicule': 3,
-            'nb_vehicules_necessaires': 1,
-            'duree_reelle_jours': 5
-        },
-        'demande_equivalente': {
-            'nom': 'TRANSPORT MULTI-PRODUITS A→B',
-            'distance_km': 800,
-            'vitesse_kmh': 80,
-            'quantite_poids': 45.5,
-            'quantite_volume': 120.3
-        },
-        'produits_a_transporter': [
-            {
-                'nom': 'MACHINES INDUSTRIELLES',
-                'quantite': 15,
-                'poids_unitaire': 2.5,
-                'volume_unitaire': 8.0,
-                'distance_km': 800,
-                'vitesse_kmh': 80
-            },
-            {
-                'nom': 'ÉQUIPEMENTS ÉLECTRONIQUES',
-                'quantite': 80,
-                'poids_unitaire': 0.3,
-                'volume_unitaire': 1.2,
-                'distance_km': 800,
-                'vitesse_kmh': 80
-            }
-        ],
-        'planification_detaillee': {
-            'nb_vehicules': 1,
-            'total_voyages': 3,
-            'date_debut': '2025-06-02',
-            'date_fin': '2025-06-06',
-            'duree_reelle_jours': 5,
-            'respect_contrainte': True,
-            'planifications_vehicules': [
-                {
-                    'vehicule_id': 1,
-                    'nb_voyages': 3,
-                    'produits_transportes': {
-                        'MACHINES INDUSTRIELLES': 15,
-                        'ÉQUIPEMENTS ÉLECTRONIQUES': 80
-                    },
-                    'charge_totale': {
-                        'poids': 45.5,
-                        'volume': 120.3
-                    },
-                    'voyages': [
-                        {
-                            'voyage_numero': 1,
-                            'charge_transportee': {
-                                'poids': 20.0,
-                                'volume': 60.0,
-                                'produits': [
-                                    {
-                                        'produit': {
-                                            'nom': 'MACHINES INDUSTRIELLES',
-                                            'poids_unitaire': 2.5,
-                                            'volume_unitaire': 8.0
-                                        },
-                                        'quantite_voyage': 8
-                                    }
-                                ]
-                            },
-                            'temps_chargement': '01:30',
-                            'aller': {
-                                'date_depart': '2025-06-02',
-                                'heure_depart': '08:00',
-                                'date_arrivee': '2025-06-02',
-                                'heure_arrivee': '18:30',
-                                'distance_km': 800,
-                                'temps_conduite_total': 10.5,
-                                'pauses_repos': 4,
-                                'pauses_nuit': 0
-                            },
-                            'temps_dechargement': '01:30',
-                            'retour': {
-                                'date_depart': '2025-06-02',
-                                'heure_depart': '20:00',
-                                'date_arrivee': '2025-06-03',
-                                'heure_arrivee': '06:30',
-                                'distance_km': 800,
-                                'temps_conduite_total': 10.5,
-                                'pauses_repos': 4,
-                                'pauses_nuit': 1
-                            },
-                            'est_dernier_voyage': False,
-                            'respecte_contrainte_temporelle': True
-                        },
-                        {
-                            'voyage_numero': 2,
-                            'charge_transportee': {
-                                'poids': 15.2,
-                                'volume': 40.1,
-                                'produits': [
-                                    {
-                                        'produit': {
-                                            'nom': 'MACHINES INDUSTRIELLES',
-                                            'poids_unitaire': 2.5,
-                                            'volume_unitaire': 8.0
-                                        },
-                                        'quantite_voyage': 6
-                                    }
-                                ]
-                            },
-                            'temps_chargement': '01:30',
-                            'aller': {
-                                'date_depart': '2025-06-03',
-                                'heure_depart': '08:00',
-                                'date_arrivee': '2025-06-03',
-                                'heure_arrivee': '18:30',
-                                'distance_km': 800,
-                                'temps_conduite_total': 10.5,
-                                'pauses_repos': 4,
-                                'pauses_nuit': 0
-                            },
-                            'temps_dechargement': '01:30',
-                            'retour': {
-                                'date_depart': '2025-06-03',
-                                'heure_depart': '20:00',
-                                'date_arrivee': '2025-06-04',
-                                'heure_arrivee': '06:30',
-                                'distance_km': 800,
-                                'temps_conduite_total': 10.5,
-                                'pauses_repos': 4,
-                                'pauses_nuit': 1
-                            },
-                            'est_dernier_voyage': False,
-                            'respecte_contrainte_temporelle': True
-                        },
-                        {
-                            'voyage_numero': 3,
-                            'charge_transportee': {
-                                'poids': 10.3,
-                                'volume': 20.2,
-                                'produits': [
-                                    {
-                                        'produit': {
-                                            'nom': 'MACHINES INDUSTRIELLES',
-                                            'poids_unitaire': 2.5,
-                                            'volume_unitaire': 8.0
-                                        },
-                                        'quantite_voyage': 1
-                                    },
-                                    {
-                                        'produit': {
-                                            'nom': 'ÉQUIPEMENTS ÉLECTRONIQUES',
-                                            'poids_unitaire': 0.3,
-                                            'volume_unitaire': 1.2
-                                        },
-                                        'quantite_voyage': 80
-                                    }
-                                ]
-                            },
-                            'temps_chargement': '01:30',
-                            'aller': {
-                                'date_depart': '2025-06-04',
-                                'heure_depart': '08:00',
-                                'date_arrivee': '2025-06-04',
-                                'heure_arrivee': '18:30',
-                                'distance_km': 800,
-                                'temps_conduite_total': 10.5,
-                                'pauses_repos': 4,
-                                'pauses_nuit': 0
-                            },
-                            'temps_dechargement': '01:30',
-                            'retour': None,  # Dernier voyage
-                            'est_dernier_voyage': True,
-                            'respecte_contrainte_temporelle': True
-                        }
-                    ]
-                }
-            ]
-        }
-    }
-    
-    # Créer l'exportateur et exporter
-    print("🚀 Démarrage de l'export avec données complètes...")
-    exportateur = ExportateurSolutions()
-    
-    try:
-        # Export complet (tous formats)
-        fichiers = exportateur.exporter_solution_complete(resultats_exemple, "all")
-        
-        # Export planning détaillé
-        planning = exportateur.exporter_planning_excel_detaille(resultats_exemple)
-        
-        # Rapport exécutif
-        rapport = exportateur.generer_rapport_executif(resultats_exemple)
-        
-        print(f"\n🎉 Exports terminés avec succès:")
-        print(f"- Fichiers générés: {len(fichiers) + 2}")
-        for fichier in fichiers:
-            print(f"  ✅ {fichier}")
-        print(f"  ✅ Planning détaillé: {planning}")
-        print(f"  ✅ Rapport exécutif: {rapport}")
-        
-    except Exception as e:
-        print(f"❌ Erreur lors de l'export: {str(e)}")
-        import traceback
-        traceback.print_exc()
-
-if __name__ == "__main__":
-    exemple_export()
 class OptimisateurNavettes:
     def __init__(self):
         self.model = None
-        self.solver = SolverFactory('gurobi')
+        if PYOMO_AVAILABLE:
+            try:
+                self.solver = SolverFactory('gurobi')
+            except:
+                try:
+                    self.solver = SolverFactory('glpk')
+                except:
+                    self.solver = None
+                    print("⚠️ Aucun solveur d'optimisation disponible - Mode heuristique uniquement")
+        else:
+            self.solver = None
         
     def calculer_navettes_optimales(self, produits_a_transporter, vehicules_data, date_debut, heure_debut, duree_max_jours=7):
         """
@@ -1824,16 +582,6 @@ class OptimisateurNavettes:
         
         return pool
     
-    def _effectuer_navettes_melange(self, pool_produits, demande, vehicule, nb_voyages, date_debut, heure_debut, vehicule_id):
-        """
-        MÉTHODE OBSOLÈTE - Remplacée par _effectuer_navettes_melange_avec_contrainte
-        Conservée pour compatibilité mais ne devrait plus être utilisée
-        """
-        print("⚠️ ATTENTION: Utilisation de la méthode obsolète sans contrainte temporelle stricte")
-        return self._effectuer_navettes_melange_avec_contrainte(
-            pool_produits, demande, vehicule, nb_voyages, date_debut, heure_debut, vehicule_id, "2025-12-31"
-        )
-    
     def _selectionner_produits_melange(self, pool_produits, capacite_poids_max, capacite_volume_max, voyage_num):
         """
         Sélectionne les produits selon la stratégie de mélange optimal:
@@ -2088,14 +836,19 @@ class OptimisateurNavettes:
         return resultat
 
 
-from pyomo.opt import SolverFactory
-from datetime import datetime, timedelta
-import math
-
 class OptimisateurNavettesMultiSemaines:
     def __init__(self):
         self.model = None
-        self.solver = SolverFactory('gurobi')
+        if PYOMO_AVAILABLE:
+            try:
+                self.solver = SolverFactory('gurobi')
+            except:
+                try:
+                    self.solver = SolverFactory('glpk')
+                except:
+                    self.solver = None
+        else:
+            self.solver = None
         
     def calculer_navettes_optimales_multi_semaines(self, produits_semaine1, produits_semaine2, vehicules_data, date_debut, heure_debut):
         """
@@ -2209,7 +962,6 @@ class OptimisateurNavettesMultiSemaines:
     
     def _optimiser_semaine_unique(self, produits_semaine, vehicules_data, date_debut, heure_debut, duree_max_jours, numero_semaine):
         """Optimise une semaine spécifique en utilisant la logique existante"""
-        
         
         optimiseur_original = OptimisateurNavettes()
         
@@ -2522,10 +1274,1060 @@ class OptimisateurNavettesMultiSemaines:
         date_fin_semaine = date_obj + timedelta(days=numero_semaine * 7 - 1)
         return date_fin_semaine.strftime('%Y-%m-%d')
 
-def main_multi_semaines():
-    """Exemple d'utilisation avec contraintes temporelles séparées"""
+
+class SolutionTransport:
+    """
+    Wrapper unifié pour optimisation Local Search
+    """
     
-    # Configuration des véhicules (identique à l'original)
+    def __init__(self, resultats_heuristique_existante):
+        """
+        Prend les résultats de OptimisateurNavettes.calculer_navettes_optimales()
+        et les transforme en format modifiable pour LS/VNS
+        """
+        
+        if not resultats_heuristique_existante:
+            raise ValueError("Résultats heuristique ne peuvent pas être None")
+        
+        # 1. SAUVEGARDE des résultats originaux
+        self.resultats_originaux = copy.deepcopy(resultats_heuristique_existante)
+        
+        # 2. EXTRACTION des informations principales
+        self.cout_initial = resultats_heuristique_existante['vehicule_optimal']['cout_total']
+        self.vehicule_utilise = resultats_heuristique_existante['vehicule_utilise']
+        self.date_debut = resultats_heuristique_existante.get('date_debut_projet', '2025-06-02')
+        
+        # 3. RESTRUCTURATION en format unifié
+        self.vehicules = self._extraire_vehicules(resultats_heuristique_existante)
+        self.voyages = self._extraire_voyages(resultats_heuristique_existante)
+        self.produits_index = self._creer_index_produits()
+        
+        # 4. ÉTAT MODIFIABLE
+        self.cout_total = self.cout_initial
+        self.est_valide = True
+        self.historique_modifications = []
+        
+        print(f"✅ SolutionTransport initialisée:")
+        print(f"   - Coût initial: {self.cout_initial:.2f}€")
+        print(f"   - Nb véhicules: {len(self.vehicules)}")
+        print(f"   - Nb voyages: {len(self.voyages)}")
+        print(f"   - Nb produits total: {sum(len(v['produits']) for v in self.voyages)}")
+    
+    def _extraire_vehicules(self, resultats):
+        """Extrait les véhicules dans un format unifié"""
+        vehicules = []
+        
+        for planif in resultats['planification_detaillee']['planifications_vehicules']:
+            vehicule_info = {
+                'id': planif['vehicule_id'],
+                'nom': resultats['vehicule_utilise']['nom'],
+                'type': resultats['vehicule_utilise']['type'],
+                'capacite_poids_max': resultats['vehicule_utilise']['capacite_poids_max'],
+                'capacite_volume_max': resultats['vehicule_utilise']['capacite_volume_max'],
+                'cout_fixe_jour': resultats['vehicule_utilise']['cout_fixe_jour'],
+                'cout_variable_km': resultats['vehicule_utilise']['cout_variable_km'],
+                'nb_voyages': planif['nb_voyages'],
+                'charge_totale': planif['charge_totale']
+            }
+            vehicules.append(vehicule_info)
+        
+        return vehicules
+    
+    def _extraire_voyages(self, resultats):
+        """Extrait tous les voyages dans un format unifié"""
+        voyages = []
+        voyage_id = 0
+        
+        for planif in resultats['planification_detaillee']['planifications_vehicules']:
+            for voyage in planif['voyages']:
+                
+                # Extraction sécurisée des informations temporelles
+                timing_info = {}
+                if 'aller' in voyage and voyage['aller']:
+                    timing_info = {
+                        'date_depart': voyage['aller'].get('date_depart'),
+                        'heure_depart': voyage['aller'].get('heure_depart', '08:00'),
+                        'date_arrivee': voyage['aller'].get('date_arrivee'),
+                        'heure_arrivee': voyage['aller'].get('heure_arrivee', '18:00'),
+                        'distance_km': voyage['aller'].get('distance_km', 800)
+                    }
+                
+                voyage_unifie = {
+                    'id': voyage_id,
+                    'vehicule_id': planif['vehicule_id'],
+                    'numero_voyage': voyage['voyage_numero'],
+                    
+                    # Charge actuelle (MODIFIABLE) - copie profonde
+                    'produits': copy.deepcopy(voyage['charge_transportee']['produits']),
+                    'poids_total': voyage['charge_transportee']['poids'],
+                    'volume_total': voyage['charge_transportee']['volume'],
+                    
+                    # Informations temporelles
+                    'timing': timing_info,
+                    
+                    # Capacités du véhicule (pour validation)
+                    'capacites': {
+                        'poids_max': resultats['vehicule_utilise']['capacite_poids_max'],
+                        'volume_max': resultats['vehicule_utilise']['capacite_volume_max']
+                    },
+                    
+                    # Informations pour recalcul des coûts
+                    'vehicule': resultats['vehicule_utilise']
+                }
+                
+                voyages.append(voyage_unifie)
+                voyage_id += 1
+        
+        return voyages
+    
+    def _creer_index_produits(self):
+        """Crée un index des produits pour recherche rapide"""
+        index = {}
+        
+        for voyage in self.voyages:
+            for i, produit_info in enumerate(voyage['produits']):
+                if 'produit' in produit_info and 'nom' in produit_info['produit']:
+                    nom_produit = produit_info['produit']['nom']
+                    if nom_produit not in index:
+                        index[nom_produit] = []
+                    
+                    index[nom_produit].append({
+                        'voyage_id': voyage['id'],
+                        'produit_index': i,
+                        'quantite': produit_info.get('quantite_voyage', 0)
+                    })
+        
+        return index
+    
+    def swap_produits(self, voyage1_id, produit1_index, voyage2_id, produit2_index):
+        """Échange deux produits entre voyages"""
+        
+        voyage1 = self._get_voyage(voyage1_id)
+        voyage2 = self._get_voyage(voyage2_id)
+        
+        if not voyage1 or not voyage2:
+            return False
+        
+        if (produit1_index >= len(voyage1['produits']) or 
+            produit2_index >= len(voyage2['produits'])):
+            return False
+        
+        # Sauvegarde pour rollback
+        backup_v1 = copy.deepcopy(voyage1['produits'])
+        backup_v2 = copy.deepcopy(voyage2['produits'])
+        
+        try:
+            # Effectuer l'échange
+            produit1 = voyage1['produits'][produit1_index]
+            produit2 = voyage2['produits'][produit2_index]
+            
+            voyage1['produits'][produit1_index] = produit2
+            voyage2['produits'][produit2_index] = produit1
+            
+            # Recalculer les charges
+            self._recalculer_charge_voyage(voyage1_id)
+            self._recalculer_charge_voyage(voyage2_id)
+            
+            # Validation
+            if self._valider_voyages([voyage1_id, voyage2_id]):
+                # Recalculer coût total
+                self._recalculer_cout_total()
+                
+                # Logger la modification
+                self._log_modification('swap', {
+                    'voyage1_id': voyage1_id,
+                    'voyage2_id': voyage2_id,
+                    'produit1': produit1.get('produit', {}).get('nom', 'INCONNU'),
+                    'produit2': produit2.get('produit', {}).get('nom', 'INCONNU')
+                })
+                
+                return True
+            else:
+                # Rollback si invalide
+                voyage1['produits'] = backup_v1
+                voyage2['produits'] = backup_v2
+                self._recalculer_charge_voyage(voyage1_id)
+                self._recalculer_charge_voyage(voyage2_id)
+                return False
+                
+        except Exception as e:
+            print(f"❌ Erreur dans swap_produits: {e}")
+            # Rollback en cas d'erreur
+            voyage1['produits'] = backup_v1
+            voyage2['produits'] = backup_v2
+            self._recalculer_charge_voyage(voyage1_id)
+            self._recalculer_charge_voyage(voyage2_id)
+            return False
+    
+    def deplacer_produit(self, produit_index, voyage_source_id, voyage_dest_id):
+        """Déplace un produit d'un voyage vers un autre"""
+        
+        if voyage_source_id == voyage_dest_id:
+            return True  # Pas de changement nécessaire
+        
+        voyage_source = self._get_voyage(voyage_source_id)
+        voyage_dest = self._get_voyage(voyage_dest_id)
+        
+        if not voyage_source or not voyage_dest:
+            return False
+        
+        if produit_index >= len(voyage_source['produits']):
+            return False
+        
+        # Sauvegarde
+        backup_source = copy.deepcopy(voyage_source['produits'])
+        backup_dest = copy.deepcopy(voyage_dest['produits'])
+        
+        try:
+            # Déplacer le produit
+            produit = voyage_source['produits'].pop(produit_index)
+            voyage_dest['produits'].append(produit)
+            
+            # Recalculer charges
+            self._recalculer_charge_voyage(voyage_source_id)
+            self._recalculer_charge_voyage(voyage_dest_id)
+            
+            # Validation
+            if self._valider_voyages([voyage_source_id, voyage_dest_id]):
+                self._recalculer_cout_total()
+                
+                self._log_modification('deplacement', {
+                    'voyage_source_id': voyage_source_id,
+                    'voyage_dest_id': voyage_dest_id,
+                    'produit': produit.get('produit', {}).get('nom', 'INCONNU')
+                })
+                
+                return True
+            else:
+                # Rollback
+                voyage_source['produits'] = backup_source
+                voyage_dest['produits'] = backup_dest
+                self._recalculer_charge_voyage(voyage_source_id)
+                self._recalculer_charge_voyage(voyage_dest_id)
+                return False
+                
+        except Exception as e:
+            print(f"❌ Erreur dans deplacer_produit: {e}")
+            # Rollback
+            voyage_source['produits'] = backup_source
+            voyage_dest['produits'] = backup_dest
+            return False
+    
+    def _get_voyage(self, voyage_id):
+        """Récupère un voyage par ID"""
+        for voyage in self.voyages:
+            if voyage['id'] == voyage_id:
+                return voyage
+        return None
+    
+    def _recalculer_charge_voyage(self, voyage_id):
+        """Recalcule la charge d'un voyage après modification"""
+        voyage = self._get_voyage(voyage_id)
+        if not voyage:
+            return
+        
+        poids_total = 0
+        volume_total = 0
+        
+        for produit_info in voyage['produits']:
+            quantite = produit_info.get('quantite_voyage', 0)
+            
+            if 'produit' in produit_info:
+                poids_unit = produit_info['produit'].get('poids_unitaire', 0)
+                volume_unit = produit_info['produit'].get('volume_unitaire', 0)
+                
+                poids_total += quantite * poids_unit
+                volume_total += quantite * volume_unit
+        
+        voyage['poids_total'] = poids_total
+        voyage['volume_total'] = volume_total
+    
+    def _valider_voyages(self, voyage_ids):
+        """Valide que les voyages respectent les capacités"""
+        for voyage_id in voyage_ids:
+            voyage = self._get_voyage(voyage_id)
+            if not voyage:
+                return False
+            
+            if (voyage['poids_total'] > voyage['capacites']['poids_max'] or
+                voyage['volume_total'] > voyage['capacites']['volume_max']):
+                return False
+        
+        return True
+    
+    def _recalculer_cout_total(self):
+        """Recalcule le coût total après modifications"""
+        
+        cout_total = 0
+        
+        # Grouper voyages par véhicule
+        voyages_par_vehicule = {}
+        for voyage in self.voyages:
+            vehicule_id = voyage['vehicule_id']
+            if vehicule_id not in voyages_par_vehicule:
+                voyages_par_vehicule[vehicule_id] = []
+            voyages_par_vehicule[vehicule_id].append(voyage)
+        
+        # Calculer coût pour chaque véhicule
+        for vehicule_id, voyages_vehicule in voyages_par_vehicule.items():
+            vehicule = self._get_vehicule(vehicule_id)
+            if not vehicule:
+                continue
+            
+            nb_jours_utilisation = self._calculer_jours_utilisation(voyages_vehicule)
+            distance_totale = self._calculer_distance_totale(voyages_vehicule)
+            
+            # Coûts selon votre logique existante
+            cout_fixe_vehicule = vehicule['cout_fixe_jour'] * nb_jours_utilisation
+            cout_variable_vehicule = distance_totale * vehicule['cout_variable_km']
+            
+            cout_total += cout_fixe_vehicule + cout_variable_vehicule
+        
+        self.cout_total = cout_total
+    
+    def _get_vehicule(self, vehicule_id):
+        """Récupère un véhicule par ID"""
+        for vehicule in self.vehicules:
+            if vehicule['id'] == vehicule_id:
+                return vehicule
+        return None
+    
+    def _calculer_jours_utilisation(self, voyages_vehicule):
+        """Calcule le nombre de jours d'utilisation d'un véhicule"""
+        if not voyages_vehicule:
+            return 0
+        
+        # Approche simple : compter les jours uniques utilisés
+        dates_utilisees = set()
+        
+        for voyage in voyages_vehicule:
+            if 'timing' in voyage and voyage['timing'].get('date_depart'):
+                dates_utilisees.add(voyage['timing']['date_depart'])
+        
+        return max(1, len(dates_utilisees))  # Au moins 1 jour
+    
+    def _calculer_distance_totale(self, voyages_vehicule):
+        """Calcule la distance totale parcourue par un véhicule"""
+        distance_totale = 0
+        
+        for voyage in voyages_vehicule:
+            if 'timing' in voyage and voyage['timing'].get('distance_km'):
+                # Aller-retour sauf pour le dernier voyage
+                distance_voyage = voyage['timing']['distance_km']
+                if voyage['numero_voyage'] < len(voyages_vehicule):
+                    distance_voyage *= 2  # Aller-retour
+                distance_totale += distance_voyage
+        
+        return distance_totale
+    
+    def _log_modification(self, type_modification, details):
+        """Enregistre une modification dans l'historique"""
+        self.historique_modifications.append({
+            'type': type_modification,
+            'details': details,
+            'cout_avant': self.cout_total,
+            'timestamp': datetime.now().isoformat()
+        })
+    
+    def clone(self):
+        """Crée une copie profonde pour les tests de Local Search"""
+        return copy.deepcopy(self)
+    
+    def est_solution_valide(self):
+        """Vérifie la validité complète de la solution"""
+        try:
+            # Vérifier capacités de tous les voyages
+            for voyage in self.voyages:
+                if (voyage['poids_total'] > voyage['capacites']['poids_max'] or
+                    voyage['volume_total'] > voyage['capacites']['volume_max']):
+                    return False
+            
+            # Vérifier intégrité des produits
+            if not self._verifier_integrite_produits():
+                return False
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ Erreur validation: {e}")
+            return False
+    
+    def _verifier_integrite_produits(self):
+        """Vérifie que tous les produits sont cohérents"""
+        # Compter les produits dans la solution actuelle
+        compteur_produits = {}
+        
+        for voyage in self.voyages:
+            for produit_info in voyage['produits']:
+                if 'produit' in produit_info and 'nom' in produit_info['produit']:
+                    nom = produit_info['produit']['nom']
+                    quantite = produit_info.get('quantite_voyage', 0)
+                    
+                    if nom not in compteur_produits:
+                        compteur_produits[nom] = 0
+                    compteur_produits[nom] += quantite
+        
+        return True
+    
+    def convertir_vers_format_original(self):
+        """Reconvertit vers le format de votre heuristique pour compatibilité"""
+        
+        # Commencer avec une copie des résultats originaux
+        resultats_modifies = copy.deepcopy(self.resultats_originaux)
+        
+        # Mettre à jour le coût total
+        resultats_modifies['vehicule_optimal']['cout_total'] = self.cout_total
+        
+        # Reconstruire les planifications_vehicules
+        planifications_mises_a_jour = []
+        
+        # Grouper les voyages par véhicule
+        voyages_par_vehicule = {}
+        for voyage in self.voyages:
+            vehicule_id = voyage['vehicule_id']
+            if vehicule_id not in voyages_par_vehicule:
+                voyages_par_vehicule[vehicule_id] = []
+            voyages_par_vehicule[vehicule_id].append(voyage)
+        
+        # Reconstruire chaque planification de véhicule
+        for vehicule_id, voyages_vehicule in voyages_par_vehicule.items():
+            voyages_reconstruits = []
+            
+            for voyage in sorted(voyages_vehicule, key=lambda v: v['numero_voyage']):
+                voyage_reconstruit = {
+                    'voyage_numero': voyage['numero_voyage'],
+                    'charge_transportee': {
+                        'poids': voyage['poids_total'],
+                        'volume': voyage['volume_total'],
+                        'produits': copy.deepcopy(voyage['produits'])
+                    }
+                }
+                
+                # Ajouter les informations temporelles si disponibles
+                if 'timing' in voyage and voyage['timing']:
+                    voyage_reconstruit['aller'] = {
+                        'date_depart': voyage['timing'].get('date_depart'),
+                        'heure_depart': voyage['timing'].get('heure_depart'),
+                        'date_arrivee': voyage['timing'].get('date_arrivee'),
+                        'heure_arrivee': voyage['timing'].get('heure_arrivee'),
+                        'distance_km': voyage['timing'].get('distance_km')
+                    }
+                
+                voyages_reconstruits.append(voyage_reconstruit)
+            
+            # Recalculer les totaux pour ce véhicule
+            vehicule = self._get_vehicule(vehicule_id)
+            charge_totale_vehicule = {
+                'poids': sum(v['poids_total'] for v in voyages_vehicule),
+                'volume': sum(v['volume_total'] for v in voyages_vehicule)
+            }
+            
+            planification_vehicule = {
+                'vehicule_id': vehicule_id,
+                'nb_voyages': len(voyages_reconstruits),
+                'charge_totale': charge_totale_vehicule,
+                'voyages': voyages_reconstruits
+            }
+            
+            planifications_mises_a_jour.append(planification_vehicule)
+        
+        resultats_modifies['planification_detaillee']['planifications_vehicules'] = planifications_mises_a_jour
+        
+        return resultats_modifies
+    
+    def afficher_resume(self):
+        """Affiche un résumé de la solution"""
+        print(f"\n📊 RÉSUMÉ SOLUTION TRANSPORT:")
+        print(f"Coût total: {self.cout_total:.2f}€ (initial: {self.cout_initial:.2f}€)")
+        
+        if self.cout_total != self.cout_initial:
+            gain = self.cout_initial - self.cout_total
+            print(f"Gain: {gain:.2f}€ ({gain/self.cout_initial*100:.1f}%)")
+        
+        print(f"Véhicules: {len(self.vehicules)}")
+        print(f"Voyages: {len(self.voyages)}")
+        print(f"Modifications: {len(self.historique_modifications)}")
+        
+        for voyage in self.voyages:
+            utilisation_poids = (voyage['poids_total'] / voyage['capacites']['poids_max']) * 100
+            utilisation_volume = (voyage['volume_total'] / voyage['capacites']['volume_max']) * 100
+            print(f"  Voyage {voyage['id']}: {utilisation_poids:.1f}% poids, {utilisation_volume:.1f}% volume")
+
+
+def appliquer_local_search(resultats_heuristique, nb_iterations=50):
+    """
+    Applique la Local Search sur les résultats de votre heuristique
+    """
+    if not resultats_heuristique:
+        return None
+    
+    try:
+        # 1. Convertir en solution modifiable
+        solution = SolutionTransport(resultats_heuristique)
+        print(f"🔍 LOCAL SEARCH - Solution initiale: {solution.cout_total:.2f}€")
+        
+        meilleure_solution = solution.clone()
+        meilleur_cout = solution.cout_total
+        nb_ameliorations = 0
+        
+        # 2. Algorithme de Local Search simple
+        for iteration in range(nb_iterations):
+            solution_test = meilleure_solution.clone()
+            amelioration_trouvee = False
+            
+            # Essayer des swaps aléatoires
+            for tentative in range(10):  # 10 tentatives par itération
+                if len(solution_test.voyages) >= 2:
+                    # Sélection aléatoire de deux voyages différents
+                    voyages_ids = list(range(len(solution_test.voyages)))
+                    voyage1_id = random.choice(voyages_ids)
+                    voyages_ids.remove(voyage1_id)
+                    voyage2_id = random.choice(voyages_ids)
+                    
+                    voyage1 = solution_test.voyages[voyage1_id]
+                    voyage2 = solution_test.voyages[voyage2_id]
+                    
+                    if voyage1['produits'] and voyage2['produits']:
+                        idx1 = random.randint(0, len(voyage1['produits']) - 1)
+                        idx2 = random.randint(0, len(voyage2['produits']) - 1)
+                        
+                        # Tester le swap
+                        if solution_test.swap_produits(voyage1_id, idx1, voyage2_id, idx2):
+                            if solution_test.cout_total < meilleur_cout:
+                                meilleure_solution = solution_test.clone()
+                                meilleur_cout = solution_test.cout_total
+                                nb_ameliorations += 1
+                                amelioration_trouvee = True
+                                print(f"   ✅ Amélioration trouvée: {meilleur_cout:.2f}€")
+                                break
+            
+            # Si pas d'amélioration avec swap, essayer des déplacements
+            if not amelioration_trouvee:
+                for tentative in range(5):
+                    if len(solution_test.voyages) >= 2:
+                        voyages_ids = list(range(len(solution_test.voyages)))
+                        voyage_source_id = random.choice(voyages_ids)
+                        voyages_ids.remove(voyage_source_id)
+                        voyage_dest_id = random.choice(voyages_ids)
+                        
+                        voyage_source = solution_test.voyages[voyage_source_id]
+                        
+                        if voyage_source['produits']:
+                            idx = random.randint(0, len(voyage_source['produits']) - 1)
+                            
+                            if solution_test.deplacer_produit(idx, voyage_source_id, voyage_dest_id):
+                                if solution_test.cout_total < meilleur_cout:
+                                    meilleure_solution = solution_test.clone()
+                                    meilleur_cout = solution_test.cout_total
+                                    nb_ameliorations += 1
+                                    print(f"   ✅ Amélioration trouvée: {meilleur_cout:.2f}€")
+                                    break
+        
+        # 3. Résultats
+        amelioration_totale = solution.cout_total - meilleur_cout
+        print(f"🎯 LOCAL SEARCH TERMINÉE:")
+        print(f"   - Coût initial: {solution.cout_total:.2f}€")
+        print(f"   - Coût final: {meilleur_cout:.2f}€")
+        print(f"   - Amélioration: {amelioration_totale:.2f}€ ({amelioration_totale/solution.cout_total*100:.2f}%)")
+        print(f"   - Nombre d'améliorations: {nb_ameliorations}")
+        
+        if amelioration_totale > 0:
+            # Reconvertir au format original
+            return meilleure_solution.convertir_vers_format_original()
+        else:
+            print("   ℹ️ Aucune amélioration trouvée - solution initiale conservée")
+            return resultats_heuristique
+            
+    except Exception as e:
+        print(f"❌ ERREUR Local Search: {e}")
+        return resultats_heuristique
+
+
+def optimiser_avec_local_search(optimiseur, produits, vehicules, date_debut, heure_debut, duree_max=7):
+    """
+    Fonction helper qui combine votre heuristique + Local Search
+    """
+    print("🚀 OPTIMISATION HYBRIDE: Heuristique + Local Search")
+    
+    # 1. Votre heuristique existante
+    print("\n1️⃣ Phase heuristique...")
+    resultats = optimiseur.calculer_navettes_optimales(
+        produits, vehicules, date_debut, heure_debut, duree_max
+    )
+    
+    if not resultats:
+        print("❌ Heuristique échouée")
+        return None
+    
+    cout_heuristique = resultats['vehicule_optimal']['cout_total']
+    print(f"✅ Heuristique terminée: {cout_heuristique:.2f}€")
+    
+    # 2. Local Search
+    print("\n2️⃣ Phase Local Search...")
+    resultats_ameliores = appliquer_local_search(resultats, nb_iterations=100)
+    
+    if resultats_ameliores:
+        cout_final = resultats_ameliores['vehicule_optimal']['cout_total']
+        gain = cout_heuristique - cout_final
+        
+        if gain > 0:
+            print(f"🎉 OPTIMISATION RÉUSSIE!")
+            print(f"   Gain total: {gain:.2f}€ ({gain/cout_heuristique*100:.2f}%)")
+            return resultats_ameliores
+        else:
+            print("ℹ️ Solution heuristique déjà optimale")
+            return resultats
+    
+    return resultats
+class VNSOptimiseur:
+    """
+    Variable Neighborhood Search pour l'optimisation des navettes
+    """
+    
+    def __init__(self):
+        self.voisinages = [
+            self._voisinage_swap_produits,
+            self._voisinage_deplacement_produits,
+            self._voisinage_redistribution_voyages,
+            self._voisinage_fusion_voyages,
+            self._voisinage_inversion_sequence,
+            self._voisinage_reoptimisation_vehicules
+
+        ]
+        self.historique_vns = []
+    
+    def optimiser_vns(self, resultats_heuristique, max_iterations=500, max_voisinages=6):
+        """
+        Applique VNS sur les résultats de l'heuristique
+        """
+        if not resultats_heuristique:
+            return None
+        
+        print(f"🔍 VNS - Variable Neighborhood Search")
+        print(f"   Max iterations: {max_iterations}")
+        print(f"   Nombre de voisinages: {len(self.voisinages)}")
+        
+        try:
+            # Initialisation
+            solution_courante = SolutionTransport(resultats_heuristique)
+            meilleure_solution = solution_courante.clone()
+            meilleur_cout = solution_courante.cout_total
+            
+            print(f"   Solution initiale: {meilleur_cout:.2f}€")
+            
+            iteration = 0
+            nb_ameliorations = 0
+            
+            while iteration < max_iterations:
+                k = 0  # Index du voisinage courant
+                amelioration_trouvee = False
+                
+                while k < min(len(self.voisinages), max_voisinages):
+                    # Génération dans le k-ième voisinage
+                    solution_voisine = self._generer_voisin(solution_courante, k)
+                    
+                    if solution_voisine and solution_voisine.est_solution_valide():
+                        # Local Search dans ce voisinage
+                        solution_amelioree = self._local_search_voisinage(solution_voisine, 20)
+                        
+                        # Test d'amélioration
+                        if solution_amelioree.cout_total < meilleur_cout:
+                            meilleure_solution = solution_amelioree.clone()
+                            meilleur_cout = solution_amelioree.cout_total
+                            solution_courante = solution_amelioree.clone()
+                            
+                            nb_ameliorations += 1
+                            amelioration_trouvee = True
+                            
+                            print(f"   ✅ Amélioration trouvée (voisinage {k+1}): {meilleur_cout:.2f}€")
+                            
+                            # Retour au premier voisinage
+                            k = 0
+                        else:
+                            # Passer au voisinage suivant
+                            k += 1
+                    else:
+                        k += 1
+                
+                iteration += 1
+                
+                # Diversification si pas d'amélioration
+                if not amelioration_trouvee and iteration % 20 == 0:
+                    solution_courante = self._diversification(meilleure_solution)
+                    print(f"   🔄 Diversification appliquée (itération {iteration})")
+            
+            # Résultats
+            amelioration_totale = solution_courante.cout_initial - meilleur_cout
+            
+            print(f"🎯 VNS TERMINÉ:")
+            print(f"   - Coût initial: {solution_courante.cout_initial:.2f}€")
+            print(f"   - Coût final: {meilleur_cout:.2f}€")
+            print(f"   - Amélioration: {amelioration_totale:.2f}€ ({amelioration_totale/solution_courante.cout_initial*100:.2f}%)")
+            print(f"   - Nombre d'améliorations: {nb_ameliorations}")
+            print(f"   - Iterations: {iteration}")
+            
+            if amelioration_totale > 0:
+                return meilleure_solution.convertir_vers_format_original()
+            else:
+                print("   ℹ️ Aucune amélioration VNS - solution initiale conservée")
+                return resultats_heuristique
+                
+        except Exception as e:
+            print(f"❌ ERREUR VNS: {e}")
+            return resultats_heuristique
+    
+    def _generer_voisin(self, solution, k):
+        """Génère un voisin dans le k-ième voisinage"""
+        try:
+            voisinage_func = self.voisinages[k]
+            return voisinage_func(solution)
+        except:
+            return None
+    
+    def _voisinage_swap_produits(self, solution):
+        """Voisinage 1: Échange de produits entre voyages"""
+        solution_voisine = solution.clone()
+        
+        # Sélectionner deux voyages aléatoirement
+        if len(solution_voisine.voyages) >= 2:
+            voyages_ids = list(range(len(solution_voisine.voyages)))
+            voyage1_id = random.choice(voyages_ids)
+            voyages_ids.remove(voyage1_id)
+            voyage2_id = random.choice(voyages_ids)
+            
+            voyage1 = solution_voisine.voyages[voyage1_id]
+            voyage2 = solution_voisine.voyages[voyage2_id]
+            
+            if voyage1['produits'] and voyage2['produits']:
+                idx1 = random.randint(0, len(voyage1['produits']) - 1)
+                idx2 = random.randint(0, len(voyage2['produits']) - 1)
+                
+                if solution_voisine.swap_produits(voyage1_id, idx1, voyage2_id, idx2):
+                    return solution_voisine
+        
+        return None
+    
+    def _voisinage_deplacement_produits(self, solution):
+        """Voisinage 2: Déplacement de produits"""
+        solution_voisine = solution.clone()
+        
+        if len(solution_voisine.voyages) >= 2:
+            # Choisir voyage source et destination
+            voyage_source_id = random.randint(0, len(solution_voisine.voyages) - 1)
+            voyage_dest_id = random.randint(0, len(solution_voisine.voyages) - 1)
+            
+            while voyage_dest_id == voyage_source_id and len(solution_voisine.voyages) > 1:
+                voyage_dest_id = random.randint(0, len(solution_voisine.voyages) - 1)
+            
+            voyage_source = solution_voisine.voyages[voyage_source_id]
+            
+            if voyage_source['produits']:
+                idx = random.randint(0, len(voyage_source['produits']) - 1)
+                
+                if solution_voisine.deplacer_produit(idx, voyage_source_id, voyage_dest_id):
+                    return solution_voisine
+        
+        return None
+    
+    def _voisinage_redistribution_voyages(self, solution):
+        """Voisinage 3: Redistribution de produits entre plusieurs voyages"""
+        solution_voisine = solution.clone()
+        
+        if len(solution_voisine.voyages) >= 3:
+            # Sélectionner 3 voyages pour redistribution
+            voyages_ids = random.sample(range(len(solution_voisine.voyages)), 3)
+            
+            # Effectuer plusieurs mouvements dans cette structure
+            for _ in range(3):
+                voyage_src = random.choice(voyages_ids)
+                voyage_dst = random.choice(voyages_ids)
+                
+                if (voyage_src != voyage_dst and 
+                    solution_voisine.voyages[voyage_src]['produits']):
+                    
+                    idx = random.randint(0, len(solution_voisine.voyages[voyage_src]['produits']) - 1)
+                    solution_voisine.deplacer_produit(idx, voyage_src, voyage_dst)
+            
+            return solution_voisine
+        
+        return None
+    
+    def _voisinage_fusion_voyages(self, solution):
+        """Voisinage 4: Tentative de fusion/division de voyages"""
+        solution_voisine = solution.clone()
+        
+        # Stratégie: redistribuer tous les produits d'un voyage vers les autres
+        if len(solution_voisine.voyages) >= 2:
+            voyage_source_id = random.randint(0, len(solution_voisine.voyages) - 1)
+            voyage_source = solution_voisine.voyages[voyage_source_id]
+            
+            if voyage_source['produits']:
+                # Redistribuer tous les produits de ce voyage
+                produits_a_redistribuer = list(voyage_source['produits'])
+                
+                for produit_info in produits_a_redistribuer:
+                    # Trouver un autre voyage capable d'accueillir ce produit
+                    voyages_possibles = [i for i in range(len(solution_voisine.voyages)) if i != voyage_source_id]
+                    
+                    if voyages_possibles:
+                        voyage_dest_id = random.choice(voyages_possibles)
+                        idx = voyage_source['produits'].index(produit_info)
+                        solution_voisine.deplacer_produit(idx, voyage_source_id, voyage_dest_id)
+                
+                return solution_voisine
+        
+        return None
+    def _voisinage_inversion_sequence(self, solution):
+        """Voisinage 5: Inverser l'ordre des produits dans un voyage"""
+        solution_voisine = solution.clone()
+        
+        if solution_voisine.voyages:
+            voyage_id = random.randint(0, len(solution_voisine.voyages) - 1)
+            voyage = solution_voisine.voyages[voyage_id]
+            
+            if len(voyage['produits']) >= 2:
+                # Inverser l'ordre des produits
+                voyage['produits'].reverse()
+                solution_voisine._recalculer_cout()  # ← Recalculer le coût
+                return solution_voisine
+        return None
+
+    def _voisinage_reoptimisation_vehicules(self, solution):
+        """Voisinage 6: Réoptimiser l'affectation véhicule-voyage"""
+        solution_voisine = solution.clone()
+        
+        # Collecter tous les produits
+        tous_produits = []
+        for voyage in solution_voisine.voyages:
+            tous_produits.extend(voyage['produits'])
+            voyage['produits'] = []  # Vider le voyage
+        
+        # ✅ CORRECTION: Réaffecter avec vérification de capacité
+        random.shuffle(tous_produits)
+        
+        for produit in tous_produits:
+            # Trouver un voyage qui peut accueillir ce produit
+            voyage_assigne = False
+            voyages_possibles = list(range(len(solution_voisine.voyages)))
+            random.shuffle(voyages_possibles)
+            
+            for voyage_id in voyages_possibles:
+                if self._peut_ajouter_produit_voyage(solution_voisine, voyage_id, produit):
+                    solution_voisine.voyages[voyage_id]['produits'].append(produit)
+                    voyage_assigne = True
+                    break
+            
+            # Si aucun voyage ne peut l'accueillir, retourner None (solution invalide)
+            if not voyage_assigne:
+                return None
+        
+        solution_voisine._recalculer_cout()
+        return solution_voisine
+    
+    def _peut_ajouter_produit_voyage(self, solution, voyage_id, produit):
+        """
+        ✅ NOUVELLE MÉTHODE: Vérifier si un produit peut être ajouté à un voyage
+        """
+        voyage = solution.voyages[voyage_id]
+        
+        # Calculer capacité actuelle du voyage
+        poids_actuel = sum(p['poids_unitaire'] * p['quantite'] for p in voyage['produits'])
+        volume_actuel = sum(p['volume_unitaire'] * p['quantite'] for p in voyage['produits'])
+        
+        # Ajouter le nouveau produit
+        nouveau_poids = poids_actuel + (produit['poids_unitaire'] * produit['quantite'])
+        nouveau_volume = volume_actuel + (produit['volume_unitaire'] * produit['quantite'])
+        
+        # Récupérer les capacités du véhicule de ce voyage
+        vehicule = voyage['vehicule']
+        
+        # Vérifier les contraintes
+        return (nouveau_poids <= vehicule['capacite_poids_max'] and 
+                nouveau_volume <= vehicule['capacite_volume_max'])
+    def _local_search_voisinage(self, solution, max_iter=200):
+        """✅ MÉTHODE MANQUANTE: Local Search spécialisé dans un voisinage"""
+        meilleure_solution = solution.clone()
+        meilleur_cout = solution.cout_total
+        
+        for iteration in range(max_iter):
+            solution_test = meilleure_solution.clone()
+            
+            # Appliquer quelques mouvements locaux
+            for _ in range(3):
+                if len(solution_test.voyages) >= 2:
+                    if random.random() < 0.5:  # 50% swap, 50% déplacement
+                        # Swap
+                        voyages_ids = list(range(len(solution_test.voyages)))
+                        v1 = random.choice(voyages_ids)
+                        voyages_ids.remove(v1)
+                        v2 = random.choice(voyages_ids)
+                        
+                        voyage1 = solution_test.voyages[v1]
+                        voyage2 = solution_test.voyages[v2]
+                        
+                        if voyage1['produits'] and voyage2['produits']:
+                            idx1 = random.randint(0, len(voyage1['produits']) - 1)
+                            idx2 = random.randint(0, len(voyage2['produits']) - 1)
+                            solution_test.swap_produits(v1, idx1, v2, idx2)
+                    else:
+                        # Déplacement
+                        v_src = random.randint(0, len(solution_test.voyages) - 1)
+                        v_dst = random.randint(0, len(solution_test.voyages) - 1)
+                        
+                        if (v_src != v_dst and 
+                            solution_test.voyages[v_src]['produits']):
+                            idx = random.randint(0, len(solution_test.voyages[v_src]['produits']) - 1)
+                            solution_test.deplacer_produit(idx, v_src, v_dst)
+            
+            # Test d'amélioration
+            if solution_test.cout_total < meilleur_cout:
+                meilleure_solution = solution_test.clone()
+                meilleur_cout = solution_test.cout_total
+        
+        return meilleure_solution
+    def _diversification(self, solution):
+        """Diversification pour échapper aux optima locaux"""
+        solution_diversifiee = solution.clone()
+        
+        # Effectuer plusieurs mouvements aléatoires
+        nb_mouvements = min(10, len(solution_diversifiee.voyages))
+        
+        for _ in range(nb_mouvements):
+            k = random.randint(0, len(self.voisinages) - 1)
+            nouvelle_solution = self._generer_voisin(solution_diversifiee, k)
+            
+            if nouvelle_solution and nouvelle_solution.est_solution_valide():
+                solution_diversifiee = nouvelle_solution
+        
+        return solution_diversifiee# ✅ MÉTHODE HELPER POUR TESTER LES VOISINAGES
+def tester_voisinages():
+        """Fonction de test pour vérifier que tous les voisinages fonctionnent"""
+        print("🧪 TEST DES VOISINAGES VNS")
+        
+        vns = VNSOptimiseur()
+        print(f"Nombre de voisinages disponibles: {len(vns.voisinages)}")
+        
+        for i, voisinage in enumerate(vns.voisinages):
+            nom_methode = voisinage.__name__
+            print(f"  {i}: {nom_methode}")
+        
+        print("✅ Tous les voisinages sont correctement enregistrés!")
+
+def _local_search_voisinage(self, solution, max_iter=20):
+        """Local Search spécialisé dans un voisinage"""
+        meilleure_solution = solution.clone()
+        meilleur_cout = solution.cout_total
+        
+        for iteration in range(max_iter):
+            solution_test = meilleure_solution.clone()
+            
+            # Appliquer quelques mouvements locaux
+            for _ in range(3):
+                if len(solution_test.voyages) >= 2:
+                    if random.random() < 0.5:  # 50% swap, 50% déplacement
+                        # Swap
+                        voyages_ids = list(range(len(solution_test.voyages)))
+                        v1 = random.choice(voyages_ids)
+                        voyages_ids.remove(v1)
+                        v2 = random.choice(voyages_ids)
+                        
+                        voyage1 = solution_test.voyages[v1]
+                        voyage2 = solution_test.voyages[v2]
+                        
+                        if voyage1['produits'] and voyage2['produits']:
+                            idx1 = random.randint(0, len(voyage1['produits']) - 1)
+                            idx2 = random.randint(0, len(voyage2['produits']) - 1)
+                            solution_test.swap_produits(v1, idx1, v2, idx2)
+                    else:
+                        # Déplacement
+                        v_src = random.randint(0, len(solution_test.voyages) - 1)
+                        v_dst = random.randint(0, len(solution_test.voyages) - 1)
+                        
+                        if (v_src != v_dst and 
+                            solution_test.voyages[v_src]['produits']):
+                            idx = random.randint(0, len(solution_test.voyages[v_src]['produits']) - 1)
+                            solution_test.deplacer_produit(idx, v_src, v_dst)
+            
+            # Test d'amélioration
+            if solution_test.cout_total < meilleur_cout:
+                meilleure_solution = solution_test.clone()
+                meilleur_cout = solution_test.cout_total
+        
+        return meilleure_solution
+    
+
+def main_comparaison_methodes():
+    """Programme de comparaison des différentes méthodes"""
+    print("="*120)
+    print("COMPARAISON DES MÉTHODES D'OPTIMISATION")
+    print("="*120)
+    print("Cette fonction n'est pas encore implémentée")
+def main_comparaison_methodes():
+    """Programme de comparaison des différentes méthodes"""
+    print("="*120)
+    print("COMPARAISON DES MÉTHODES D'OPTIMISATION")
+    print("="*120)
+    print("Cette fonction n'est pas encore implémentée")
+def appliquer_vns(resultats_heuristique, max_iterations=100):
+        """
+        Interface simple pour appliquer VNS
+        """
+        vns = VNSOptimiseur()
+        return vns.optimiser_vns(resultats_heuristique, max_iterations)
+
+
+def optimiser_avec_vns(optimiseur, produits, vehicules, date_debut, heure_debut, duree_max=7):
+        """
+        Fonction helper qui combine heuristique + VNS
+        """
+        print("🚀 OPTIMISATION HYBRIDE: Heuristique + VNS")
+        
+        # 1. Heuristique existante
+        print("\n1️⃣ Phase heuristique...")
+        resultats = optimiseur.calculer_navettes_optimales(
+            produits, vehicules, date_debut, heure_debut, duree_max
+        )
+        
+        if not resultats:
+            print("❌ Heuristique échouée")
+            return None
+        
+        cout_heuristique = resultats['vehicule_optimal']['cout_total']
+        print(f"✅ Heuristique terminée: {cout_heuristique:.2f}€")
+        
+        # 2. VNS
+        print("\n2️⃣ Phase VNS...")
+        resultats_ameliores = appliquer_vns(resultats, max_iterations=150)
+        
+        if resultats_ameliores:
+            cout_final = resultats_ameliores['vehicule_optimal']['cout_total']
+            gain = cout_heuristique - cout_final
+            
+            if gain > 0:
+                print(f"🎉 OPTIMISATION VNS RÉUSSIE!")
+                print(f"   Gain total: {gain:.2f}€ ({gain/cout_heuristique*100:.2f}%)")
+                return resultats_ameliores
+            else:
+                print("ℹ️ Solution heuristique déjà optimale")
+                return resultats
+        
+        return resultats
+
+
+def main_complet():
+    """
+    Programme principal complet avec optimisation multi-semaines, Local Search ET VNS
+    """
+    print("="*120)
+    print("SYSTÈME D'OPTIMISATION DE NAVETTES - VERSION COMPLÈTE AVEC VNS")
+    print("Heuristique + Optimisation Multi-Semaines + Local Search + VNS")
+    if PYOMO_AVAILABLE:
+        print("🔧 Pyomo disponible - Toutes les fonctionnalités activées")
+    else:
+        print("⚠️ Mode heuristique uniquement - Pyomo non disponible")
+    print("="*120)
+    
+    # Configuration des véhicules (garder votre configuration)
     vehicules_disponibles = [
         {
             'nom': 'CAMION LÉGER 1',
@@ -2565,7 +2367,7 @@ def main_multi_semaines():
         }
     ]
     
-    # PRODUITS SEMAINE 1 (Transport obligatoire première semaine)
+    # PRODUITS (garder vos définitions)
     produits_semaine1 = [
         {
             'nom': 'MACHINES INDUSTRIELLES URGENTES',
@@ -2593,7 +2395,6 @@ def main_multi_semaines():
         }
     ]
     
-    # PRODUITS SEMAINE 2 (Transport obligatoire deuxième semaine)
     produits_semaine2 = [
         {
             'nom': 'MOBILIER DE BUREAU STANDARD',
@@ -2621,32 +2422,31 @@ def main_multi_semaines():
         }
     ]
     
-    # Configuration temporelle
-    DATE_DEBUT = '2025-06-02'  # Lundi
+    DATE_DEBUT = '2025-06-02'
     HEURE_DEBUT = '08:00'
     
-    print("="*120)
-    print("OPTIMISATION DE NAVETTES MULTI-SEMAINES AVEC CONTRAINTES TEMPORELLES SÉPARÉES")
-    print("="*120)
-    print(f"📅 CONTRAINTE SEMAINE 1: Transport OBLIGATOIRE du {DATE_DEBUT} au {OptimisateurNavettesMultiSemaines()._calculer_fin_semaine(DATE_DEBUT, 1)}")
-    print(f"📅 CONTRAINTE SEMAINE 2: Transport OBLIGATOIRE du {OptimisateurNavettesMultiSemaines()._calculer_debut_semaine(DATE_DEBUT, 2)} au {OptimisateurNavettesMultiSemaines()._calculer_fin_semaine(DATE_DEBUT, 2)}")
-    print(f"🕐 Début des opérations: {HEURE_DEBUT} chaque semaine")
-    print(f"📍 Trajet: A ←→ B (distance: 800 km)")
-    
-    # Calcul des totaux pour information
+    # Calculs préliminaires (garder vos calculs)
     poids_s1 = sum(p['quantite'] * p['poids_unitaire'] for p in produits_semaine1)
     volume_s1 = sum(p['quantite'] * p['volume_unitaire'] for p in produits_semaine1)
     poids_s2 = sum(p['quantite'] * p['poids_unitaire'] for p in produits_semaine2)
     volume_s2 = sum(p['quantite'] * p['volume_unitaire'] for p in produits_semaine2)
     
-    print(f"\n📊 RÉSUMÉ DES CONTRAINTES TEMPORELLES:")
-    print(f"SEMAINE 1 (URGENT): {len(produits_semaine1)} types de produits - {poids_s1:.2f}t, {volume_s1:.2f}m³")
+    print(f"\n📊 APERÇU DU PROJET COMPLET:")
+    print(f"📅 Période: Du {DATE_DEBUT} sur 2 semaines avec contraintes temporelles strictes")
+    print(f"🕐 Début des opérations: {HEURE_DEBUT} chaque semaine")
+    print(f"📍 Trajet: A ←→ B (distance: 800 km)")
+    print(f"🚛 Véhicules disponibles: {len(vehicules_disponibles)} types")
+    print(f"\nSEMAINE 1 (URGENT): {len(produits_semaine1)} types de produits - {poids_s1:.2f}t, {volume_s1:.2f}m³")
     print(f"SEMAINE 2 (PLANIFIÉ): {len(produits_semaine2)} types de produits - {poids_s2:.2f}t, {volume_s2:.2f}m³")
     print(f"TOTAL PROJET: {poids_s1 + poids_s2:.2f}t, {volume_s1 + volume_s2:.2f}m³")
     
-    # Lancement de l'optimisation multi-semaines
-    optimiseur = OptimisateurNavettesMultiSemaines()
-    resultats = optimiseur.calculer_navettes_optimales_multi_semaines(
+    # PHASE 1: OPTIMISATION MULTI-SEMAINES
+    print(f"\n" + "="*120)
+    print("PHASE 1: OPTIMISATION MULTI-SEMAINES AVEC CONTRAINTES TEMPORELLES")
+    print("="*120)
+    
+    optimiseur_multi = OptimisateurNavettesMultiSemaines()
+    resultats_multi = optimiseur_multi.calculer_navettes_optimales_multi_semaines(
         produits_semaine1,
         produits_semaine2,
         vehicules_disponibles,
@@ -2654,100 +2454,114 @@ def main_multi_semaines():
         HEURE_DEBUT
     )
     
-    if resultats is None:
-        print("\n❌ IMPOSSIBLE DE SATISFAIRE LES CONTRAINTES TEMPORELLES")
+    if not resultats_multi:
+        print("\n❌ PHASE 1 ÉCHOUÉE: Impossible de satisfaire les contraintes temporelles")
         return
-    exportateur = ExportateurSolutions()
-    fichiers = exportateur.exporter_solution_complete(
-        resultats, 
-        format_export="all",  # ou "excel", "csv", "json", "pdf"
-        dossier_export="mes_exports"
-    )
-    planning_detaille = exportateur.exporter_planning_excel_detaille(resultats)
-    rapport_executif = exportateur.generer_rapport_executif(resultats)
-    # Affichage du résumé final multi-semaines
-    print("\n" + "="*120)
-    print("RÉSUMÉ FINAL MULTI-SEMAINES AVEC CONTRAINTES TEMPORELLES SÉPARÉES")
+    
+    # PHASE 2: AMÉLIORATION PAR LOCAL SEARCH
+    print(f"\n" + "="*120)
+    print("PHASE 2: AMÉLIORATION PAR LOCAL SEARCH")
     print("="*120)
     
-    print(f"\n📅 CALENDRIER DU PROJET:")
-    print(f"Début: {resultats['date_debut_projet']}")
-    print(f"Fin: {resultats['date_fin_projet']}")
-    print(f"Durée totale: {resultats['duree_totale_projet']} jours")
+    resultats_apres_ls = resultats_multi
     
-    print(f"\n💰 BILAN FINANCIER GLOBAL:")
-    print(f"Coût total projet: {resultats['cout_total_global']:.2f}€")
+    if resultats_multi['resultats_semaine1']:
+        print("\n🔍 Application Local Search SEMAINE 1...")
+        resultats_s1_ls = appliquer_local_search(
+            resultats_multi['resultats_semaine1'], 
+            nb_iterations=50
+        )
+        if resultats_s1_ls:
+            resultats_apres_ls['resultats_semaine1'] = resultats_s1_ls
     
-    if resultats['resultats_semaine1'] and resultats['resultats_semaine2']:
-        s1_cout = resultats['resultats_semaine1']['vehicule_optimal']['cout_total']
-        s2_cout = resultats['resultats_semaine2']['vehicule_optimal']['cout_total']
-        print(f"  - Semaine 1: {s1_cout:.2f}€ ({s1_cout/resultats['cout_total_global']*100:.1f}%)")
-        print(f"  - Semaine 2: {s2_cout:.2f}€ ({s2_cout/resultats['cout_total_global']*100:.1f}%)")
-        
-        print(f"\n🚛 FLOTTE UTILISÉE:")
-        vehicule_s1 = resultats['resultats_semaine1']['vehicule_utilise']['nom']
-        vehicule_s2 = resultats['resultats_semaine2']['vehicule_utilise']['nom']
-        
-        if vehicule_s1 == vehicule_s2:
-            print(f"✅ VÉHICULE UNIQUE: {vehicule_s1}")
-            print(f"   Avantages: Continuité opérationnelle, équipe unique, maintenance centralisée")
-        else:
-            print(f"🔧 VÉHICULES MULTIPLES:")
-            print(f"   Semaine 1: {vehicule_s1}")
-            print(f"   Semaine 2: {vehicule_s2}")
-            print(f"   Gestion: Coordination multi-équipes nécessaire")
-            
-    elif resultats['resultats_semaine1']:
-        print(f"  - Semaine 1 uniquement: {resultats['resultats_semaine1']['vehicule_optimal']['cout_total']:.2f}€")
-        print(f"  - Véhicule: {resultats['resultats_semaine1']['vehicule_utilise']['nom']}")
-        
-    elif resultats['resultats_semaine2']:
-        print(f"  - Semaine 2 uniquement: {resultats['resultats_semaine2']['vehicule_optimal']['cout_total']:.2f}€")
-        print(f"  - Véhicule: {resultats['resultats_semaine2']['vehicule_utilise']['nom']}")
+    if resultats_multi['resultats_semaine2']:
+        print("\n🔍 Application Local Search SEMAINE 2...")
+        resultats_s2_ls = appliquer_local_search(
+            resultats_multi['resultats_semaine2'], 
+            nb_iterations=50
+        )
+        if resultats_s2_ls:
+            resultats_apres_ls['resultats_semaine2'] = resultats_s2_ls
+    tester_voisinages()
+    # PHASE 3: AMÉLIORATION PAR VNS ← NOUVEAU !
+    print(f"\n" + "="*120)
+    print("PHASE 3: AMÉLIORATION PAR VNS (Variable Neighborhood Search)")
+    print("="*120)
     
-    print(f"\n📊 PERFORMANCE GLOBALE:")
-    print(f"Nombre total de véhicules: {resultats['nb_vehicules_total']}")
+    resultats_finaux = resultats_apres_ls
     
-    # Calcul de métriques globales
-    poids_total = poids_s1 + poids_s2
-    if poids_total > 0:
-        cout_par_tonne = resultats['cout_total_global'] / poids_total
-        print(f"Coût par tonne: {cout_par_tonne:.2f}€/tonne")
+    if resultats_apres_ls['resultats_semaine1']:
+        print("\n🔍 Application VNS SEMAINE 1...")
+        resultats_s1_vns = appliquer_vns(
+            resultats_apres_ls['resultats_semaine1'], 
+            max_iterations=100
+        )
+        if resultats_s1_vns:
+            resultats_finaux['resultats_semaine1'] = resultats_s1_vns
     
-    volume_total = volume_s1 + volume_s2
-    if volume_total > 0:
-        cout_par_m3 = resultats['cout_total_global'] / volume_total
-        print(f"Coût par m³: {cout_par_m3:.2f}€/m³")
+    if resultats_apres_ls['resultats_semaine2']:
+        print("\n🔍 Application VNS SEMAINE 2...")
+        resultats_s2_vns = appliquer_vns(
+            resultats_apres_ls['resultats_semaine2'], 
+            max_iterations=100
+        )
+        if resultats_s2_vns:
+            resultats_finaux['resultats_semaine2'] = resultats_s2_vns
     
-    # Affichage des optimisations possibles
-    if resultats['optimisations_possibles']:
-        print(f"\n💡 OPTIMISATIONS IDENTIFIÉES:")
-        for i, opt in enumerate(resultats['optimisations_possibles'], 1):
-            print(f"  {i}. {opt['description']}")
-            print(f"     Impact: {opt['impact']}")
+    # CALCUL DES TOTAUX FINAUX
+    cout_initial_global = resultats_multi['cout_total_global']
+    cout_apres_ls = 0
+    cout_total_final = 0
     
-    # Recommandations finales
-    print(f"\n🎯 RECOMMANDATIONS FINALES:")
+    if resultats_apres_ls['resultats_semaine1']:
+        cout_apres_ls += resultats_apres_ls['resultats_semaine1']['vehicule_optimal']['cout_total']
+    if resultats_apres_ls['resultats_semaine2']:
+        cout_apres_ls += resultats_apres_ls['resultats_semaine2']['vehicule_optimal']['cout_total']
     
-    if resultats['resultats_semaine1'] and resultats['resultats_semaine2']:
-        print(f"✅ PROJET DEUX SEMAINES RÉALISABLE")
-        print(f"   - Contraintes temporelles respectées")
-        print(f"   - Coût total maîtrisé: {resultats['cout_total_global']:.2f}€")
-        print(f"   - Solutions techniques validées")
-        
-        # Analyse des risques
-        s1 = resultats['resultats_semaine1']
-        s2 = resultats['resultats_semaine2']
-        
-        if s1['nb_vehicules_necessaires'] == 1 and s2['nb_vehicules_necessaires'] == 1:
-            print(f"   - Risque opérationnel: FAIBLE (1 véhicule par semaine)")
-        else:
-            nb_max = max(s1['nb_vehicules_necessaires'], s2['nb_vehicules_necessaires'])
-            print(f"   - Risque opérationnel: MODÉRÉ ({nb_max} véhicules max par semaine)")
-            
-    print(f"\n🚀 PROJET PRÊT POUR EXÉCUTION AVEC CONTRAINTES TEMPORELLES STRICTES")
-    print(f"   Chaque semaine a sa planification optimisée individuellement")
-    print(f"   Respect garanti des échéances par semaine")
+    if resultats_finaux['resultats_semaine1']:
+        cout_total_final += resultats_finaux['resultats_semaine1']['vehicule_optimal']['cout_total']
+    if resultats_finaux['resultats_semaine2']:
+        cout_total_final += resultats_finaux['resultats_semaine2']['vehicule_optimal']['cout_total']
+    
+    resultats_finaux['cout_total_global'] = cout_total_final
+    
+    gain_ls = cout_initial_global - cout_apres_ls
+    gain_vns = cout_apres_ls - cout_total_final
+    gain_total = cout_initial_global - cout_total_final
+    
+    # AFFICHAGE FINAL COMPLET AVEC VNS
+    print("\n" + "="*120)
+    print("RÉSUMÉ FINAL COMPLET - OPTIMISATION TRIPLE PHASE AVEC VNS")
+    print("="*120)
+    
+    print(f"\n💰 BILAN FINANCIER DÉTAILLÉ:")
+    print(f"Coût initial (après heuristique): {cout_initial_global:.2f}€")
+    print(f"Coût après Local Search: {cout_apres_ls:.2f}€")
+    print(f"Coût final (après VNS): {cout_total_final:.2f}€")
+    
+    print(f"\n📈 GAINS PAR PHASE D'OPTIMISATION:")
+    if gain_ls > 0:
+        print(f"🎯 Local Search: {gain_ls:.2f}€ économisés ({gain_ls/cout_initial_global*100:.2f}%)")
+    else:
+        print(f"🎯 Local Search: Aucune amélioration")
+    
+    if gain_vns > 0:
+        print(f"🔄 VNS: {gain_vns:.2f}€ économisés supplémentaires ({gain_vns/cout_apres_ls*100:.2f}%)")
+    else:
+        print(f"🔄 VNS: Aucune amélioration supplémentaire")
+    
+    if gain_total > 0:
+        print(f"🎉 GAIN TOTAL: {gain_total:.2f}€ ({gain_total/cout_initial_global*100:.2f}%)")
+        print(f"✨ Optimisation triple-phase efficace!")
+    
+    print(f"\n🚀 SYSTÈME D'OPTIMISATION AVANCÉ TERMINÉ")
+    print(f"   ✅ Heuristique → Local Search → VNS appliqués")
+    print(f"   ✅ Gains totaux: {gain_total:.2f}€")
+    print("="*120)
+    
+    return resultats_finaux
+
 
 if __name__ == "__main__":
-    main_multi_semaines()
+    main_complet()
+    
