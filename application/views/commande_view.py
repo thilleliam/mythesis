@@ -6,6 +6,20 @@ from application.database import engine
 from sqlalchemy import func
 from datetime import date, datetime, timedelta
 from sqlalchemy import outerjoin, exists
+import tkinter as tk
+
+# Imports pour matplotlib
+try:
+    import matplotlib.pyplot as plt
+    from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+    from matplotlib.figure import Figure
+    import matplotlib.style as style
+    from collections import Counter
+    import numpy as np
+    MATPLOTLIB_AVAILABLE = True
+except ImportError:
+    MATPLOTLIB_AVAILABLE = False
+    print("Matplotlib non disponible. Installez-le avec: pip install matplotlib")
 
 configure_mappers()
 
@@ -16,11 +30,11 @@ class CommandeApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Gestion des Commandes")
-        self.root.geometry("1200x700")
+        self.root.geometry("1600x900")  # Plus large pour les graphiques
         photo = ttk.PhotoImage(file="C:\\Users\\BIG-computer\\Pictures\\Logo1.png")
         root.iconphoto(False, photo)
         
-        # Appliquer le thème Darkly
+        # Appliquer le thème
         style = ttk.Style("cosmo")
         
         # Import local pour éviter les imports circulaires
@@ -44,7 +58,11 @@ class CommandeApp:
         self.date_livraison_var = StringVar()
         self.statut_var = StringVar()
         
-        # Configuration du style
+        # Configuration du style matplotlib
+        if MATPLOTLIB_AVAILABLE:
+            plt.style.use('seaborn-v0_8-whitegrid')  # Style moderne
+        
+        # Configuration du style tkinter
         style.configure('Treeview', rowheight=30)
         style.configure('TButton', font=("Segoe UI", 10))
         style.configure('TLabel', font=("Segoe UI", 10))
@@ -58,69 +76,32 @@ class CommandeApp:
         main_frame = ttk.Frame(self.notebook)
         self.notebook.add(main_frame, text="Gestion des commandes")
         
-        # Onglet statistiques
-        stats_frame = ttk.Frame(self.notebook)
-        self.notebook.add(stats_frame, text="Statistiques")
+        # Onglet tableau de bord
+        dashboard_frame = ttk.Frame(self.notebook)
+        self.notebook.add(dashboard_frame, text="Tableau de bord")
         
-        # Formulaire dans l'onglet principal
-        form_frame = ttk.LabelFrame(main_frame, text="Informations de la commande", padding=15)
-        form_frame.pack(fill=X, padx=10, pady=10)
+        # Setup des onglets
+        self.setup_main_tab(main_frame)
+        self.setup_dashboard_tab(dashboard_frame)
+        
+        # Barre d'état
+        self.status_var = StringVar()
+        self.status_var.set("Prêt")
+        self.status_bar = ttk.Label(self.root, textvariable=self.status_var, relief=SUNKEN, anchor=W)
+        self.status_bar.pack(side=BOTTOM, fill=X)
 
-        # Première ligne
-        ttk.Label(form_frame, text="ID Commande").grid(row=0, column=0, padx=5, pady=8, sticky=W)
-        ttk.Entry(form_frame, textvariable=self.id_commande_var, state=DISABLED, width=12).grid(row=0, column=1, padx=5, pady=8, sticky=W)
-
-        ttk.Label(form_frame, text="ID Client").grid(row=0, column=2, padx=5, pady=8, sticky=W)
-        self.client_cb = ttk.Combobox(form_frame, textvariable=self.id_client_var, width=15)
-        self.client_cb.grid(row=0, column=3, padx=5, pady=8, sticky=W)
-
-        ttk.Label(form_frame, text="Tournée").grid(row=0, column=4, padx=5, pady=8, sticky=W)
-        self.tournee_cb = ttk.Combobox(form_frame, textvariable=self.id_tournee_var, width=15)
-        self.tournee_cb.grid(row=0, column=5, padx=5, pady=8, sticky=W)
-
-        # Deuxième ligne
-        ttk.Label(form_frame, text="Nature Service").grid(row=1, column=0, padx=5, pady=8, sticky=W)
-        ttk.Entry(form_frame, textvariable=self.nature_service_var).grid(row=1, column=1, padx=5, pady=8, sticky=W)
-
-        ttk.Label(form_frame, text="Type Véhicule").grid(row=1, column=2, padx=5, pady=8, sticky=W)
-        vehicle_types = ["Camion", "Semi-remorque", "Fourgon", "Benne", "Citerne"]
-        self.type_vehicule_cb = ttk.Combobox(form_frame, textvariable=self.type_vehicule_var, values=vehicle_types)
-        self.type_vehicule_cb.grid(row=1, column=3, padx=5, pady=8, sticky=W)
-
-        ttk.Label(form_frame, text="Quantité Requise").grid(row=1, column=4, padx=5, pady=8, sticky=W)
-        ttk.Entry(form_frame, textvariable=self.quantite_requise_var).grid(row=1, column=5, padx=5, pady=8, sticky=W)
-
-        # Troisième ligne
-        ttk.Label(form_frame, text="Lieu Chargement").grid(row=2, column=0, padx=5, pady=8, sticky=W)
-        ttk.Entry(form_frame, textvariable=self.lieu_chargement_var).grid(row=2, column=1, columnspan=2, padx=5, pady=8, sticky=W+E)
-
-        ttk.Label(form_frame, text="Date Commande").grid(row=2, column=3, padx=5, pady=8, sticky=W)
-        date_cmd_entry = ttk.Entry(form_frame, textvariable=self.date_commande_var)
-        date_cmd_entry.grid(row=2, column=4, padx=5, pady=8, sticky=W)
-        ttk.Button(form_frame, text="Aujourd'hui", command=lambda: self.date_commande_var.set(datetime.now().strftime("%Y-%m-%d %H:%M:%S")), 
-                  bootstyle=INFO, width=12).grid(row=2, column=5, padx=5, pady=8, sticky=W)
-
-        # Quatrième ligne
-        ttk.Label(form_frame, text="Date Livraison").grid(row=3, column=0, padx=5, pady=8, sticky=W)
-        date_liv_entry = ttk.Entry(form_frame, textvariable=self.date_livraison_var)
-        date_liv_entry.grid(row=3, column=1, columnspan=2, padx=5, pady=8, sticky=W+E)
-        ttk.Button(form_frame, text="+3 jours", command=lambda: self.date_livraison_var.set((datetime.now() + timedelta(days=3)).strftime("%Y-%m-%d %H:%M:%S")), 
-                  bootstyle=INFO, width=12).grid(row=3, column=3, padx=5, pady=8, sticky=W)
-
-        # Statut
-        ttk.Label(form_frame, text="Statut").grid(row=3, column=4, padx=5, pady=8, sticky=W)
-        status_types = ["En attente", "En cours", "Livrée", "Annulée"]
-        self.statut_cb = ttk.Combobox(form_frame, textvariable=self.statut_var, values=status_types)
-        self.statut_cb.grid(row=3, column=5, padx=5, pady=8, sticky=W)
-
+        # Chargement initial des données
+        self.charger_donnees()
+        self.update_dashboard()
+    
+    def setup_main_tab(self, parent):
+        """Configure l'onglet principal de gestion"""
         # Boutons d'actions
-        btn_frame = ttk.Frame(main_frame, padding=10)
+        btn_frame = ttk.Frame(parent, padding=10)
         btn_frame.pack(fill=X, pady=10)
 
-        ttk.Button(btn_frame, text="Ajouter", command=self.ajouter, bootstyle=SUCCESS, width=15).pack(side=LEFT, padx=8)
-        ttk.Button(btn_frame, text="Modifier", command=self.modifier, bootstyle=WARNING, width=15).pack(side=LEFT, padx=8)
         ttk.Button(btn_frame, text="Supprimer", command=self.supprimer, bootstyle=DANGER, width=15).pack(side=LEFT, padx=8)
-        ttk.Button(btn_frame, text="Vider", command=self.vider_formulaire, bootstyle=SECONDARY, width=15).pack(side=LEFT, padx=8)
+        ttk.Button(btn_frame, text="Actualiser", command=self.charger_donnees, bootstyle=SECONDARY, width=15).pack(side=LEFT, padx=8)
         
         # Frame d'outils à droite
         tools_frame = ttk.Frame(btn_frame)
@@ -134,7 +115,7 @@ class CommandeApp:
                   bootstyle=PRIMARY, width=18).pack(side=LEFT, padx=8)
 
         # Tableau des commandes
-        tree_frame = ttk.Frame(main_frame)
+        tree_frame = ttk.Frame(parent)
         tree_frame.pack(fill=BOTH, expand=True, pady=10)
         
         # Barre de défilement pour le tableau
@@ -196,69 +177,365 @@ class CommandeApp:
         self.context_menu.add_command(label="Marquer comme livrée", command=self.marquer_livree)
         
         self.tree.bind("<Button-3>", self.show_context_menu)
-        
-        # Contenu de l'onglet statistiques
-        self.setup_stats_tab(stats_frame)
-        
-        # Barre d'état
-        self.status_var = StringVar()
-        self.status_var.set("Prêt")
-        self.status_bar = ttk.Label(self.root, textvariable=self.status_var, relief=SUNKEN, anchor=W)
-        self.status_bar.pack(side=BOTTOM, fill=X)
-
-        # Chargement initial des données
-        self.charger_clients()
-        self.charger_tournees()
-        self.charger_donnees()
     
-    def setup_stats_tab(self, parent):
-        """Configure l'onglet des statistiques"""
-        # Frame pour les statistiques
-        stats_frame = ttk.Frame(parent, padding=15)
-        stats_frame.pack(fill=BOTH, expand=True)
-        
-        # Statistiques globales
-        global_frame = ttk.LabelFrame(stats_frame, text="Statistiques globales", padding=15)
-        global_frame.pack(fill=X, pady=15)
+    def setup_dashboard_tab(self, parent):
+        # Frame principal pour le dashboard avec scrollbars
+        outer_frame = ttk.Frame(parent)
+        outer_frame.pack(fill=BOTH, expand=True)
+
+        # Création du canvas
+        dashboard_canvas = tk.Canvas(outer_frame)
+        dashboard_canvas.pack(side=LEFT, fill=BOTH, expand=True)
+
+        # Scrollbars
+        scrollbar_y = ttk.Scrollbar(outer_frame, orient=VERTICAL, command=dashboard_canvas.yview)
+        scrollbar_y.pack(side=RIGHT, fill=Y)
+        scrollbar_x = ttk.Scrollbar(outer_frame, orient=HORIZONTAL, command=dashboard_canvas.xview)
+        scrollbar_x.pack(side=BOTTOM, fill=X)
+
+        dashboard_canvas.configure(yscrollcommand=scrollbar_y.set, xscrollcommand=scrollbar_x.set)
+
+        # Frame interne qui contiendra tout le dashboard
+        dashboard_main = ttk.Frame(dashboard_canvas)
+        dashboard_canvas.create_window((0, 0), window=dashboard_main, anchor="nw")
+
+        def on_configure(event):
+            dashboard_canvas.configure(scrollregion=dashboard_canvas.bbox("all"))
+
+        dashboard_main.bind("<Configure>", on_configure)
+
+        # Frame pour les statistiques en haut
+        stats_frame = ttk.LabelFrame(dashboard_main, text="Statistiques globales", padding=10)
+        stats_frame.pack(fill=X, pady=(0, 10))
         
         # Variables pour les statistiques
         self.total_commandes_var = StringVar(value="0")
         self.commandes_retard_var = StringVar(value="0")
         self.commandes_sans_tournee_var = StringVar(value="0")
+        self.commandes_livrees_var = StringVar(value="0")
         
-        # Affichage des statistiques
-        ttk.Label(global_frame, text="Total des commandes:").grid(row=0, column=0, padx=8, pady=8, sticky=W)
-        ttk.Label(global_frame, textvariable=self.total_commandes_var, width=12).grid(row=0, column=1, padx=8, pady=8, sticky=W)
+        # Création des cartes de statistiques
+        stats_inner_frame = ttk.Frame(stats_frame)
+        stats_inner_frame.pack(fill=X)
         
-        ttk.Label(global_frame, text="Commandes en retard:").grid(row=1, column=0, padx=8, pady=8, sticky=W)
-        ttk.Label(global_frame, textvariable=self.commandes_retard_var, width=12).grid(row=1, column=1, padx=8, pady=8, sticky=W)
+        # Configuration en grille pour les stats
+        for i in range(4):
+            stats_inner_frame.columnconfigure(i, weight=1)
         
-        ttk.Label(global_frame, text="Commandes sans tournée:").grid(row=2, column=0, padx=8, pady=8, sticky=W)
-        ttk.Label(global_frame, textvariable=self.commandes_sans_tournee_var, width=12).grid(row=2, column=1, padx=8, pady=8, sticky=W)
+        # Cartes de statistiques avec style amélioré
+        self.create_stat_card(stats_inner_frame, "Total Commandes", self.total_commandes_var, "blue", 0)
+        self.create_stat_card(stats_inner_frame, "En Retard", self.commandes_retard_var, "red", 1)
+        self.create_stat_card(stats_inner_frame, "Sans Tournée", self.commandes_sans_tournee_var, "orange", 2)
+        self.create_stat_card(stats_inner_frame, "Livrées", self.commandes_livrees_var, "green", 3)
         
-        # Bouton pour rafraîchir les statistiques
-        ttk.Button(global_frame, text="Rafraîchir", command=self.rafraichir_statistiques, 
-                  bootstyle=PRIMARY, width=15).grid(row=3, column=0, columnspan=2, pady=15)
+        # Bouton actualiser
+        ttk.Button(stats_frame, text="🔄 Actualiser Dashboard", command=self.update_dashboard, 
+                  bootstyle=PRIMARY, width=25).pack(pady=10)
         
-        # Graphique des commandes par type de véhicule
-        chart_frame = ttk.LabelFrame(stats_frame, text="Répartition des commandes", padding=15)
-        chart_frame.pack(fill=BOTH, expand=True, pady=15)
+        # Frame pour les graphiques matplotlib
+        if MATPLOTLIB_AVAILABLE:
+            self.setup_matplotlib_charts(dashboard_main)
+        else:
+            # Fallback si matplotlib n'est pas disponible
+            error_frame = ttk.LabelFrame(dashboard_main, text="Graphiques non disponibles", padding=20)
+            error_frame.pack(fill=BOTH, expand=True)
+            ttk.Label(error_frame, text="Matplotlib n'est pas installé.\nInstallez-le avec: pip install matplotlib", 
+                     font=("Segoe UI", 12), foreground="red").pack(pady=50)
         
-        # Ajout d'un espace pour un futur graphique
-        canvas_frame = ttk.Frame(chart_frame, height=300)
-        canvas_frame.pack(fill=BOTH, expand=True)
+        # Ajout d'un tableau Treeview avec scrollbars pour les commandes (aperçu)
+        table_frame = ttk.LabelFrame(dashboard_main, text="Aperçu des commandes", padding=10)
+        table_frame.pack(fill=BOTH, expand=True, pady=10)
         
-        ttk.Label(canvas_frame, text="Graphique de répartition des commandes").pack(pady=20)
-        ttk.Button(canvas_frame, text="Générer graphique", 
-                  bootstyle=INFO, width=20, command=self.generer_graphique).pack(pady=15)
+        # Scrollbars pour le tableau (déjà présentes)
+        self.dashboard_scrollbar_y = ttk.Scrollbar(table_frame)
+        self.dashboard_scrollbar_y.pack(side=RIGHT, fill=Y)
+        self.dashboard_scrollbar_x = ttk.Scrollbar(table_frame, orient=HORIZONTAL)
+        self.dashboard_scrollbar_x.pack(side=BOTTOM, fill=X)
+        
+        # Treeview
+        self.dashboard_tree = ttk.Treeview(
+            table_frame,
+            columns=("id_commande", "id_client", "statut", "date_commande", "date_livraison"),
+            show="headings",
+            yscrollcommand=self.dashboard_scrollbar_y.set,
+            xscrollcommand=self.dashboard_scrollbar_x.set
+        )
+        self.dashboard_tree.heading("id_commande", text="ID")
+        self.dashboard_tree.heading("id_client", text="Client")
+        self.dashboard_tree.heading("statut", text="Statut")
+        self.dashboard_tree.heading("date_commande", text="Date Commande")
+        self.dashboard_tree.heading("date_livraison", text="Date Livraison")
+        for col in ("id_commande", "id_client", "statut", "date_commande", "date_livraison"):
+            self.dashboard_tree.column(col, width=120)
+        self.dashboard_tree.pack(side=LEFT, fill=BOTH, expand=True)
+        self.dashboard_scrollbar_y.config(command=self.dashboard_tree.yview)
+        self.dashboard_scrollbar_x.config(command=self.dashboard_tree.xview)
     
-    def generer_graphique(self):
-        """Génère un graphique de répartition des commandes par type de véhicule"""
+    def create_stat_card(self, parent, title, var, color, column):
+        """Crée une carte de statistique stylée"""
+        card = ttk.Frame(parent, relief=RAISED, borderwidth=2)
+        card.grid(row=0, column=column, padx=5, pady=5, sticky="ew")
+        
+        # Titre
+        ttk.Label(card, text=title, font=("Segoe UI", 10, "bold")).pack(pady=(10, 5))
+        
+        # Valeur avec couleur
+        value_label = ttk.Label(card, textvariable=var, font=("Segoe UI", 20, "bold"))
+        value_label.pack(pady=(0, 10))
+        
+        # Appliquer la couleur (limité avec ttkbootstrap, mais on essaie)
         try:
-            # Cette fonction est préparée pour une future implémentation
-            messagebox.showinfo("Information", "Fonctionnalité de graphique en cours de développement.")
+            if color == "blue":
+                value_label.configure(foreground="#007bff")
+            elif color == "red":
+                value_label.configure(foreground="#dc3545")
+            elif color == "orange":
+                value_label.configure(foreground="#fd7e14")
+            elif color == "green":
+                value_label.configure(foreground="#28a745")
+        except:
+            pass  # Si la couleur ne fonctionne pas, on continue
+    
+    def setup_matplotlib_charts(self, parent):
+        """Configure les graphiques matplotlib"""
+        # Frame pour contenir tous les graphiques
+        charts_main_frame = ttk.Frame(parent)
+        charts_main_frame.pack(fill=BOTH, expand=True)
+        
+        # Configuration en grille
+        charts_main_frame.columnconfigure(0, weight=1)
+        charts_main_frame.columnconfigure(1, weight=1)
+        charts_main_frame.rowconfigure(0, weight=1)
+        charts_main_frame.rowconfigure(1, weight=1)
+        
+        # Frame pour graphique véhicules (camembert)
+        self.vehicle_frame = ttk.LabelFrame(charts_main_frame, text="📊 Répartition par Type de Véhicule", padding=5)
+        self.vehicle_frame.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
+        
+        # Frame pour graphique statuts (barres)
+        self.status_frame = ttk.LabelFrame(charts_main_frame, text="📈 Répartition par Statut", padding=5)
+        self.status_frame.grid(row=0, column=1, padx=5, pady=5, sticky="nsew")
+        
+        # Frame pour graphique clients (barres horizontales)
+        self.client_frame = ttk.LabelFrame(charts_main_frame, text="👥 Top 10 Clients", padding=5)
+        self.client_frame.grid(row=1, column=0, columnspan=2, padx=5, pady=5, sticky="nsew")
+        
+        # Initialiser les figures matplotlib
+        self.vehicle_fig = Figure(figsize=(6, 4), dpi=80, facecolor='white')
+        self.status_fig = Figure(figsize=(6, 4), dpi=80, facecolor='white')
+        self.client_fig = Figure(figsize=(12, 4), dpi=80, facecolor='white')
+        
+        # Créer les canvas
+        self.vehicle_canvas = FigureCanvasTkAgg(self.vehicle_fig, self.vehicle_frame)
+        self.vehicle_canvas.get_tk_widget().pack(fill=BOTH, expand=True)
+        
+        self.status_canvas = FigureCanvasTkAgg(self.status_fig, self.status_frame)
+        self.status_canvas.get_tk_widget().pack(fill=BOTH, expand=True)
+        
+        self.client_canvas = FigureCanvasTkAgg(self.client_fig, self.client_frame)
+        self.client_canvas.get_tk_widget().pack(fill=BOTH, expand=True)
+    
+    def create_vehicle_pie_chart(self, data):
+        """Crée un graphique en camembert pour les types de véhicules"""
+        if not MATPLOTLIB_AVAILABLE or not data:
+            return
+        
+        self.vehicle_fig.clear()
+        ax = self.vehicle_fig.add_subplot(111)
+        
+        # Couleurs modernes
+        colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD']
+        
+        # Données
+        labels = list(data.keys())
+        sizes = list(data.values())
+        
+        # Créer le camembert
+        wedges, texts, autotexts = ax.pie(sizes, labels=labels, autopct='%1.1f%%', 
+                                         startangle=90, colors=colors[:len(labels)],
+                                         textprops={'fontsize': 9})
+        
+        # Améliorer l'apparence
+        for autotext in autotexts:
+            autotext.set_color('white')
+            autotext.set_fontweight('bold')
+        
+        ax.set_title('Répartition par Type de Véhicule', fontsize=12, fontweight='bold', pad=20)
+        
+        # Rafraîchir le canvas
+        self.vehicle_canvas.draw()
+    
+    def create_status_bar_chart(self, data):
+        """Crée un graphique en barres pour les statuts"""
+        if not MATPLOTLIB_AVAILABLE or not data:
+            return
+        
+        self.status_fig.clear()
+        ax = self.status_fig.add_subplot(111)
+        
+        # Couleurs selon le statut
+        color_map = {
+            'En attente': '#FFA500',
+            'En cours': '#4169E1', 
+            'Livré': '#32CD32',
+            'Annulé': '#DC143C'
+        }
+        
+        # Données
+        statuts = list(data.keys())
+        counts = list(data.values())
+        colors = [color_map.get(statut, '#708090') for statut in statuts]
+        
+        # Créer le graphique en barres
+        bars = ax.bar(statuts, counts, color=colors, alpha=0.8, edgecolor='white', linewidth=1.5)
+        
+        # Ajouter les valeurs sur les barres
+        for bar, count in zip(bars, counts):
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height + 0.1,
+                   f'{count}', ha='center', va='bottom', fontweight='bold')
+        
+        # Améliorer l'apparence
+        ax.set_title('Répartition par Statut', fontsize=12, fontweight='bold', pad=20)
+        ax.set_ylabel('Nombre de commandes', fontsize=10)
+        ax.tick_params(axis='x', rotation=45)
+        ax.grid(axis='y', alpha=0.3)
+        
+        # Ajuster la mise en page
+        self.status_fig.tight_layout()
+        
+        # Rafraîchir le canvas
+        self.status_canvas.draw()
+    
+    def create_client_bar_chart(self, data, max_items=10):
+        """Crée un graphique en barres horizontales pour les clients"""
+        if not MATPLOTLIB_AVAILABLE or not data:
+            return
+        
+        self.client_fig.clear()
+        ax = self.client_fig.add_subplot(111)
+        
+        # Prendre les top clients
+        sorted_data = sorted(data.items(), key=lambda x: x[1], reverse=True)[:max_items]
+        
+        if not sorted_data:
+            return
+        
+        # Données
+        clients = [item[0] for item in sorted_data]
+        counts = [item[1] for item in sorted_data]
+        
+        # Créer un dégradé de couleurs
+        colors = plt.cm.Set3(np.linspace(0, 1, len(clients)))
+        
+        # Créer le graphique en barres horizontales
+        bars = ax.barh(clients, counts, color=colors, alpha=0.8, edgecolor='white', linewidth=1)
+        
+        # Ajouter les valeurs à côté des barres
+        for bar, count in zip(bars, counts):
+            width = bar.get_width()
+            ax.text(width + 0.1, bar.get_y() + bar.get_height()/2.,
+                   f'{count}', ha='left', va='center', fontweight='bold')
+        
+        # Améliorer l'apparence
+        ax.set_title(f'Top {len(clients)} Clients par Nombre de Commandes', 
+                    fontsize=12, fontweight='bold', pad=20)
+        ax.set_xlabel('Nombre de commandes', fontsize=10)
+        ax.grid(axis='x', alpha=0.3)
+        
+        # Inverser l'ordre pour avoir le plus grand en haut
+        ax.invert_yaxis()
+        
+        # Ajuster la mise en page
+        self.client_fig.tight_layout()
+        
+        # Rafraîchir le canvas
+        self.client_canvas.draw()
+    
+    def update_dashboard(self):
+        """Met à jour le tableau de bord avec les dernières données"""
+        try:
+            # Mise à jour des statistiques
+            self.rafraichir_statistiques()
+            
+            # Mise à jour du tableau dashboard_tree
+            if hasattr(self, 'dashboard_tree'):
+                self.dashboard_tree.delete(*self.dashboard_tree.get_children())
+                commandes = session.query(self.Commande).all()
+                for commande in commandes:
+                    statut = commande.statut if getattr(commande, 'statut', None) else "En attente"
+                    self.dashboard_tree.insert("", END, values=(
+                        commande.id_commande,
+                        commande.id_client,
+                        statut,
+                        commande.date_commande,
+                        commande.date_livraison
+                    ))
+            
+            if not MATPLOTLIB_AVAILABLE:
+                return
+            
+            # Récupérer les données pour les graphiques
+            commandes = session.query(self.Commande).all()
+            
+            if not commandes:
+                # Afficher des graphiques vides
+                self.create_empty_charts()
+                return
+            
+            # Préparer les données
+            types_vehicules = [cmd.type_vehicule for cmd in commandes if cmd.type_vehicule]
+            vehicle_data = Counter(types_vehicules)
+            
+            statuts = [cmd.statut if getattr(cmd, 'statut', None) else 'En attente' for cmd in commandes]
+            status_data = Counter(statuts)
+            
+            clients = [cmd.id_client for cmd in commandes if cmd.id_client]
+            client_data = Counter(clients)
+            
+            # Créer les graphiques
+            self.create_vehicle_pie_chart(vehicle_data)
+            self.create_status_bar_chart(status_data)
+            self.create_client_bar_chart(client_data)
+            
+            self.status_var.set(f"Dashboard mis à jour - {datetime.now().strftime('%H:%M:%S')}")
+            
         except Exception as e:
-            messagebox.showerror("Erreur", f"Erreur lors de la génération du graphique: {str(e)}")
+            messagebox.showerror("Erreur", f"Erreur lors de la mise à jour du dashboard: {str(e)}")
+            import traceback
+            traceback.print_exc()
+    
+    def create_empty_charts(self):
+        """Crée des graphiques vides quand il n'y a pas de données"""
+        if not MATPLOTLIB_AVAILABLE:
+            return
+        
+        # Graphique véhicules vide
+        self.vehicle_fig.clear()
+        ax1 = self.vehicle_fig.add_subplot(111)
+        ax1.text(0.5, 0.5, 'Aucune donnée\ndisponible', 
+                ha='center', va='center', transform=ax1.transAxes,
+                fontsize=14, color='gray')
+        ax1.set_title('Répartition par Type de Véhicule', fontsize=12, fontweight='bold')
+        self.vehicle_canvas.draw()
+        
+        # Graphique statuts vide
+        self.status_fig.clear()
+        ax2 = self.status_fig.add_subplot(111)
+        ax2.text(0.5, 0.5, 'Aucune donnée\ndisponible', 
+                ha='center', va='center', transform=ax2.transAxes,
+                fontsize=14, color='gray')
+        ax2.set_title('Répartition par Statut', fontsize=12, fontweight='bold')
+        self.status_canvas.draw()
+        
+        # Graphique clients vide
+        self.client_fig.clear()
+        ax3 = self.client_fig.add_subplot(111)
+        ax3.text(0.5, 0.5, 'Aucune donnée disponible', 
+                ha='center', va='center', transform=ax3.transAxes,
+                fontsize=14, color='gray')
+        ax3.set_title('Top 10 Clients', fontsize=12, fontweight='bold')
+        self.client_canvas.draw()
     
     def rafraichir_statistiques(self):
         """Met à jour les statistiques des commandes"""
@@ -273,153 +550,27 @@ class CommandeApp:
                 self.Commande.date_livraison < date_actuelle).scalar()
             self.commandes_retard_var.set(str(retard))
         
+            # Commandes sans tournée
             sans_tournee = session.query(func.count(self.Commande.id_commande)).filter(
                 ~exists().where(self.Tournee.id_commande == self.Commande.id_commande)
             ).scalar()
-            
             self.commandes_sans_tournee_var.set(str(sans_tournee))
             
-            messagebox.showinfo("Succès", "Statistiques mises à jour avec succès")
+            # Commandes livrées
+            livrees = session.query(func.count(self.Commande.id_commande)).filter(
+                self.Commande.statut == 'Livré').scalar() if hasattr(self.Commande, 'statut') else 0
+            self.commandes_livrees_var.set(str(livrees))
+            
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors de la mise à jour des statistiques: {str(e)}")
             import traceback
             traceback.print_exc()
 
+    # [Le reste des méthodes reste identique - supprimer, selectionner, charger_donnees, etc.]
     def show_context_menu(self, event):
         """Affiche le menu contextuel sur clic droit"""
         if self.tree.selection():
             self.context_menu.post(event.x_root, event.y_root)
-
-    def charger_clients(self):
-        """Charge la liste des clients dans le combobox"""
-        try:
-            clients = session.query(self.Chantier).all()
-            self.client_cb["values"] = [str(client.id_client) for client in clients]
-        except Exception as e:
-            messagebox.showerror("Erreur", f"Erreur lors du chargement des clients: {str(e)}")
-
-    def charger_tournees(self):
-        """Charge la liste des tournées dans le combobox"""
-        try:
-            tournees = session.query(self.Tournee).all()
-            self.tournee_cb["values"] = [""] + [str(tournee.id_tournee) for tournee in tournees]
-        except Exception as e:
-            messagebox.showerror("Erreur", f"Erreur lors du chargement des tournées: {str(e)}")
-
-    def ajouter(self):
-        """Ajoute une nouvelle commande à la base de données"""
-        try:
-            # Validation des données
-            if not self.id_client_var.get():
-                messagebox.showwarning("Attention", "Veuillez sélectionner un client")
-                return
-                
-            # Conversion des valeurs
-            quantite = float(self.quantite_requise_var.get() or 0)
-            
-            # Dates par défaut si non fournies
-            if not self.date_commande_var.get():
-                date_commande = datetime.now()
-                self.date_commande_var.set(date_commande.strftime("%Y-%m-%d %H:%M:%S"))
-            else:
-                date_commande = datetime.strptime(self.date_commande_var.get(), "%Y-%m-%d %H:%M:%S")
-                
-            if not self.date_livraison_var.get():
-                date_livraison = datetime.now() + timedelta(days=3)
-                self.date_livraison_var.set(date_livraison.strftime("%Y-%m-%d %H:%M:%S"))
-            else:
-                date_livraison = datetime.strptime(self.date_livraison_var.get(), "%Y-%m-%d %H:%M:%S")
-            
-            # Création de la commande
-            commande = self.Commande(
-                id_client=self.id_client_var.get(),
-                nature_service=self.nature_service_var.get(),
-                type_vehicule=self.type_vehicule_var.get(),
-                quantite_requise=quantite,
-                lieu_chargement=self.lieu_chargement_var.get(),
-                date_commande=date_commande,
-                date_livraison=date_livraison
-            )
-            
-            # Ajout de l'attribut statut (si on veut le gérer)
-            if self.statut_var.get():
-                if hasattr(commande, 'statut'):
-                    commande.statut = self.statut_var.get()
-            
-            # Ajout à la base de données
-            session.add(commande)
-            session.commit()
-            
-            # Associer à une tournée si spécifiée
-            if self.id_tournee_var.get():
-                tournee_id = int(self.id_tournee_var.get())
-                commande.associer_tournee(tournee_id)
-                session.commit()
-            
-            # Mise à jour de l'interface
-            self.charger_donnees()
-            self.vider_formulaire()
-            self.status_var.set(f"Commande ajoutée avec succès - {datetime.now().strftime('%H:%M:%S')}")
-            messagebox.showinfo("Succès", "Commande ajoutée avec succès")
-        except ValueError as e:
-            messagebox.showerror("Erreur", f"Erreur de format: {str(e)}")
-        except Exception as e:
-            messagebox.showerror("Erreur", f"Erreur lors de l'ajout: {str(e)}")
-            import traceback
-            traceback.print_exc()
-
-    def modifier(self):
-        """Modifie une commande existante"""
-        item = self.tree.selection()
-        if not item:
-            messagebox.showwarning("Attention", "Sélectionnez une commande à modifier")
-            return
-        
-        try:
-            id_commande = int(self.tree.item(item, "values")[0])
-            commande = session.query(self.Commande).filter_by(id_commande=id_commande).first()
-            
-            if commande:
-                # Validation et conversion des valeurs
-                quantite = float(self.quantite_requise_var.get() or 0)
-                date_commande = datetime.strptime(self.date_commande_var.get(), "%Y-%m-%d %H:%M:%S")
-                date_livraison = datetime.strptime(self.date_livraison_var.get(), "%Y-%m-%d %H:%M:%S")
-                
-                # Mise à jour de la commande
-                commande.id_client = self.id_client_var.get()
-                commande.nature_service = self.nature_service_var.get()
-                commande.type_vehicule = self.type_vehicule_var.get()
-                commande.quantite_requise = quantite
-                commande.lieu_chargement = self.lieu_chargement_var.get()
-                commande.date_commande = date_commande
-                commande.date_livraison = date_livraison
-                
-                # Gestion du statut s'il est présent dans la classe
-                if hasattr(commande, 'statut') and self.statut_var.get():
-                    commande.statut = self.statut_var.get()
-                
-                # Traitement de la tournée
-                if self.id_tournee_var.get():
-                    # Associer à la nouvelle tournée
-                    tournee_id = int(self.id_tournee_var.get())
-                    commande.associer_tournee(tournee_id)
-                else:
-                    # Pour dissocier la tournée, on utilise la méthode associer_tournee avec None
-                    commande.associer_tournee(None)
-                
-                # Mise à jour dans la base de données
-                session.commit()
-                
-                # Mise à jour de l'interface
-                self.charger_donnees()
-                self.status_var.set(f"Commande n°{id_commande} modifiée - {datetime.now().strftime('%H:%M:%S')}")
-                messagebox.showinfo("Succès", "Commande modifiée avec succès")
-        except ValueError as e:
-            messagebox.showerror("Erreur", f"Erreur de format: {str(e)}")
-        except Exception as e:
-            messagebox.showerror("Erreur", f"Erreur lors de la modification: {str(e)}")
-            import traceback
-            traceback.print_exc()
 
     def supprimer(self):
         """Supprime une commande existante"""
@@ -436,16 +587,16 @@ class CommandeApp:
                     session.delete(commande)
                     session.commit()
                 
-                # Mise à jour de l'interface
+                # Mise à jour de l'interface et du dashboard
                 self.charger_donnees()
-                self.vider_formulaire()
+                self.update_dashboard()
                 self.status_var.set(f"Commande n°{id_commande} supprimée - {datetime.now().strftime('%H:%M:%S')}")
                 messagebox.showinfo("Succès", "Commande supprimée avec succès")
             except Exception as e:
                 messagebox.showerror("Erreur", f"Erreur lors de la suppression: {str(e)}")
 
     def selectionner(self, event=None):
-        """Remplit le formulaire avec les données de la commande sélectionnée"""
+        """Remplit les variables avec les données de la commande sélectionnée"""
         item = self.tree.selection()
         if item:
             values = self.tree.item(item, "values")
@@ -453,22 +604,22 @@ class CommandeApp:
             self.id_client_var.set(values[1])
             
             # Gestion du numéro de tournée
-            tournee_id = values[2]
-            if tournee_id and tournee_id != "None":
+            tournee_id = values[3]
+            if tournee_id and tournee_id != "Non assignée":
                 self.id_tournee_var.set(tournee_id)
             else:
                 self.id_tournee_var.set("")
                 
-            self.nature_service_var.set(values[3])
-            self.type_vehicule_var.set(values[4])
-            self.quantite_requise_var.set(values[5])
-            self.lieu_chargement_var.set(values[6])
-            self.date_commande_var.set(values[7])
-            self.date_livraison_var.set(values[8])
+            self.nature_service_var.set(values[4])
+            self.type_vehicule_var.set(values[5])
+            self.quantite_requise_var.set(values[6])
+            self.lieu_chargement_var.set(values[7])
+            self.date_commande_var.set(values[8])
+            self.date_livraison_var.set(values[9])
             
             # Gestion du statut si présent
-            if len(values) > 9:
-                self.statut_var.set(values[9])
+            if len(values) > 10:
+                self.statut_var.set(values[10])
             else:
                 self.statut_var.set("")
 
@@ -482,10 +633,13 @@ class CommandeApp:
                 id_tournee = None
                 if hasattr(commande, 'tournee') and commande.tournee:
                     id_tournee = commande.tournee.id_tournee
-                # Récupérer le statut s'il existe
-                statut = getattr(commande, 'statut', "En attente") if hasattr(commande, 'statut') else "En attente"
+                
+                # Récupérer le statut s'il existe, sinon afficher 'En attente'
+                statut = commande.statut if getattr(commande, 'statut', None) else "En attente"
+                
                 # Récupérer le nom d'équipement
                 nom_equipement = commande.equipement.nomEquipement if commande.equipement else "-"
+                
                 self.tree.insert("", END, values=(
                     commande.id_commande, 
                     commande.id_client, 
@@ -500,28 +654,11 @@ class CommandeApp:
                     statut
                 ))
             
-            # Mise à jour des statistiques si l'onglet existe
-            if hasattr(self, 'total_commandes_var'):
-                self.rafraichir_statistiques()
-                
             self.status_var.set(f"Données chargées - {datetime.now().strftime('%H:%M:%S')}")
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors du chargement des données: {str(e)}")
             import traceback
             traceback.print_exc()
-
-    def vider_formulaire(self):
-        """Vide le formulaire pour une nouvelle saisie"""
-        self.id_commande_var.set("")
-        self.id_client_var.set("")
-        self.id_tournee_var.set("")
-        self.nature_service_var.set("")
-        self.type_vehicule_var.set("")
-        self.quantite_requise_var.set("")
-        self.lieu_chargement_var.set("")
-        self.date_commande_var.set("")
-        self.date_livraison_var.set("")
-        self.statut_var.set("")
 
     def verifier_retard(self):
         """Vérifie si une commande est en retard"""
@@ -565,6 +702,7 @@ class CommandeApp:
                         commande.associer_tournee(id_tournee)
                         session.commit()
                         self.charger_donnees()
+                        self.update_dashboard()
                         self.status_var.set(f"Commande n°{id_commande} associée à tournée n°{id_tournee}")
                         messagebox.showinfo("Succès", f"Commande n°{id_commande} associée à la tournée n°{id_tournee}")
                     else:
@@ -596,7 +734,7 @@ class CommandeApp:
         date_from_var = StringVar()
         date_to_var = StringVar()
         
-        # Première ligne
+        # Configuration des critères
         ttk.Label(criteria_frame, text="ID Client:").grid(row=0, column=0, padx=5, pady=5, sticky=W)
         ttk.Entry(criteria_frame, textvariable=client_search_var).grid(row=0, column=1, padx=5, pady=5, sticky=W+E)
         
@@ -604,24 +742,17 @@ class CommandeApp:
         vehicle_types = ["", "Camion", "Semi-remorque", "Fourgon", "Benne", "Citerne"]
         ttk.Combobox(criteria_frame, textvariable=vehicle_search_var, values=vehicle_types).grid(row=0, column=3, padx=5, pady=5, sticky=W+E)
         
-        # Deuxième ligne
         ttk.Label(criteria_frame, text="Date livraison de:").grid(row=1, column=0, padx=5, pady=5, sticky=W)
         ttk.Entry(criteria_frame, textvariable=date_from_var).grid(row=1, column=1, padx=5, pady=5, sticky=W+E)
         
         ttk.Label(criteria_frame, text="à:").grid(row=1, column=2, padx=5, pady=5, sticky=W)
         ttk.Entry(criteria_frame, textvariable=date_to_var).grid(row=1, column=3, padx=5, pady=5, sticky=W+E)
         
-        # Boutons de recherche
-        btn_frame = ttk.Frame(main_frame)
-        btn_frame.pack(fill=X, pady=10)
-        
+        # Fonctions de recherche
         def executer_recherche():
-            """Exécute la recherche selon les critères spécifiés"""
             try:
-                # Construire la requête de base
                 query = session.query(self.Commande)
                 
-                # Appliquer les filtres
                 if client_search_var.get():
                     query = query.filter(self.Commande.id_client == client_search_var.get())
                     
@@ -644,16 +775,12 @@ class CommandeApp:
                         messagebox.showwarning("Format de date incorrect", "Utilisez le format YYYY-MM-DD")
                         return
                 
-                # Exécuter la requête
                 resultats = query.all()
                 
-                # Vider le tableau des résultats
                 for item in result_tree.get_children():
                     result_tree.delete(item)
                     
-                # Remplir avec les nouveaux résultats
                 for commande in resultats:
-                    # Récupérer l'ID de la tournée via la relation, s'il existe
                     id_tournee = None
                     if commande.tournee:
                         id_tournee = commande.tournee.id_tournee
@@ -670,15 +797,11 @@ class CommandeApp:
                         commande.date_livraison
                     ))
                     
-                # Mettre à jour le statut
                 status_var.set(f"Recherche terminée - {len(resultats)} résultat(s)")
             except Exception as e:
                 messagebox.showerror("Erreur", f"Erreur lors de la recherche: {str(e)}")
-                import traceback
-                traceback.print_exc()
+        
         def exporter_resultats():
-            """Exporte les résultats de la recherche dans un fichier CSV"""
-            # Vérifier s'il y a des résultats à exporter
             if not result_tree.get_children():
                 messagebox.showinfo("Information", "Aucun résultat à exporter.")
                 return
@@ -687,7 +810,6 @@ class CommandeApp:
                 import csv
                 from tkinter import filedialog
                 
-                # Demander où enregistrer le fichier
                 fichier = filedialog.asksaveasfilename(
                     defaultextension=".csv",
                     filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
@@ -695,27 +817,27 @@ class CommandeApp:
                 )
                 
                 if not fichier:
-                    return  # Annulation par l'utilisateur
+                    return
                 
-                # Écrire les données dans le fichier CSV
                 with open(fichier, 'w', newline='', encoding='utf-8') as csvfile:
                     writer = csv.writer(csvfile, delimiter=';')
                     
-                    # En-têtes
                     headers = ["ID", "Client", "Tournée", "Service", "Véhicule", 
                             "Quantité", "Lieu", "Date Commande", "Date Livraison"]
                     writer.writerow(headers)
                     
-                    # Données
                     for item_id in result_tree.get_children():
                         values = result_tree.item(item_id, "values")
                         writer.writerow(values)
                 
-                # Confirmation
                 messagebox.showinfo("Succès", f"Les résultats ont été exportés vers {fichier}")
                 
             except Exception as e:
                 messagebox.showerror("Erreur", f"Erreur lors de l'exportation: {str(e)}")
+        
+        # Boutons
+        btn_frame = ttk.Frame(main_frame)
+        btn_frame.pack(fill=X, pady=10)
         
         ttk.Button(btn_frame, text="Rechercher", command=executer_recherche, 
                 bootstyle=PRIMARY, width=15).pack(side=LEFT, padx=5)
@@ -728,50 +850,29 @@ class CommandeApp:
         result_frame = ttk.LabelFrame(main_frame, text="Résultats", padding=10)
         result_frame.pack(fill=BOTH, expand=True, pady=10)
         
-        # Scrollbars
         y_scrollbar = ttk.Scrollbar(result_frame)
         y_scrollbar.pack(side=RIGHT, fill=Y)
         
         x_scrollbar = ttk.Scrollbar(result_frame, orient=HORIZONTAL)
         x_scrollbar.pack(side=BOTTOM, fill=X)
         
-        # Tableau
         result_tree = ttk.Treeview(result_frame, columns=(
             "id_commande", "id_client", "id_tournee", "nature_service", 
             "type_vehicule", "quantite_requise", "lieu_chargement", 
             "date_commande", "date_livraison"), show="headings",
             yscrollcommand=y_scrollbar.set, xscrollcommand=x_scrollbar.set)
         
-        # Configuration des barres de défilement
         y_scrollbar.config(command=result_tree.yview)
         x_scrollbar.config(command=result_tree.xview)
         
-        # Configuration des colonnes
-        result_tree.heading("id_commande", text="ID")
-        result_tree.heading("id_client", text="Client")
-        result_tree.heading("id_tournee", text="Tournée")
-        result_tree.heading("nature_service", text="Service")
-        result_tree.heading("type_vehicule", text="Véhicule")
-        result_tree.heading("quantite_requise", text="Quantité")
-        result_tree.heading("lieu_chargement", text="Lieu")
-        result_tree.heading("date_commande", text="Date Commande")
-        result_tree.heading("date_livraison", text="Date Livraison")
+        # Configuration des colonnes du tableau de résultats
+        for col in result_tree["columns"]:
+            result_tree.heading(col, text=col.replace("_", " ").title())
+            result_tree.column(col, width=100)
         
-        # Configurer les largeurs des colonnes
-        result_tree.column("id_commande", width=50)
-        result_tree.column("id_client", width=50)
-        result_tree.column("id_tournee", width=50)
-        result_tree.column("nature_service", width=120)
-        result_tree.column("type_vehicule", width=100)
-        result_tree.column("quantite_requise", width=80)
-        result_tree.column("lieu_chargement", width=120)
-        result_tree.column("date_commande", width=150)
-        result_tree.column("date_livraison", width=150)
-        
-        # Pack le tableau
         result_tree.pack(side=LEFT, fill=BOTH, expand=True)
         
-        # Barre d'état pour les résultats
+        # Barre d'état
         status_var = StringVar()
         status_var.set("Prêt pour la recherche")
         status_bar = ttk.Label(recherche_window, textvariable=status_var, relief=SUNKEN, anchor=W)
@@ -793,27 +894,23 @@ class CommandeApp:
                 details_window.title(f"Détails du Client {id_client}")
                 details_window.geometry("500x300")
                 
-                # Frame pour les détails
                 details_frame = ttk.Frame(details_window, padding=15)
                 details_frame.pack(fill=BOTH, expand=True)
                 
-                # Affichage des détails du client
                 ttk.Label(details_frame, text=f"ID: {client.id_client}", font=("Segoe UI", 12, "bold")).pack(anchor=W, pady=5)
-                ttk.Label(details_frame, text=f"Nom: {getattr(client, 'nom', 'Non spécifié')}").pack(anchor=W, pady=2)
-                ttk.Label(details_frame, text=f"Adresse: {getattr(client, 'adresse', 'Non spécifiée')}").pack(anchor=W, pady=2)
-                ttk.Label(details_frame, text=f"Contact: {getattr(client, 'contact', 'Non spécifié')}").pack(anchor=W, pady=2)
-                ttk.Label(details_frame, text=f"Téléphone: {getattr(client, 'telephone', 'Non spécifié')}").pack(anchor=W, pady=2)
+                ttk.Label(details_frame, text=f"Localisation: {getattr(client, 'localisation', 'Non spécifiée')}").pack(anchor=W, pady=2)
+                ttk.Label(details_frame, text=f"Nature terrain: {getattr(client, 'nature_terrain', 'Non spécifiée')}").pack(anchor=W, pady=2)
+                ttk.Label(details_frame, text=f"Distance goudron: {getattr(client, 'distanceAllerGoudron', 'Non spécifiée')} km").pack(anchor=W, pady=2)
+                ttk.Label(details_frame, text=f"Distance piste: {getattr(client, 'distanceAllerPiste', 'Non spécifiée')} km").pack(anchor=W, pady=2)
+                ttk.Label(details_frame, text=f"Temps aller: {getattr(client, 'temps_aller', 'Non calculé')} h").pack(anchor=W, pady=2)
                 
-                # Statistiques du client
                 stats_frame = ttk.LabelFrame(details_frame, text="Statistiques", padding=10)
                 stats_frame.pack(fill=X, pady=10)
                 
-                # Nombre de commandes pour ce client
                 nb_commandes = session.query(func.count(self.Commande.id_commande)).filter(
                     self.Commande.id_client == id_client).scalar()
                 ttk.Label(stats_frame, text=f"Nombre de commandes: {nb_commandes}").pack(anchor=W, pady=2)
                 
-                # Bouton pour fermer
                 ttk.Button(details_window, text="Fermer", command=details_window.destroy, 
                         bootstyle=SECONDARY, width=15).pack(pady=10)
             else:
@@ -833,19 +930,16 @@ class CommandeApp:
             commande = session.query(self.Commande).filter_by(id_commande=id_commande).first()
             
             if commande:
-                # Ouvre une boîte de dialogue pour entrer les paramètres
                 distance = simpledialog.askfloat("Distance", "Distance à parcourir (km):", minvalue=0.1)
                 if distance is None:
-                    return  # L'utilisateur a annulé
+                    return
                     
                 poids = simpledialog.askfloat("Poids", "Poids de la cargaison (kg):", minvalue=0.1)
                 if poids is None:
-                    return  # L'utilisateur a annulé
+                    return
                 
-                # Calcule le délai
                 delai = commande.calculer_delai_livraison(distance, poids)
                 
-                # Affiche le résultat
                 heures = int(delai)
                 minutes = int((delai - heures) * 60)
                 
@@ -869,34 +963,24 @@ class CommandeApp:
             commande = session.query(self.Commande).filter_by(id_commande=id_commande).first()
             
             if commande:
-                # Vérifier si la commande est déjà livrée
-                if hasattr(commande, 'statut') and commande.statut == 'livrée':
+                if hasattr(commande, 'statut') and commande.statut == 'Livré':
                     messagebox.showinfo("Information", f"La commande n°{id_commande} est déjà marquée comme livrée.")
                     return
                 
-                # Demander une confirmation
                 confirmation = messagebox.askyesno("Confirmation", 
                                                 f"Êtes-vous sûr de vouloir marquer la commande n°{id_commande} comme livrée ?")
                 if not confirmation:
                     return
                 
-                # Ajouter un attribut statut si la classe ne l'a pas déjà
-                if not hasattr(commande, 'statut'):
-                    # On peut ajouter un attribut dynamiquement, mais cela ne sera pas sauvegardé dans la base
-                    commande.statut = 'livrée'
-                    messagebox.showinfo("Succès", f"La commande n°{id_commande} a été marquée comme livrée.")
-                    messagebox.showwarning("Attention", "L'attribut 'statut' n'est pas persistant dans la base de données. "
-                                        "Pensez à ajouter cette colonne à votre modèle pour un suivi permanent.")
-                else:
-                    # Si l'attribut existe dans le modèle de la base
-                    commande.statut = 'livrée'
-                    session.commit()
-                    messagebox.showinfo("Succès", f"La commande n°{id_commande} a été marquée comme livrée.")
+                commande.statut = 'Livré'
+                session.commit()
+                messagebox.showinfo("Succès", f"La commande n°{id_commande} a été marquée comme livrée.")
                 
-                # Mettre à jour l'interface
                 self.charger_donnees()
+                self.update_dashboard()
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors du marquage: {str(e)}")
+
 # Point d'entrée pour l'application
 def main():
     root = ttk.Window(themename="cosmo")

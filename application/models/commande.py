@@ -15,6 +15,7 @@ class Commande(Base):
     lieu_chargement = Column(String(255))
     date_commande = Column(DateTime)
     date_livraison = Column(DateTime)
+    statut = Column(String(255), nullable=True)
 
     equipement = relationship("Equipement")
 
