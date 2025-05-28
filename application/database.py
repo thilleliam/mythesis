@@ -18,15 +18,14 @@ try:
     sys.stdout.reconfigure(encoding='utf-8')
 except:
     pass  # Skip if not available
-
 class DatabaseConfig:
     def __init__(self):
-        # ONLY use FreeSQLDatabase - no AWS references anywhere
-        self.DB_HOST = os.environ.get("DB_HOST", "sql8.freesqldatabase.com")
-        self.DB_USER = os.environ.get("DB_USER", "sql8781735")
-        self.DB_PASSWORD = os.environ.get("DB_PASSWORD", "YQ8d2QdLqV")
-        self.DB_NAME = os.environ.get("DB_NAME", "sql8781735")
-        self.DB_PORT = int(os.environ.get("DB_PORT", "3306"))
+        # CONFIGURATION RAILWAY
+        self.DB_HOST = os.environ.get("DB_HOST", "shortline.proxy.rlwy.net")
+        self.DB_USER = os.environ.get("DB_USER", "root")
+        self.DB_PASSWORD = os.environ.get("DB_PASSWORD", "lxdQZVBnFXQivTLxGUMbupHbObfiaAbW")
+        self.DB_NAME = os.environ.get("DB_NAME", "railway")
+        self.DB_PORT = int(os.environ.get("DB_PORT", "12194"))  # Port spécial Railway
         
         # Construct database URL
         self.DATABASE_URL = os.environ.get(
@@ -34,14 +33,8 @@ class DatabaseConfig:
             f"mysql+pymysql://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
         )
         
-        # CRITICAL: Verify we're not using AWS database
-        if "amazonaws.com" in self.DATABASE_URL or "ec2-" in self.DATABASE_URL:
-            logger.error("❌ CRITICAL: AWS database detected in URL!")
-            logger.error(f"Current URL: {self.DATABASE_URL}")
-            raise ValueError("AWS database URL detected - this should not happen!")
-        
+        # Supprimez la vérification AWS (plus nécessaire)
         logger.info(f"Database configuration: {self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}")
-
 # Base for model creation
 class Base(DeclarativeBase):
     pass
