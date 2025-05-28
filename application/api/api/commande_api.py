@@ -1,3 +1,8 @@
+import sys
+import os
+# Ajouter le répertoire racine au PYTHONPATH
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+
 from flask import Flask, request, jsonify
 from sqlalchemy.orm import sessionmaker
 from application.database import engine
