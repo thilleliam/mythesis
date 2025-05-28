@@ -7,14 +7,20 @@ from application.models.tournee import Tournee
 from datetime import datetime
 from functools import wraps
 import uuid
+import os
+
+# Configuration pour Railway
 
 app = Flask(__name__)
+# Port pour Railway
+port = int(os.environ.get('PORT', 5000))
+
 Session = sessionmaker(bind=engine)
 
 # Table pour stocker les positions GPS des conducteurs
-# Vous devrez créer cette table ou l'ajouter à votre modèle existant
+
 from sqlalchemy import Column, String, Float, DateTime, ForeignKey
-from application.config import Base
+from application.database import Base
 
 class PositionConducteur(Base):
     """Modèle pour stocker les positions GPS des conducteurs"""
@@ -1100,7 +1106,15 @@ def home():
     """
 
 if __name__ == '__main__':
-    print("🚀 Serveur TMS démarré sur http://127.0.0.1:5000")
-    print("📝 Formulaire: http://127.0.0.1:5000/commande/form")
-    print("📱 App Chauffeur: http://127.0.0.1:5000/chauffeur/app")
-    app.run(debug=True)
+    # Créer les tables si elles n'existent pas
+    with app.app_context():
+        Base.metadata.create_all(bind=engine)
+    
+    # Mode production sur Railway
+    if os.environ.get('RAILWAY_ENVIRONMENT'):
+        app.run(host='0.0.0.0', port=port)
+    else:
+        print("🚀 Serveur TMS démarré sur http://127.0.0.1:5000")
+        print("📝 Formulaire: http://127.0.0.1:5000/commande/form")
+        print("📱 App Chauffeur: http://127.0.0.1:5000/chauffeur/app")
+        app.run(debug=True)
