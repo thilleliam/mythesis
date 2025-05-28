@@ -1,7 +1,7 @@
 # etape.py
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
-from application.config import Base
+from application.database import Base
 
 class EtapeRotation(Base):
     __tablename__ = "etapes_rotation"

@@ -1,4 +1,4 @@
-from application.config import Base
+from application.database import Base
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float
 from sqlalchemy.orm import relationship, backref
 from datetime import datetime

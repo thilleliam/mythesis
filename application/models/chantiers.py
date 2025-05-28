@@ -1,4 +1,4 @@
-from application.config import Base
+from application.database import Base
 from sqlalchemy import Column, event, Integer, String, Float
 from sqlalchemy.orm import relationship
 

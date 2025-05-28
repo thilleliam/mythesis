@@ -1,6 +1,7 @@
 from sqlalchemy import Column, String, Enum
 from sqlalchemy.orm import relationship
-from application.config import Base
+from application.database import Base
+
 from application.database import SessionLocal
 from sqlalchemy import func
 

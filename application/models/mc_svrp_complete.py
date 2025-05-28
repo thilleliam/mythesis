@@ -13,8 +13,9 @@ import math
 import sys
 from collections import defaultdict
 from sqlalchemy import func
-from application.config import Base
-from application.database import SessionLocal
+from application.models.vehicule import Vehicule
+
+from application.database import SessionLocal , Base
 from datetime import date
 
 sys.stdout.reconfigure(encoding='utf-8')
@@ -1615,3 +1616,1263 @@ def print_detailed_solution_mc(solution, instance):
 - Compatible avec vos données existantes
 - Interface graphique inchangée
 """
+
+class ExportateurSolutions:
+    """Classe pour exporter les solutions d'optimisation vers différents formats"""
+    
+    def __init__(self):
+        self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+    def exporter_solution_complete(self, resultats, format_export="all", dossier_export="exports"):
+        """
+        Exporte la solution complète vers différents formats
+        
+        Args:
+            resultats: Dictionnaire des résultats de l'optimisation
+            format_export: "excel", "csv", "json", "pdf", "all"
+            dossier_export: Dossier de destination
+        """
+        
+        # Créer le dossier d'export s'il n'existe pas
+        if not os.path.exists(dossier_export):
+            os.makedirs(dossier_export)
+            
+        fichiers_exportes = []
+        
+        print(f"\n📁 EXPORT DE LA SOLUTION D'OPTIMISATION")
+        print(f"Dossier de destination: {dossier_export}")
+        print(f"Format(s) demandé(s): {format_export}")
+        
+        # Vérifier le type de résultats (mono ou multi-semaines)
+        is_multi_semaines = 'resultats_semaine1' in resultats or 'resultats_semaine2' in resultats
+        
+        if format_export in ["excel", "all"]:
+            fichier_excel = self._exporter_vers_excel(resultats, dossier_export, is_multi_semaines)
+            fichiers_exportes.append(fichier_excel)
+            
+        if format_export in ["csv", "all"]:
+            fichiers_csv = self._exporter_vers_csv(resultats, dossier_export, is_multi_semaines)
+            fichiers_exportes.extend(fichiers_csv)
+            
+        if format_export in ["json", "all"]:
+            fichier_json = self._exporter_vers_json(resultats, dossier_export, is_multi_semaines)
+            fichiers_exportes.append(fichier_json)
+            
+        if format_export in ["pdf", "all"]:
+            fichier_pdf = self._exporter_vers_pdf(resultats, dossier_export, is_multi_semaines)
+            fichiers_exportes.append(fichier_pdf)
+            
+        print(f"\n✅ EXPORT TERMINÉ")
+        print(f"Fichiers générés:")
+        for fichier in fichiers_exportes:
+            print(f"  - {fichier}")
+            
+        return fichiers_exportes
+    
+    def _exporter_vers_excel(self, resultats, dossier, is_multi_semaines):
+        """Exporte vers Excel avec plusieurs onglets"""
+        
+        nom_fichier = f"optimisation_navettes_{self.timestamp}.xlsx"
+        chemin_fichier = os.path.join(dossier, nom_fichier)
+        
+        print(f"📊 Export Excel: {nom_fichier}")
+        
+        wb = Workbook()
+        
+        # Supprimer la feuille par défaut
+        wb.remove(wb.active)
+        
+        if is_multi_semaines:
+            self._creer_onglets_multi_semaines(wb, resultats)
+        else:
+            self._creer_onglets_mono_semaine(wb, resultats)
+            
+        wb.save(chemin_fichier)
+        return chemin_fichier
+    
+    def _creer_onglets_multi_semaines(self, wb, resultats):
+        """Crée les onglets pour une solution multi-semaines"""
+        
+        # 1. Onglet Résumé Global
+        ws_resume = wb.create_sheet("Résumé Global")
+        self._remplir_resume_global(ws_resume, resultats, True)
+        
+        # 2. Onglet Semaine 1 (si existe)
+        if resultats.get('resultats_semaine1'):
+            ws_s1 = wb.create_sheet("Semaine 1")
+            self._remplir_details_semaine(ws_s1, resultats['resultats_semaine1'], 1)
+            
+        # 3. Onglet Semaine 2 (si existe)
+        if resultats.get('resultats_semaine2'):
+            ws_s2 = wb.create_sheet("Semaine 2")
+            self._remplir_details_semaine(ws_s2, resultats['resultats_semaine2'], 2)
+            
+        # 4. Onglet Planification Détaillée
+        ws_planning = wb.create_sheet("Planning Détaillé")
+        self._remplir_planning_detaille(ws_planning, resultats, True)
+        
+        # 5. Onglet Analyse Coûts
+        ws_couts = wb.create_sheet("Analyse Coûts")
+        self._remplir_analyse_couts(ws_couts, resultats, True)
+        
+    def _creer_onglets_mono_semaine(self, wb, resultats):
+        """Crée les onglets pour une solution mono-semaine"""
+        
+        # 1. Onglet Résumé
+        ws_resume = wb.create_sheet("Résumé")
+        self._remplir_resume_global(ws_resume, resultats, False)
+        
+        # 2. Onglet Détails
+        ws_details = wb.create_sheet("Détails Solution")
+        self._remplir_details_semaine(ws_details, resultats, 1)
+        
+        # 3. Onglet Planning
+        ws_planning = wb.create_sheet("Planning")
+        self._remplir_planning_detaille(ws_planning, resultats, False)
+        
+        # 4. Onglet Coûts
+        ws_couts = wb.create_sheet("Analyse Coûts")
+        self._remplir_analyse_couts(ws_couts, resultats, False)
+        
+    def _remplir_resume_global(self, ws, resultats, is_multi):
+        """Remplit l'onglet résumé global"""
+        
+        # Titre principal
+        ws['A1'] = "RÉSUMÉ DE L'OPTIMISATION DES NAVETTES"
+        ws['A1'].font = Font(size=16, bold=True)
+        ws.merge_cells('A1:E1')
+        
+        row = 3
+        
+        if is_multi:
+            # Informations projet multi-semaines
+            ws[f'A{row}'] = "TYPE DE PROJET"
+            ws[f'B{row}'] = "Multi-semaines"
+            ws[f'A{row}'].font = Font(bold=True)
+            row += 1
+            
+            ws[f'A{row}'] = "DURÉE TOTALE"
+            ws[f'B{row}'] = f"{resultats['duree_totale_projet']} jours"
+            ws[f'A{row}'].font = Font(bold=True)
+            row += 1
+            
+            ws[f'A{row}'] = "COÛT TOTAL"
+            ws[f'B{row}'] = f"{resultats['cout_total_global']:.2f} €"
+            ws[f'A{row}'].font = Font(bold=True)
+            ws[f'B{row}'].font = Font(color="FF0000")
+            row += 2
+            
+            # Détails par semaine
+            if resultats.get('resultats_semaine1'):
+                s1 = resultats['resultats_semaine1']
+                ws[f'A{row}'] = "SEMAINE 1"
+                ws[f'A{row}'].font = Font(bold=True, color="0000FF")
+                row += 1
+                
+                ws[f'A{row}'] = "Véhicule utilisé"
+                ws[f'B{row}'] = s1['vehicule_utilise']['nom']
+                row += 1
+                
+                ws[f'A{row}'] = "Nombre de véhicules"
+                ws[f'B{row}'] = s1['nb_vehicules_necessaires']
+                row += 1
+                
+                ws[f'A{row}'] = "Coût semaine 1"
+                ws[f'B{row}'] = f"{s1['vehicule_optimal']['cout_total']:.2f} €"
+                row += 2
+                
+            if resultats.get('resultats_semaine2'):
+                s2 = resultats['resultats_semaine2']
+                ws[f'A{row}'] = "SEMAINE 2"
+                ws[f'A{row}'].font = Font(bold=True, color="0000FF")
+                row += 1
+                
+                ws[f'A{row}'] = "Véhicule utilisé"
+                ws[f'B{row}'] = s2['vehicule_utilise']['nom']
+                row += 1
+                
+                ws[f'A{row}'] = "Nombre de véhicules"
+                ws[f'B{row}'] = s2['nb_vehicules_necessaires']
+                row += 1
+                
+                ws[f'A{row}'] = "Coût semaine 2"
+                ws[f'B{row}'] = f"{s2['vehicule_optimal']['cout_total']:.2f} €"
+                row += 1
+                
+        else:
+            # Informations projet mono-semaine
+            ws[f'A{row}'] = "VÉHICULE SÉLECTIONNÉ"
+            ws[f'B{row}'] = resultats['vehicule_utilise']['nom']
+            ws[f'A{row}'].font = Font(bold=True)
+            row += 1
+            
+            ws[f'A{row}'] = "NOMBRE DE VÉHICULES"
+            ws[f'B{row}'] = resultats['nb_vehicules_necessaires']
+            ws[f'A{row}'].font = Font(bold=True)
+            row += 1
+            
+            ws[f'A{row}'] = "COÛT TOTAL"
+            ws[f'B{row}'] = f"{resultats['vehicule_optimal']['cout_total']:.2f} €"
+            ws[f'A{row}'].font = Font(bold=True)
+            ws[f'B{row}'].font = Font(color="FF0000")
+            row += 1
+            
+            ws[f'A{row}'] = "DURÉE RÉELLE"
+            ws[f'B{row}'] = f"{resultats['duree_reelle']} jours"
+            ws[f'A{row}'].font = Font(bold=True)
+            
+        # Ajuster la largeur des colonnes
+        ws.column_dimensions['A'].width = 25
+        ws.column_dimensions['B'].width = 30
+        
+    def _remplir_details_semaine(self, ws, resultats_semaine, numero_semaine):
+        """Remplit les détails d'une semaine"""
+        
+        ws['A1'] = f"DÉTAILS SEMAINE {numero_semaine}"
+        ws['A1'].font = Font(size=14, bold=True)
+        ws.merge_cells('A1:F1')
+        
+        row = 3
+        
+        # Informations véhicule
+        ws[f'A{row}'] = "VÉHICULE ET CAPACITÉS"
+        ws[f'A{row}'].font = Font(bold=True)
+        row += 1
+        
+        vehicule = resultats_semaine['vehicule_utilise']
+        ws[f'A{row}'] = "Nom du véhicule"
+        ws[f'B{row}'] = vehicule.get('nom', 'Non spécifié')
+        row += 1
+        
+        ws[f'A{row}'] = "Type"
+        ws[f'B{row}'] = vehicule.get('type', 'Non spécifié')
+        row += 1
+        
+        ws[f'A{row}'] = "Capacité poids"
+        ws[f'B{row}'] = f"{vehicule.get('capacite_poids_max', 'N/A')} tonnes"
+        row += 1
+        
+        ws[f'A{row}'] = "Capacité volume"
+        ws[f'B{row}'] = f"{vehicule.get('capacite_volume_max', 'N/A')} m³"
+        row += 2
+        
+        # Produits à transporter
+        ws[f'A{row}'] = "PRODUITS À TRANSPORTER"
+        ws[f'A{row}'].font = Font(bold=True)
+        row += 1
+        
+        # Headers
+        headers = ['Produit', 'Quantité', 'Poids Unit.', 'Volume Unit.', 'Poids Total', 'Volume Total']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=row, column=col, value=header)
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
+            
+        row += 1
+        
+        # Vérifier si les produits existent
+        produits = resultats_semaine.get('produits_a_transporter', [])
+        if not produits:
+            # Si pas de produits_a_transporter, essayer de les reconstituer depuis la planification
+            produits = self._extraire_produits_depuis_planification(resultats_semaine)
+        
+        for produit in produits:
+            poids_total = produit.get('quantite', 0) * produit.get('poids_unitaire', 0)
+            volume_total = produit.get('quantite', 0) * produit.get('volume_unitaire', 0)
+            
+            ws.cell(row=row, column=1, value=produit.get('nom', 'Produit inconnu'))
+            ws.cell(row=row, column=2, value=produit.get('quantite', 0))
+            ws.cell(row=row, column=3, value=f"{produit.get('poids_unitaire', 0)} t")
+            ws.cell(row=row, column=4, value=f"{produit.get('volume_unitaire', 0)} m³")
+            ws.cell(row=row, column=5, value=f"{poids_total:.2f} t")
+            ws.cell(row=row, column=6, value=f"{volume_total:.2f} m³")
+            row += 1
+            
+        # Ajuster les colonnes
+        for col in range(1, 7):
+            ws.column_dimensions[chr(64 + col)].width = 15
+    
+    def _extraire_produits_depuis_planification(self, resultats_semaine):
+        """Extrait les produits depuis la planification si pas disponibles directement"""
+        produits = {}
+        
+        planif = resultats_semaine.get('planification_detaillee', {})
+        planifications_vehicules = planif.get('planifications_vehicules', [])
+        
+        for planif_vehicule in planifications_vehicules:
+            for voyage in planif_vehicule.get('voyages', []):
+                charge = voyage.get('charge_transportee', {})
+                for p in charge.get('produits', []):
+                    produit_info = p.get('produit', {})
+                    nom_produit = produit_info.get('nom', 'Produit inconnu')
+                    
+                    if nom_produit not in produits:
+                        produits[nom_produit] = {
+                            'nom': nom_produit,
+                            'quantite': 0,
+                            'poids_unitaire': produit_info.get('poids_unitaire', 0),
+                            'volume_unitaire': produit_info.get('volume_unitaire', 0)
+                        }
+                    
+                    produits[nom_produit]['quantite'] += p.get('quantite_voyage', 0)
+        
+        return list(produits.values())
+            
+    def _remplir_planning_detaille(self, ws, resultats, is_multi):
+        """Remplit le planning détaillé"""
+        
+        ws['A1'] = "PLANNING DÉTAILLÉ DES VOYAGES"
+        ws['A1'].font = Font(size=14, bold=True)
+        ws.merge_cells('A1:J1')
+        
+        row = 3
+        
+        if is_multi:
+            # Multi-semaines
+            for semaine_num in [1, 2]:
+                semaine_key = f'resultats_semaine{semaine_num}'
+                if resultats.get(semaine_key):
+                    ws[f'A{row}'] = f"SEMAINE {semaine_num}"
+                    ws[f'A{row}'].font = Font(bold=True, color="0000FF")
+                    row += 1
+                    
+                    row = self._ajouter_voyages_planning(ws, resultats[semaine_key], row)
+                    row += 1
+        else:
+            # Mono-semaine
+            row = self._ajouter_voyages_planning(ws, resultats, row)
+            
+    def _ajouter_voyages_planning(self, ws, resultats_semaine, row_start):
+        """Ajoute les voyages au planning"""
+        
+        headers = ['Véhicule', 'Voyage', 'Date Départ', 'Heure Départ', 'Date Arrivée', 'Heure Arrivée', 'Charge (t)', 'Charge (m³)', 'Produits']
+        
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=row_start, column=col, value=header)
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")
+            
+        row = row_start + 1
+        
+        planif = resultats_semaine.get('planification_detaillee', {})
+        planifications_vehicules = planif.get('planifications_vehicules', [])
+        
+        for planif_vehicule in planifications_vehicules:
+            vehicule_id = planif_vehicule.get('vehicule_id', 'N/A')
+            
+            for voyage in planif_vehicule.get('voyages', []):
+                voyage_num = voyage.get('voyage_numero', 'N/A')
+                charge = voyage.get('charge_transportee', {})
+                aller = voyage.get('aller', {})
+                
+                # Produits transportés
+                produits_list = charge.get('produits', [])
+                produits_str = ", ".join([f"{p.get('produit', {}).get('nom', 'Inconnu')} ({p.get('quantite_voyage', 0)})" for p in produits_list])
+                
+                ws.cell(row=row, column=1, value=f"Véhicule {vehicule_id}")
+                ws.cell(row=row, column=2, value=voyage_num)
+                ws.cell(row=row, column=3, value=aller.get('date_depart', 'N/A'))
+                ws.cell(row=row, column=4, value=aller.get('heure_depart', 'N/A'))
+                ws.cell(row=row, column=5, value=aller.get('date_arrivee', 'N/A'))
+                ws.cell(row=row, column=6, value=aller.get('heure_arrivee', 'N/A'))
+                ws.cell(row=row, column=7, value=f"{charge.get('poids', 0):.2f}")
+                ws.cell(row=row, column=8, value=f"{charge.get('volume', 0):.2f}")
+                ws.cell(row=row, column=9, value=produits_str)
+                
+                row += 1
+                
+        # Ajuster les colonnes
+        for col in range(1, 10):
+            ws.column_dimensions[chr(64 + col)].width = 12
+        ws.column_dimensions['I'].width = 40  # Colonne produits plus large
+        
+        return row
+        
+    def _remplir_analyse_couts(self, ws, resultats, is_multi):
+        """Remplit l'analyse des coûts"""
+        
+        ws['A1'] = "ANALYSE DÉTAILLÉE DES COÛTS"
+        ws['A1'].font = Font(size=14, bold=True)
+        ws.merge_cells('A1:E1')
+        
+        row = 3
+        
+        if is_multi:
+            # Coûts globaux
+            ws[f'A{row}'] = "COÛTS GLOBAUX"
+            ws[f'A{row}'].font = Font(bold=True, color="FF0000")
+            row += 1
+            
+            ws[f'A{row}'] = "Coût total projet"
+            ws[f'B{row}'] = f"{resultats['cout_total_global']:.2f} €"
+            ws[f'B{row}'].font = Font(bold=True)
+            row += 2
+            
+            # Détail par semaine
+            for semaine_num in [1, 2]:
+                semaine_key = f'resultats_semaine{semaine_num}'
+                if resultats.get(semaine_key):
+                    s = resultats[semaine_key]
+                    ws[f'A{row}'] = f"SEMAINE {semaine_num}"
+                    ws[f'A{row}'].font = Font(bold=True, color="0000FF")
+                    row += 1
+                    
+                    ws[f'A{row}'] = "Coût fixe"
+                    ws[f'B{row}'] = f"{s['vehicule_optimal']['cout_fixe_total']:.2f} €"
+                    row += 1
+                    
+                    ws[f'A{row}'] = "Coût variable"
+                    ws[f'B{row}'] = f"{s['vehicule_optimal']['cout_variable_total']:.2f} €"
+                    row += 1
+                    
+                    ws[f'A{row}'] = "Coût total semaine"
+                    ws[f'B{row}'] = f"{s['vehicule_optimal']['cout_total']:.2f} €"
+                    ws[f'B{row}'].font = Font(bold=True)
+                    row += 2
+        else:
+            # Mono-semaine
+            opt = resultats['vehicule_optimal']
+            
+            ws[f'A{row}'] = "Coût fixe total"
+            ws[f'B{row}'] = f"{opt['cout_fixe_total']:.2f} €"
+            row += 1
+            
+            ws[f'A{row}'] = "Coût variable total"
+            ws[f'B{row}'] = f"{opt['cout_variable_total']:.2f} €"
+            row += 1
+            
+            ws[f'A{row}'] = "COÛT TOTAL"
+            ws[f'B{row}'] = f"{opt['cout_total']:.2f} €"
+            ws[f'A{row}'].font = Font(bold=True)
+            ws[f'B{row}'].font = Font(bold=True, color="FF0000")
+            
+        ws.column_dimensions['A'].width = 25
+        ws.column_dimensions['B'].width = 20
+    
+    def _exporter_vers_csv(self, resultats, dossier, is_multi):
+        """Exporte vers CSV (plusieurs fichiers)"""
+        
+        print(f"📄 Export CSV...")
+        fichiers_csv = []
+        
+        if is_multi:
+            # Résumé global
+            df_resume = self._creer_dataframe_resume_multi(resultats)
+            fichier_resume = os.path.join(dossier, f"resume_global_{self.timestamp}.csv")
+            df_resume.to_csv(fichier_resume, index=False, encoding='utf-8-sig', sep=';')
+            fichiers_csv.append(fichier_resume)
+            
+            # Détails par semaine
+            for semaine_num in [1, 2]:
+                semaine_key = f'resultats_semaine{semaine_num}'
+                if resultats.get(semaine_key):
+                    df_semaine = self._creer_dataframe_semaine(resultats[semaine_key])
+                    fichier_semaine = os.path.join(dossier, f"semaine_{semaine_num}_{self.timestamp}.csv")
+                    df_semaine.to_csv(fichier_semaine, index=False, encoding='utf-8-sig', sep=';')
+                    fichiers_csv.append(fichier_semaine)
+        else:
+            # Mono-semaine
+            df_solution = self._creer_dataframe_semaine(resultats)
+            fichier_solution = os.path.join(dossier, f"solution_optimisation_{self.timestamp}.csv")
+            df_solution.to_csv(fichier_solution, index=False, encoding='utf-8-sig', sep=';')
+            fichiers_csv.append(fichier_solution)
+            
+        return fichiers_csv
+    
+    def _creer_dataframe_resume_multi(self, resultats):
+        """Crée un DataFrame pour le résumé multi-semaines"""
+        
+        data = []
+        
+        # Ligne globale
+        data.append({
+            'Type': 'GLOBAL',
+            'Semaine': 'PROJET',
+            'Vehicule': 'N/A',
+            'Nb_Vehicules': resultats['nb_vehicules_total'],
+            'Cout_Total': resultats['cout_total_global'],
+            'Duree_Jours': resultats['duree_totale_projet']
+        })
+        
+        # Lignes par semaine
+        for semaine_num in [1, 2]:
+            semaine_key = f'resultats_semaine{semaine_num}'
+            if resultats.get(semaine_key):
+                s = resultats[semaine_key]
+                data.append({
+                    'Type': 'SEMAINE',
+                    'Semaine': f'S{semaine_num}',
+                    'Vehicule': s['vehicule_utilise']['nom'],
+                    'Nb_Vehicules': s['nb_vehicules_necessaires'],
+                    'Cout_Total': s['vehicule_optimal']['cout_total'],
+                    'Duree_Jours': s['duree_reelle']
+                })
+                
+        return pd.DataFrame(data)
+    
+    def _creer_dataframe_semaine(self, resultats_semaine):
+        """Crée un DataFrame pour une semaine"""
+        
+        data = []
+        
+        if 'planification_detaillee' in resultats_semaine:
+            planif = resultats_semaine['planification_detaillee']
+            for planif_vehicule in planif['planifications_vehicules']:
+                for voyage in planif_vehicule['voyages']:
+                    charge = voyage['charge_transportee']
+                    produits = ", ".join([f"{p['produit']['nom']}({p['quantite_voyage']})" for p in charge['produits']])
+                    
+                    data.append({
+                        'Vehicule_ID': planif_vehicule['vehicule_id'],
+                        'Voyage_Numero': voyage['voyage_numero'],
+                        'Date_Depart': voyage['aller']['date_depart'],
+                        'Heure_Depart': voyage['aller']['heure_depart'],
+                        'Date_Arrivee': voyage['aller']['date_arrivee'],
+                        'Heure_Arrivee': voyage['aller']['heure_arrivee'],
+                        'Charge_Poids_T': charge['poids'],
+                        'Charge_Volume_M3': charge['volume'],
+                        'Produits_Transportes': produits,
+                        'Distance_KM': voyage['aller']['distance_km'],
+                        'Temps_Conduite_H': voyage['aller']['temps_conduite_total']
+                    })
+                    
+        return pd.DataFrame(data)
+    
+    def _exporter_vers_json(self, resultats, dossier, is_multi):
+        """Exporte vers JSON"""
+        
+        nom_fichier = f"optimisation_complete_{self.timestamp}.json"
+        chemin_fichier = os.path.join(dossier, nom_fichier)
+        
+        print(f"🔗 Export JSON: {nom_fichier}")
+        
+        # Préparer les données pour JSON (sérialisation)
+        donnees_json = self._preparer_donnees_json(resultats)
+        
+        with open(chemin_fichier, 'w', encoding='utf-8') as f:
+            json.dump(donnees_json, f, indent=2, ensure_ascii=False, default=str)
+            
+        return chemin_fichier
+    
+    def _preparer_donnees_json(self, resultats):
+        """Prépare les données pour l'export JSON"""
+        
+        # Conversion récursive des objets non-sérialisables
+        def convertir_pour_json(obj):
+            if isinstance(obj, dict):
+                return {k: convertir_pour_json(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convertir_pour_json(item) for item in obj]
+            elif hasattr(obj, '__dict__'):
+                return convertir_pour_json(obj.__dict__)
+            else:
+                return obj
+                
+        donnees = convertir_pour_json(resultats)
+        
+        # Ajouter des métadonnées
+        donnees['export_metadata'] = {
+            'timestamp': self.timestamp,
+            'export_date': datetime.now().isoformat(),
+            'version': '1.0',
+            'format': 'optimisation_navettes_json'
+        }
+        
+        return donnees
+    
+    def _exporter_vers_pdf(self, resultats, dossier, is_multi):
+        """Exporte vers PDF"""
+        
+        nom_fichier = f"rapport_optimisation_{self.timestamp}.pdf"
+        chemin_fichier = os.path.join(dossier, nom_fichier)
+        
+        print(f"📋 Export PDF: {nom_fichier}")
+        
+        doc = SimpleDocTemplate(chemin_fichier, pagesize=landscape(A4))
+        styles = getSampleStyleSheet()
+        story = []
+        
+        # Titre principal
+        titre_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=18,
+            spaceAfter=20,
+            alignment=1  # Centré
+        )
+        
+        story.append(Paragraph("RAPPORT D'OPTIMISATION DES NAVETTES", titre_style))
+        story.append(Spacer(1, 20))
+        
+        if is_multi:
+            # Résumé multi-semaines
+            story.append(Paragraph("RÉSUMÉ GLOBAL", styles['Heading2']))
+            
+            data_resume = [
+                ['Métrique', 'Valeur'],
+                ['Durée totale projet', f"{resultats['duree_totale_projet']} jours"],
+                ['Coût total', f"{resultats['cout_total_global']:.2f} €"],
+                ['Nombre total véhicules', str(resultats['nb_vehicules_total'])]
+            ]
+            
+            table_resume = Table(data_resume)
+            table_resume.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            
+            story.append(table_resume)
+            story.append(Spacer(1, 20))
+            
+            # Détails par semaine
+            for semaine_num in [1, 2]:
+                semaine_key = f'resultats_semaine{semaine_num}'
+                if resultats.get(semaine_key):
+                    s = resultats[semaine_key]
+                    
+                    story.append(Paragraph(f"SEMAINE {semaine_num}", styles['Heading3']))
+                    
+                    data_semaine = [
+                        ['Aspect', 'Détail'],
+                        ['Véhicule utilisé', s['vehicule_utilise']['nom']],
+                        ['Nombre de véhicules', str(s['nb_vehicules_necessaires'])],
+                        ['Coût total', f"{s['vehicule_optimal']['cout_total']:.2f} €"],
+                        ['Durée réelle', f"{s['duree_reelle']} jours"],
+                        ['Nombre de voyages', str(s['planification_detaillee']['total_voyages'])]
+                    ]
+                    
+                    table_semaine = Table(data_semaine)
+                    table_semaine.setStyle(TableStyle([
+                        ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
+                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                        ('FONTSIZE', (0, 0), (-1, 0), 10),
+                        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                        ('BACKGROUND', (0, 1), (-1, -1), colors.lightgrey),
+                        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                    ]))
+                    
+                    story.append(table_semaine)
+                    story.append(Spacer(1, 15))
+        else:
+            # Solution mono-semaine
+            story.append(Paragraph("SOLUTION OPTIMALE", styles['Heading2']))
+            
+            opt = resultats['vehicule_optimal']
+            data_solution = [
+                ['Aspect', 'Valeur'],
+                ['Véhicule sélectionné', resultats['vehicule_utilise']['nom']],
+                ['Type de véhicule', resultats['vehicule_utilise']['type']],
+                ['Nombre de véhicules', str(resultats['nb_vehicules_necessaires'])],
+                ['Durée réelle', f"{resultats['duree_reelle']} jours"],
+                ['Coût fixe', f"{opt['cout_fixe_total']:.2f} €"],
+                ['Coût variable', f"{opt['cout_variable_total']:.2f} €"],
+                ['COÛT TOTAL', f"{opt['cout_total']:.2f} €"]
+            ]
+            
+            table_solution = Table(data_solution)
+            table_solution.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('BACKGROUND', (0, -1), (-1, -1), colors.yellow),  # Dernière ligne en surbrillance
+                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            
+            story.append(table_solution)
+            
+        doc.build(story)
+        return chemin_fichier
+
+    def exporter_planning_excel_detaille(self, resultats, dossier_export="exports"):
+        """Exporte un planning Excel ultra-détaillé avec formatage avancé"""
+        
+        nom_fichier = f"planning_detaille_{self.timestamp}.xlsx"
+        chemin_fichier = os.path.join(dossier_export, nom_fichier)
+        
+        print(f"📅 Export Planning Détaillé: {nom_fichier}")
+        
+        wb = Workbook()
+        wb.remove(wb.active)
+        
+        # Style pour les headers
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        border = Border(left=Side(style='thin'), right=Side(style='thin'), 
+                       top=Side(style='thin'), bottom=Side(style='thin'))
+        
+        is_multi_semaines = 'resultats_semaine1' in resultats or 'resultats_semaine2' in resultats
+        
+        if is_multi_semaines:
+            # Onglet par semaine
+            for semaine_num in [1, 2]:
+                semaine_key = f'resultats_semaine{semaine_num}'
+                if resultats.get(semaine_key):
+                    ws = wb.create_sheet(f"Planning S{semaine_num}")
+                    self._creer_planning_detaille_semaine(ws, resultats[semaine_key], semaine_num, header_font, header_fill, border)
+            
+            # Onglet comparatif
+            ws_comp = wb.create_sheet("Comparatif Semaines")
+            self._creer_comparatif_semaines(ws_comp, resultats, header_font, header_fill, border)
+        else:
+            # Planning unique
+            ws = wb.create_sheet("Planning Complet")
+            self._creer_planning_detaille_semaine(ws, resultats, 1, header_font, header_fill, border)
+            
+        wb.save(chemin_fichier)
+        return chemin_fichier
+    
+    def _creer_planning_detaille_semaine(self, ws, resultats_semaine, semaine_num, header_font, header_fill, border):
+        """Crée un planning détaillé pour une semaine avec formatage avancé"""
+        
+        # Titre
+        ws['A1'] = f"PLANNING DÉTAILLÉ SEMAINE {semaine_num}"
+        ws['A1'].font = Font(size=16, bold=True)
+        ws.merge_cells('A1:P1')
+        ws['A1'].alignment = Alignment(horizontal='center')
+        
+        # Headers du tableau
+        headers = [
+            'Véhicule', 'Voyage', 'Date Départ', 'Heure Départ', 'Date Arrivée', 'Heure Arrivée',
+            'Durée Trajet (h)', 'Distance (km)', 'Charge Poids (t)', 'Charge Volume (m³)',
+            'Utilisation Poids (%)', 'Utilisation Volume (%)', 'Produits', 'Quantités', 'Pauses Repos', 'Pauses Nuit'
+        ]
+        
+        row = 3
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=row, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.border = border
+            cell.alignment = Alignment(horizontal='center', wrap_text=True)
+            
+        row += 1
+        
+        # Données du planning
+        vehicule = resultats_semaine['vehicule_utilise']
+        planif = resultats_semaine['planification_detaillee']
+        
+        for planif_vehicule in planif['planifications_vehicules']:
+            for voyage in planif_vehicule['voyages']:
+                charge = voyage['charge_transportee']
+                aller = voyage['aller']
+                
+                # Calculs d'utilisation
+                util_poids = (charge['poids'] / vehicule['capacite_poids_max']) * 100
+                util_volume = (charge['volume'] / vehicule['capacite_volume_max']) * 100
+                
+                # Produits et quantités séparés
+                produits = [p['produit']['nom'] for p in charge['produits']]
+                quantites = [str(p['quantite_voyage']) for p in charge['produits']]
+                
+                # Données de la ligne
+                donnees = [
+                    f"Véhicule {planif_vehicule['vehicule_id']}",
+                    voyage['voyage_numero'],
+                    aller['date_depart'],
+                    aller['heure_depart'],
+                    aller['date_arrivee'],
+                    aller['heure_arrivee'],
+                    f"{aller['temps_conduite_total']:.2f}",
+                    aller['distance_km'],
+                    f"{charge['poids']:.2f}",
+                    f"{charge['volume']:.2f}",
+                    f"{util_poids:.1f}%",
+                    f"{util_volume:.1f}%",
+                    "\n".join(produits),
+                    "\n".join(quantites),
+                    aller['pauses_repos'],
+                    aller['pauses_nuit']
+                ]
+                
+                for col, valeur in enumerate(donnees, 1):
+                    cell = ws.cell(row=row, column=col, value=valeur)
+                    cell.border = border
+                    
+                    # Formatage conditionnel pour les utilisations
+                    if col == 11 or col == 12:  # Colonnes utilisation
+                        if util_poids > 90 or util_volume > 90:
+                            cell.fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
+                        elif util_poids > 75 or util_volume > 75:
+                            cell.fill = PatternFill(start_color="FFE66D", end_color="FFE66D", fill_type="solid")
+                        else:
+                            cell.fill = PatternFill(start_color="95E1D3", end_color="95E1D3", fill_type="solid")
+                    
+                    # Alignement pour les colonnes de texte multiple
+                    if col in [13, 14]:  # Produits et quantités
+                        cell.alignment = Alignment(vertical='top', wrap_text=True)
+                        
+                row += 1
+                
+        # Ajustement des colonnes
+        colonnes_width = [12, 8, 12, 12, 12, 12, 12, 10, 12, 12, 15, 15, 25, 15, 12, 12]
+        for i, width in enumerate(colonnes_width, 1):
+            ws.column_dimensions[chr(64 + i)].width = width
+            
+        # Ligne de totaux
+        row += 1
+        ws.cell(row=row, column=1, value="TOTAUX").font = Font(bold=True)
+        
+        # Calcul des totaux
+        total_poids = sum(
+            sum(voyage['charge_transportee']['poids'] for voyage in planif_vehicule['voyages'])
+            for planif_vehicule in planif['planifications_vehicules']
+        )
+        total_volume = sum(
+            sum(voyage['charge_transportee']['volume'] for voyage in planif_vehicule['voyages'])
+            for planif_vehicule in planif['planifications_vehicules']
+        )
+        total_distance = sum(
+            sum(voyage['aller']['distance_km'] for voyage in planif_vehicule['voyages'])
+            for planif_vehicule in planif['planifications_vehicules']
+        )
+        
+        ws.cell(row=row, column=8, value=f"{total_distance} km").font = Font(bold=True)
+        ws.cell(row=row, column=9, value=f"{total_poids:.2f} t").font = Font(bold=True)
+        ws.cell(row=row, column=10, value=f"{total_volume:.2f} m³").font = Font(bold=True)
+        
+    def _creer_comparatif_semaines(self, ws, resultats, header_font, header_fill, border):
+        """Crée un comparatif entre les semaines"""
+        
+        ws['A1'] = "COMPARATIF INTER-SEMAINES"
+        ws['A1'].font = Font(size=16, bold=True)
+        ws.merge_cells('A1:F1')
+        ws['A1'].alignment = Alignment(horizontal='center')
+        
+        # Headers
+        headers = ['Métrique', 'Semaine 1', 'Semaine 2', 'Total', 'Différence', 'Optimisation']
+        
+        row = 3
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=row, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.border = border
+            
+        row += 1
+        
+        # Données comparatives
+        s1 = resultats.get('resultats_semaine1')
+        s2 = resultats.get('resultats_semaine2')
+        
+        comparaisons = [
+            ['Véhicule utilisé', 
+             s1['vehicule_utilise']['nom'] if s1 else 'N/A',
+             s2['vehicule_utilise']['nom'] if s2 else 'N/A',
+             'N/A',
+             'Identique' if s1 and s2 and s1['vehicule_utilise']['nom'] == s2['vehicule_utilise']['nom'] else 'Différent',
+             'Unifier si possible'],
+            
+            ['Coût total (€)',
+             f"{s1['vehicule_optimal']['cout_total']:.2f}" if s1 else '0',
+             f"{s2['vehicule_optimal']['cout_total']:.2f}" if s2 else '0',
+             f"{resultats['cout_total_global']:.2f}",
+             f"{abs(s1['vehicule_optimal']['cout_total'] - s2['vehicule_optimal']['cout_total']):.2f}" if s1 and s2 else 'N/A',
+             'Équilibrer les charges'],
+             
+            ['Nb véhicules',
+             str(s1['nb_vehicules_necessaires']) if s1 else '0',
+             str(s2['nb_vehicules_necessaires']) if s2 else '0',
+             str(resultats['nb_vehicules_total']),
+             str(abs(s1['nb_vehicules_necessaires'] - s2['nb_vehicules_necessaires'])) if s1 and s2 else 'N/A',
+             'Homogénéiser'],
+             
+            ['Durée (jours)',
+             str(s1['duree_reelle']) if s1 else '0',
+             str(s2['duree_reelle']) if s2 else '0',
+             str(resultats['duree_totale_projet']),
+             str(abs(s1['duree_reelle'] - s2['duree_reelle'])) if s1 and s2 else 'N/A',
+             'Optimiser planning'],
+             
+            ['Nb voyages total',
+             str(s1['planification_detaillee']['total_voyages']) if s1 else '0',
+             str(s2['planification_detaillee']['total_voyages']) if s2 else '0',
+             str((s1['planification_detaillee']['total_voyages'] if s1 else 0) + (s2['planification_detaillee']['total_voyages'] if s2 else 0)),
+             str(abs((s1['planification_detaillee']['total_voyages'] if s1 else 0) - (s2['planification_detaillee']['total_voyages'] if s2 else 0))),
+             'Répartir équitablement']
+        ]
+        
+        for comparaison in comparaisons:
+            for col, valeur in enumerate(comparaison, 1):
+                cell = ws.cell(row=row, column=col, value=valeur)
+                cell.border = border
+                
+                # Formatage spécial pour la colonne optimisation
+                if col == 6:
+                    cell.fill = PatternFill(start_color="E8F4FD", end_color="E8F4FD", fill_type="solid")
+                    cell.font = Font(italic=True)
+                    
+            row += 1
+            
+        # Ajuster les colonnes
+        for col in range(1, 7):
+            ws.column_dimensions[chr(64 + col)].width = 20
+            
+    def generer_rapport_executif(self, resultats, dossier_export="exports"):
+        """Génère un rapport exécutif synthétique"""
+        
+        nom_fichier = f"rapport_executif_{self.timestamp}.xlsx"
+        chemin_fichier = os.path.join(dossier_export, nom_fichier)
+        
+        print(f"📊 Export Rapport Exécutif: {nom_fichier}")
+        
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Rapport Exécutif"
+        
+        # Styles
+        titre_font = Font(size=18, bold=True, color="FFFFFF")
+        titre_fill = PatternFill(start_color="2E4BC6", end_color="2E4BC6", fill_type="solid")
+        
+        # Titre principal
+        ws['A1'] = "RAPPORT EXÉCUTIF - OPTIMISATION NAVETTES"
+        ws['A1'].font = titre_font
+        ws['A1'].fill = titre_fill
+        ws.merge_cells('A1:F1')
+        ws['A1'].alignment = Alignment(horizontal='center')
+        
+        row = 3
+        
+        # Résumé exécutif
+        is_multi = 'resultats_semaine1' in resultats or 'resultats_semaine2' in resultats
+        
+        ws[f'A{row}'] = "RÉSUMÉ EXÉCUTIF"
+        ws[f'A{row}'].font = Font(size=14, bold=True, color="2E4BC6")
+        row += 2
+        
+        if is_multi:
+            # Multi-semaines
+            ws[f'A{row}'] = f"• Projet sur {resultats['duree_totale_projet']} jours (2 semaines)"
+            row += 1
+            ws[f'A{row}'] = f"• Coût total optimisé: {resultats['cout_total_global']:.2f} €"
+            row += 1
+            ws[f'A{row}'] = f"• {resultats['nb_vehicules_total']} véhicules mobilisés au total"
+            row += 1
+            
+            if resultats.get('resultats_semaine1') and resultats.get('resultats_semaine2'):
+                s1 = resultats['resultats_semaine1']
+                s2 = resultats['resultats_semaine2']
+                if s1['vehicule_utilise']['nom'] == s2['vehicule_utilise']['nom']:
+                    ws[f'A{row}'] = f"• Continuité opérationnelle: même véhicule ({s1['vehicule_utilise']['nom']})"
+                else:
+                    ws[f'A{row}'] = f"• Gestion multi-véhicules: {s1['vehicule_utilise']['nom']} + {s2['vehicule_utilise']['nom']}"
+                row += 1
+        else:
+            # Mono-semaine
+            ws[f'A{row}'] = f"• Projet sur {resultats['duree_reelle']} jours"
+            row += 1
+            ws[f'A{row}'] = f"• Coût total: {resultats['vehicule_optimal']['cout_total']:.2f} €"
+            row += 1
+            ws[f'A{row}'] = f"• Véhicule optimal: {resultats['vehicule_utilise']['nom']}"
+            row += 1
+            ws[f'A{row}'] = f"• {resultats['nb_vehicules_necessaires']} véhicule(s) nécessaire(s)"
+            row += 1
+            
+        row += 2
+        
+        # Recommandations
+        ws[f'A{row}'] = "RECOMMANDATIONS CLÉS"
+        ws[f'A{row}'].font = Font(size=14, bold=True, color="2E4BC6")
+        row += 2
+        
+        recommandations = self._generer_recommandations_executives(resultats, is_multi)
+        for recommandation in recommandations:
+            ws[f'A{row}'] = f"• {recommandation}"
+            row += 1
+            
+        # Ajuster les colonnes
+        ws.column_dimensions['A'].width = 80
+        
+        wb.save(chemin_fichier)
+        return chemin_fichier
+    
+    def _generer_recommandations_executives(self, resultats, is_multi):
+        """Génère des recommandations pour le niveau exécutif"""
+        
+        recommandations = []
+        
+        if is_multi:
+            s1 = resultats.get('resultats_semaine1')
+            s2 = resultats.get('resultats_semaine2')
+            
+            if s1 and s2:
+                # Analyse des coûts
+                cout_s1 = s1['vehicule_optimal']['cout_total']
+                cout_s2 = s2['vehicule_optimal']['cout_total']
+                
+                if abs(cout_s1 - cout_s2) / max(cout_s1, cout_s2) > 0.2:
+                    recommandations.append("Déséquilibre des coûts détecté (>20%) - Rééquilibrer la répartition des produits")
+                    
+                if s1['vehicule_utilise']['nom'] != s2['vehicule_utilise']['nom']:
+                    recommandations.append("Véhicules différents utilisés - Évaluer l'unification pour réduire les coûts fixes")
+                else:
+                    recommandations.append("Continuité véhicule assurée - Optimisation des coûts fixes réussie")
+                    
+                # Analyse de l'utilisation
+                if s1['nb_vehicules_necessaires'] == 1 and s2['nb_vehicules_necessaires'] == 1:
+                    recommandations.append("Risque opérationnel faible - Solution de secours recommandée")
+                else:
+                    recommandations.append("Complexité multi-véhicules - Renforcer la coordination des équipes")
+                    
+        else:
+            # Mono-semaine
+            opt = resultats['vehicule_optimal']
+            
+            if resultats['nb_vehicules_necessaires'] == 1:
+                recommandations.append("Solution simple et économique - Risque de dépendance unique")
+            else:
+                recommandations.append(f"Solution multi-véhicules ({resultats['nb_vehicules_necessaires']}) - Avantage de parallélisation")
+                
+            # Analyse du coût par tonne
+            poids_total = resultats['demande_equivalente']['quantite_poids']
+            if poids_total > 0:
+                cout_par_tonne = opt['cout_total'] / poids_total
+                if cout_par_tonne < 50:
+                    recommandations.append("Excellent ratio coût/tonne - Solution très compétitive")
+                elif cout_par_tonne > 100:
+                    recommandations.append("Ratio coût/tonne élevé - Évaluer des alternatives")
+                    
+        recommandations.append("Surveiller les contraintes temporelles pour respecter les échéances")
+        recommandations.append("Prévoir des solutions de contingence en cas de problème véhicule")
+        
+        return recommandations
+
+# Exemple d'utilisation corrigé
+def exemple_export():
+    """Exemple d'utilisation de l'exportateur avec données complètes"""
+    
+    # Simuler des résultats COMPLETS (structure réaliste)
+    resultats_exemple = {
+        'vehicule_utilise': {
+            'nom': 'SEMI-REMORQUE STANDARD', 
+            'type': 'LOURD',
+            'capacite_poids_max': 40,
+            'capacite_volume_max': 100,
+            'vitesse_kmh': 75,
+            'cout_fixe_jour': 400,
+            'cout_variable_km': 1.20
+        },
+        'nb_vehicules_necessaires': 1,
+        'duree_reelle': 5,
+        'respect_contrainte': True,
+        'vehicule_optimal': {
+            'cout_total': 2450.50,
+            'cout_fixe_total': 2000.00,
+            'cout_variable_total': 450.50,
+            'voyages_par_vehicule': 3,
+            'nb_vehicules_necessaires': 1,
+            'duree_reelle_jours': 5
+        },
+        'demande_equivalente': {
+            'nom': 'TRANSPORT MULTI-PRODUITS A→B',
+            'distance_km': 800,
+            'vitesse_kmh': 80,
+            'quantite_poids': 45.5,
+            'quantite_volume': 120.3
+        },
+        'produits_a_transporter': [
+            {
+                'nom': 'MACHINES INDUSTRIELLES',
+                'quantite': 15,
+                'poids_unitaire': 2.5,
+                'volume_unitaire': 8.0,
+                'distance_km': 800,
+                'vitesse_kmh': 80
+            },
+            {
+                'nom': 'ÉQUIPEMENTS ÉLECTRONIQUES',
+                'quantite': 80,
+                'poids_unitaire': 0.3,
+                'volume_unitaire': 1.2,
+                'distance_km': 800,
+                'vitesse_kmh': 80
+            }
+        ],
+        'planification_detaillee': {
+            'nb_vehicules': 1,
+            'total_voyages': 3,
+            'date_debut': '2025-06-02',
+            'date_fin': '2025-06-06',
+            'duree_reelle_jours': 5,
+            'respect_contrainte': True,
+            'planifications_vehicules': [
+                {
+                    'vehicule_id': 1,
+                    'nb_voyages': 3,
+                    'produits_transportes': {
+                        'MACHINES INDUSTRIELLES': 15,
+                        'ÉQUIPEMENTS ÉLECTRONIQUES': 80
+                    },
+                    'charge_totale': {
+                        'poids': 45.5,
+                        'volume': 120.3
+                    },
+                    'voyages': [
+                        {
+                            'voyage_numero': 1,
+                            'charge_transportee': {
+                                'poids': 20.0,
+                                'volume': 60.0,
+                                'produits': [
+                                    {
+                                        'produit': {
+                                            'nom': 'MACHINES INDUSTRIELLES',
+                                            'poids_unitaire': 2.5,
+                                            'volume_unitaire': 8.0
+                                        },
+                                        'quantite_voyage': 8
+                                    }
+                                ]
+                            },
+                            'temps_chargement': '01:30',
+                            'aller': {
+                                'date_depart': '2025-06-02',
+                                'heure_depart': '08:00',
+                                'date_arrivee': '2025-06-02',
+                                'heure_arrivee': '18:30',
+                                'distance_km': 800,
+                                'temps_conduite_total': 10.5,
+                                'pauses_repos': 4,
+                                'pauses_nuit': 0
+                            },
+                            'temps_dechargement': '01:30',
+                            'retour': {
+                                'date_depart': '2025-06-02',
+                                'heure_depart': '20:00',
+                                'date_arrivee': '2025-06-03',
+                                'heure_arrivee': '06:30',
+                                'distance_km': 800,
+                                'temps_conduite_total': 10.5,
+                                'pauses_repos': 4,
+                                'pauses_nuit': 1
+                            },
+                            'est_dernier_voyage': False,
+                            'respecte_contrainte_temporelle': True
+                        },
+                        {
+                            'voyage_numero': 2,
+                            'charge_transportee': {
+                                'poids': 15.2,
+                                'volume': 40.1,
+                                'produits': [
+                                    {
+                                        'produit': {
+                                            'nom': 'MACHINES INDUSTRIELLES',
+                                            'poids_unitaire': 2.5,
+                                            'volume_unitaire': 8.0
+                                        },
+                                        'quantite_voyage': 6
+                                    }
+                                ]
+                            },
+                            'temps_chargement': '01:30',
+                            'aller': {
+                                'date_depart': '2025-06-03',
+                                'heure_depart': '08:00',
+                                'date_arrivee': '2025-06-03',
+                                'heure_arrivee': '18:30',
+                                'distance_km': 800,
+                                'temps_conduite_total': 10.5,
+                                'pauses_repos': 4,
+                                'pauses_nuit': 0
+                            },
+                            'temps_dechargement': '01:30',
+                            'retour': {
+                                'date_depart': '2025-06-03',
+                                'heure_depart': '20:00',
+                                'date_arrivee': '2025-06-04',
+                                'heure_arrivee': '06:30',
+                                'distance_km': 800,
+                                'temps_conduite_total': 10.5,
+                                'pauses_repos': 4,
+                                'pauses_nuit': 1
+                            },
+                            'est_dernier_voyage': False,
+                            'respecte_contrainte_temporelle': True
+                        },
+                        {
+                            'voyage_numero': 3,
+                            'charge_transportee': {
+                                'poids': 10.3,
+                                'volume': 20.2,
+                                'produits': [
+                                    {
+                                        'produit': {
+                                            'nom': 'MACHINES INDUSTRIELLES',
+                                            'poids_unitaire': 2.5,
+                                            'volume_unitaire': 8.0
+                                        },
+                                        'quantite_voyage': 1
+                                    },
+                                    {
+                                        'produit': {
+                                            'nom': 'ÉQUIPEMENTS ÉLECTRONIQUES',
+                                            'poids_unitaire': 0.3,
+                                            'volume_unitaire': 1.2
+                                        },
+                                        'quantite_voyage': 80
+                                    }
+                                ]
+                            },
+                            'temps_chargement': '01:30',
+                            'aller': {
+                                'date_depart': '2025-06-04',
+                                'heure_depart': '08:00',
+                                'date_arrivee': '2025-06-04',
+                                'heure_arrivee': '18:30',
+                                'distance_km': 800,
+                                'temps_conduite_total': 10.5,
+                                'pauses_repos': 4,
+                                'pauses_nuit': 0
+                            },
+                            'temps_dechargement': '01:30',
+                            'retour': None,  # Dernier voyage
+                            'est_dernier_voyage': True,
+                            'respecte_contrainte_temporelle': True
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+    
+    # Créer l'exportateur et exporter
+    print("🚀 Démarrage de l'export avec données complètes...")
+    exportateur = ExportateurSolutions()
+    
+    try:
+        # Export complet (tous formats)
+        fichiers = exportateur.exporter_solution_complete(resultats_exemple, "all")
+        
+        # Export planning détaillé
+        planning = exportateur.exporter_planning_excel_detaille(resultats_exemple)
+        
+        # Rapport exécutif
+        rapport = exportateur.generer_rapport_executif(resultats_exemple)
+        
+        print(f"\n🎉 Exports terminés avec succès:")
+        print(f"- Fichiers générés: {len(fichiers) + 2}")
+        for fichier in fichiers:
+            print(f"  ✅ {fichier}")
+        print(f"  ✅ Planning détaillé: {planning}")
+        print(f"  ✅ Rapport exécutif: {rapport}")
+        
+    except Exception as e:
+        print(f"❌ Erreur lors de l'export: {str(e)}")
+        import traceback
+        traceback.print_exc()
+
+if __name__ == "__main__":
+    exemple_export()

@@ -8,7 +8,7 @@ import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 from tkinter import messagebox, simpledialog, StringVar, IntVar, DoubleVar, DISABLED, X, LEFT, BOTH
 from sqlalchemy.orm import sessionmaker, configure_mappers
-from application.database import SessionLocal, engine
+from application.database import SessionLocal, engine, Base
 from sqlalchemy import func, or_
 from datetime import date, datetime, timedelta
 import re

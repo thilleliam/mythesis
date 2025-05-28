@@ -12,7 +12,8 @@ sys.stdout.reconfigure(encoding='utf-8')
 from sqlalchemy import func
 
 # Import de votre classe Vehicule et de la session SQLAlchemy
-from application.config import Base
+
+from application.models.vehicule import Vehicule
 from application.database import SessionLocal
 from datetime import date
 
