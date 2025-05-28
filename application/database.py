@@ -8,7 +8,8 @@ import pymysql  # Ensure pymysql is imported
 sys.stdout.reconfigure(encoding='utf-8')
 
 # Define the database URL using an environment variable for better security
-DATABASE_URL = os.getenv("DATABASE_URL", "mysql+pymysql://root:thilleli1900@localhost/tms_db")
+# FreeSQLDatabase MySQL
+DATABASE_URL = "mysql+pymysql://sql8781735:YQ8d2QdLqV@sql8.freesqldatabase.com:3306/sql8781735"
 
 # Create the SQLAlchemy engine
 engine = create_engine(DATABASE_URL, echo=True)
