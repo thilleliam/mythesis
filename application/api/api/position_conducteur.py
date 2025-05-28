@@ -1,3 +1,71 @@
+import sys
+import os
+from flask import Flask, request, jsonify
+
+# Détection automatique du chemin vers la racine du projet
+def get_project_root():
+    """Trouve automatiquement la racine du projet"""
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # Remonte dans l'arborescence jusqu'à trouver le dossier 'application'
+    while current_dir != os.path.dirname(current_dir):  # Pas encore à la racine du système
+        if 'application' in os.listdir(current_dir):
+            return current_dir
+        current_dir = os.path.dirname(current_dir)
+    
+    # Si pas trouvé, utiliser le répertoire parent du script actuel
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Configuration dynamique du chemin
+if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RENDER'):
+    # En production (Railway/Render)
+    project_root = '/opt/render/project/go/src/github.com/thilleliam/mythesis'
+else:
+    # En développement local
+    project_root = get_project_root()
+
+print(f"DEBUG - Chemin du projet détecté: {project_root}")
+print(f"DEBUG - Chemin existe: {os.path.exists(project_root)}")
+
+# Ajouter le chemin au PYTHONPATH
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+# Vérifier que le dossier application existe
+app_path = os.path.join(project_root, 'application')
+if os.path.exists(app_path):
+    print("DEBUG - Contenu de application/:", os.listdir(app_path))
+else:
+    print(f"ERROR - Le dossier application n'existe pas dans: {project_root}")
+    print(f"DEBUG - Contenu du projet: {os.listdir(project_root) if os.path.exists(project_root) else 'Chemin inexistant'}")
+
+print("DEBUG - PYTHONPATH:", sys.path[:3])
+
+# Import avec gestion d'erreur améliorée
+try:
+    from application.database import engine
+    print("SUCCESS - Import de database réussi!")
+except ImportError as e:
+    print(f"ERROR - Import failed: {e}")
+    print("INFO - Tentative d'import direct...")
+    
+    # Plan B - import direct avec chemin absolu
+    try:
+        import importlib.util
+        database_path = os.path.join(project_root, "application", "database.py")
+        
+        if os.path.exists(database_path):
+            spec = importlib.util.spec_from_file_location("database", database_path)
+            database_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(database_module)
+            engine = database_module.engine
+            print("SUCCESS - Import direct réussi!")
+        else:
+            print(f"ERROR - Fichier database.py introuvable: {database_path}")
+            raise ImportError("Impossible de charger le module database")
+    except Exception as e2:
+        print(f"ERROR - Import direct échoué: {e2}")
+        raise ImportError(f"Échec complet de l'import: {e} | {e2}")
 from flask import Flask, request, jsonify
 from sqlalchemy.orm import sessionmaker
 from application.database import engine
