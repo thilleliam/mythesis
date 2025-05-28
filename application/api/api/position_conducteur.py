@@ -8,7 +8,7 @@ def get_project_root():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     
     # Remonte dans l'arborescence jusqu'à trouver le dossier 'application'
-    while current_dir != os.path.dirname(current_dir):  # Pas encore à la racine du système
+    while current_dir != os.path.dirname(current_dir):
         if 'application' in os.listdir(current_dir):
             return current_dir
         current_dir = os.path.dirname(current_dir)
@@ -16,14 +16,36 @@ def get_project_root():
     # Si pas trouvé, utiliser le répertoire parent du script actuel
     return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Configuration dynamique du chemin
-if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RENDER'):
-    # En production (Railway/Render)
-    project_root = '/opt/render/project/go/src/github.com/thilleliam/mythesis'
-else:
-    # En développement local
-    project_root = get_project_root()
+# Configuration dynamique du chemin - VERSION AMÉLIORÉE
+def setup_project_path():
+    """Configure le chemin du projet selon l'environnement"""
+    
+    # Essayer plusieurs chemins possibles pour Render
+    possible_paths = [
+        '/opt/render/project/src',
+        '/opt/render/project/go/src/github.com/thilleliam/mythesis',
+        get_project_root()
+    ]
+    
+    if os.environ.get('RENDER'):
+        print("🔧 Environnement Render détecté")
+        for path in possible_paths:
+            if os.path.exists(os.path.join(path, 'application')):
+                print(f"✅ Chemin trouvé: {path}")
+                return path
+    elif os.environ.get('RAILWAY_ENVIRONMENT'):
+        print("🔧 Environnement Railway détecté")
+        return '/opt/render/project/go/src/github.com/thilleliam/mythesis'
+    else:
+        print("🔧 Environnement local détecté")
+        return get_project_root()
+    
+    # Fallback
+    print("⚠️ Utilisation du chemin par défaut")
+    return os.path.dirname(os.path.abspath(__file__))
 
+# Configuration
+project_root = setup_project_path()
 print(f"DEBUG - Chemin du projet détecté: {project_root}")
 print(f"DEBUG - Chemin existe: {os.path.exists(project_root)}")
 
@@ -34,38 +56,31 @@ if project_root not in sys.path:
 # Vérifier que le dossier application existe
 app_path = os.path.join(project_root, 'application')
 if os.path.exists(app_path):
+    print("✅ Dossier application trouvé")
     print("DEBUG - Contenu de application/:", os.listdir(app_path))
 else:
-    print(f"ERROR - Le dossier application n'existe pas dans: {project_root}")
-    print(f"DEBUG - Contenu du projet: {os.listdir(project_root) if os.path.exists(project_root) else 'Chemin inexistant'}")
+    print(f"❌ Le dossier application n'existe pas dans: {project_root}")
+    if os.path.exists(project_root):
+        print(f"DEBUG - Contenu du projet: {os.listdir(project_root)}")
 
 print("DEBUG - PYTHONPATH:", sys.path[:3])
 
 # Import avec gestion d'erreur améliorée
 try:
     from application.database import engine
-    print("SUCCESS - Import de database réussi!")
+    print("✅ Import de database réussi!")
 except ImportError as e:
-    print(f"ERROR - Import failed: {e}")
-    print("INFO - Tentative d'import direct...")
-    
-    # Plan B - import direct avec chemin absolu
-    try:
-        import importlib.util
-        database_path = os.path.join(project_root, "application", "database.py")
-        
-        if os.path.exists(database_path):
-            spec = importlib.util.spec_from_file_location("database", database_path)
-            database_module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(database_module)
-            engine = database_module.engine
-            print("SUCCESS - Import direct réussi!")
-        else:
-            print(f"ERROR - Fichier database.py introuvable: {database_path}")
-            raise ImportError("Impossible de charger le module database")
-    except Exception as e2:
-        print(f"ERROR - Import direct échoué: {e2}")
-        raise ImportError(f"Échec complet de l'import: {e} | {e2}")
+    print(f"❌ Import failed: {e}")
+    raise
+
+# Configuration Flask
+app = Flask(__name__)
+
+# Port - CONFIGURATION CORRIGÉE
+port = int(os.environ.get('PORT', 5000))
+host = '0.0.0.0'  # Toujours écouter sur toutes les interfaces
+
+print(f"🔧 Configuration serveur: {host}:{port}")
 from flask import Flask, request, jsonify
 from sqlalchemy.orm import sessionmaker
 from application.database import engine
@@ -1172,17 +1187,23 @@ def home():
     <p><a href="/api/clients">👥 Voir tous les clients (JSON)</a></p>
     <p><a href="/chauffeur/app">📱 App Chauffeur</a></p>
     """
-
 if __name__ == '__main__':
     # Créer les tables si elles n'existent pas
-    with app.app_context():
-        Base.metadata.create_all(bind=engine)
+    try:
+        with app.app_context():
+            Base.metadata.create_all(bind=engine)
+        print("✅ Tables de base de données créées/vérifiées")
+    except Exception as e:
+        print(f"⚠️ Erreur création tables: {e}")
     
-    # Mode production sur Railway
-    if os.environ.get('RAILWAY_ENVIRONMENT'):
-        app.run(host='0.0.0.0', port=port)
+    # Démarrage du serveur - TOUJOURS sur 0.0.0.0
+    is_production = os.environ.get('RENDER') or os.environ.get('RAILWAY_ENVIRONMENT')
+    
+    if is_production:
+        print(f"🚀 Serveur TMS démarré en PRODUCTION sur {host}:{port}")
+        app.run(host=host, port=port, debug=False)
     else:
-        print("🚀 Serveur TMS démarré sur http://127.0.0.1:5000")
-        print("📝 Formulaire: http://127.0.0.1:5000/commande/form")
-        print("📱 App Chauffeur: http://127.0.0.1:5000/chauffeur/app")
-        app.run(debug=True)
+        print(f"🚀 Serveur TMS démarré en DÉVELOPPEMENT sur {host}:{port}")
+        print(f"📝 Formulaire: http://localhost:{port}/commande/form")
+        print(f"📱 App Chauffeur: http://localhost:{port}/chauffeur/app")
+        app.run(host=host, port=port, debug=True)
