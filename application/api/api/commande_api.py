@@ -1,39 +1,81 @@
 import sys
 import os
 from flask import Flask, request, jsonify
+from datetime import datetime
 
-# Chemin vers la racine du projet
-project_root = '/opt/render/project/go/src/github.com/thilleliam/mythesis'
+def get_project_root():
+    """
+    Détermine le chemin racine du projet selon l'environnement
+    """
+    # 1. Vérifier si on est sur Render (chemin spécifique Render)
+    render_path = '/opt/render/project/go/src/github.com/thilleliam/mythesis'
+    if os.path.exists(render_path):
+        return render_path
+    
+    # 2. Vérifier si on est dans le répertoire du projet (local)
+    current_dir = os.getcwd()
+    
+    # Chercher le dossier 'application' dans le répertoire courant ou ses parents
+    search_dir = current_dir
+    for _ in range(5):  # Chercher jusqu'à 5 niveaux au-dessus
+        if os.path.exists(os.path.join(search_dir, 'application')):
+            return search_dir
+        parent = os.path.dirname(search_dir)
+        if parent == search_dir:  # On a atteint la racine
+            break
+        search_dir = parent
+    
+    # 3. Utiliser le répertoire courant par défaut
+    return current_dir
+
+# Configuration dynamique du chemin du projet
+project_root = get_project_root()
 sys.path.insert(0, project_root)
 
-# Debug - afficher le contenu
-print("DEBUG - Contenu de application/:", os.listdir(os.path.join(project_root, 'application')))
-print("DEBUG - PYTHONPATH:", sys.path[:3])
+# Debug - affichage des informations
+print("DEBUG - Project root:", project_root)
+print("DEBUG - Current working directory:", os.getcwd())
+print("DEBUG - Python path:", sys.path[:3])
+
+# Vérification de l'existence des fichiers
+application_path = os.path.join(project_root, 'application')
+if os.path.exists(application_path):
+    print("SUCCESS - Application directory found!")
+    print("DEBUG - Application contents:", os.listdir(application_path))
+else:
+    print("ERROR - Application directory not found")
+    print("DEBUG - Looking for 'application' folder in:", project_root)
+    print("DEBUG - Available folders:", [d for d in os.listdir(project_root) if os.path.isdir(os.path.join(project_root, d))])
+
+# Tentative d'import de la base de données
+engine = None
+Session = None
 
 try:
     from application.database import engine
-    print("SUCCESS - Import réussi!")
+    from sqlalchemy.orm import sessionmaker
+    Session = sessionmaker(bind=engine)
+    print("SUCCESS - Database import successful!")
 except ImportError as e:
-    print(f"ERROR - Import failed: {e}")
-    # Plan B - import direct
-    import importlib.util
-    spec = importlib.util.spec_from_file_location("database", os.path.join(project_root, "application", "database.py"))
-    database_module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(database_module)
-    engine = database_module.engine
+    print(f"ERROR - Database import failed: {e}")
+    print("WARNING - Application will start without database connection")
 
-from flask import Flask, request, jsonify
-from sqlalchemy.orm import sessionmaker
-from application.database import engine
-from application.models.commande import Commande
-from application.models.equipements import Equipement  # Import du modèle Equipement
-from datetime import datetime
-import os
+# Tentative d'import des modèles
+Commande = None
+Equipement = None
 
+try:
+    from application.models.commande import Commande
+    from application.models.equipements import Equipement
+    print("SUCCESS - Models import successful!")
+except ImportError as e:
+    print(f"ERROR - Models import failed: {e}")
+    print("WARNING - API endpoints will not work without models")
+
+# Création de l'application Flask
 app = Flask(__name__)
-Session = sessionmaker(bind=engine)
 
-# HTML intégré directement dans le code Python
+# HTML du formulaire
 HTML_FORM = """
 <!DOCTYPE html>
 <html lang="fr">
@@ -110,23 +152,6 @@ HTML_FORM = """
             color: var(--white);
             font-size: 1.5rem;
             font-weight: 600;
-        }
-
-        .navbar .nav-links {
-            display: flex;
-            gap: 1rem;
-        }
-
-        .navbar .nav-link {
-            color: var(--white);
-            text-decoration: none;
-            padding: 0.5rem 1rem;
-            border-radius: var(--border-radius);
-            transition: var(--transition);
-        }
-
-        .navbar .nav-link:hover {
-            background-color: var(--primary-dark);
         }
 
         .main-container {
@@ -368,14 +393,13 @@ HTML_FORM = """
     </style>
 </head>
 <body>
+    <div class="version-banner">
+        ✨ Version Adaptative - Fonctionne en Local et sur Render
+    </div>
 
     <nav class="navbar">
         <div class="container">
             <h1><i class="fas fa-truck"></i> TMS - Transport Management</h1>
-            <div class="nav-links">
-                <a href="#" class="nav-link"><i class="fas fa-sign-in-alt"></i> Login</a>
-                <a href="/api/commandes" class="nav-link"><i class="fas fa-list"></i> Commandes</a>
-            </div>
         </div>
     </nav>
 
@@ -689,106 +713,283 @@ HTML_FORM = """
 </html>
 """
 
-# Routes API
-@app.route('/api/equipements', methods=['GET'])
-def get_equipements():
-    """Endpoint pour récupérer la liste des équipements"""
-    session = Session()
-    try:
-        equipements = session.query(Equipement).all()
-        result = []
-        for eq in equipements:
-            result.append({
-                'ID_equipement': eq.ID_equipement,
-                'nomEquipement': eq.nomEquipement
-            })
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-    finally:
-        session.close()
-
-@app.route('/api/commandes', methods=['POST'])
-def create_commande():
-    data = request.json
-    session = Session()
-    try:
-        commande = Commande(
-            id_client=data.get('id_client'),
-            id_equipement=data.get('id_equipement'),  # Utilisation de id_equipement au lieu de produits
-            nature_service=data.get('nature_service'),
-            type_vehicule=data.get('type_vehicule'),
-            quantite_requise=data.get('quantite_requise'),
-            lieu_chargement=data.get('lieu_chargement'),
-            date_commande=datetime.strptime(data.get('date_commande'), '%Y-%m-%d %H:%M:%S') if data.get('date_commande') else None,
-            date_livraison=datetime.strptime(data.get('date_livraison'), '%Y-%m-%d %H:%M:%S') if data.get('date_livraison') else None
-        )
-        session.add(commande)
-        session.commit()
-        return jsonify({'message': 'Commande créée', 'id_commande': commande.id_commande}), 201
-    except Exception as e:
-        session.rollback()
-        return jsonify({'error': str(e)}), 400
-    finally:
-        session.close()
-
-@app.route('/api/commandes', methods=['GET'])
-def get_commandes():
-    session = Session()
-    try:
-        # Jointure avec la table equipements pour récupérer le nom
-        commandes = session.query(Commande).join(Equipement, Commande.id_equipement == Equipement.ID_equipement).all()
-        result = []
-        for c in commandes:
-            result.append({
-                'id_commande': c.id_commande,
-                'id_client': c.id_client,
-                'id_equipement': c.id_equipement,
-                'nomEquipement': c.equipement.nomEquipement,  # Nom de l'équipement via la relation
-                'nature_service': c.nature_service,
-                'type_vehicule': c.type_vehicule,
-                'quantite_requise': c.quantite_requise,
-                'lieu_chargement': c.lieu_chargement,
-                'date_commande': c.date_commande.strftime('%Y-%m-%d %H:%M:%S') if c.date_commande else None,
-                'date_livraison': c.date_livraison.strftime('%Y-%m-%d %H:%M:%S') if c.date_livraison else None
-            })
-    except Exception as e:
-        # Si la jointure échoue, récupérer les commandes sans les noms d'équipements
-        commandes = session.query(Commande).all()
-        result = []
-        for c in commandes:
-            result.append({
-                'id_commande': c.id_commande,
-                'id_client': c.id_client,
-                'id_equipement': c.id_equipement,
-                'nomEquipement': None,
-                'nature_service': c.nature_service,
-                'type_vehicule': c.type_vehicule,
-                'quantite_requise': c.quantite_requise,
-                'lieu_chargement': c.lieu_chargement,
-                'date_commande': c.date_commande.strftime('%Y-%m-%d %H:%M:%S') if c.date_commande else None,
-                'date_livraison': c.date_livraison.strftime('%Y-%m-%d %H:%M:%S') if c.date_livraison else None
-            })
-    finally:
-        session.close()
-    
-    return jsonify(result)
-
-# Route pour le formulaire - HTML intégré
-@app.route('/commande/form')
-def commande_form():
-    return HTML_FORM
-
-# Route d'accueil
+# Route d'accueil avec diagnostic amélioré
 @app.route('/')
 def home():
-    return """
-    <h1>🚀 TMS API</h1>
-    <p><a href="/commande/form">📝 Nouveau formulaire de commande</a></p>
-    <p><a href="/api/commandes">📋 Voir toutes les commandes (JSON)</a></p>
-    <p><a href="/api/equipements">🔧 Voir tous les équipements (JSON)</a></p>
+    # Détection de l'environnement
+    is_render = '/opt/render/' in project_root
+    is_local = not is_render
+    
+    status_info = []
+    
+    # Informations sur l'environnement
+    if is_render:
+        status_info.append("🚀 Environnement : Render (Production)")
+    else:
+        status_info.append("💻 Environnement : Local (Développement)")
+    
+    status_info.append(f"📁 Projet : {project_root}")
+    
+    # Vérification de la base de données
+    if engine is not None:
+        status_info.append("✅ Base de données : Connectée")
+    else:
+        status_info.append("❌ Base de données : Non connectée")
+    
+    # Vérification des modèles
+    if Commande is not None and Equipement is not None:
+        status_info.append("✅ Modèles : Importés")
+    else:
+        status_info.append("❌ Modèles : Non importés")
+    
+    # Vérification du dossier application
+    if os.path.exists(application_path):
+        status_info.append("✅ Dossier application : Trouvé")
+    else:
+        status_info.append("❌ Dossier application : Non trouvé")
+    
+    status_html = "<br>".join(status_info)
+    
+    # Liens disponibles
+    available_links = []
+    available_links.append('<a href="/health">🔍 État détaillé</a>')
+    available_links.append('<a href="/api/test">🧪 Test API</a>')
+    
+    if Session and Commande and Equipement:
+        available_links.append('<a href="/commande/form">📝 Formulaire de commande</a>')
+        available_links.append('<a href="/api/commandes">📋 API Commandes</a>')
+        available_links.append('<a href="/api/equipements">🔧 API Équipements</a>')
+    
+    links_html = " ".join(available_links)
+    
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>TMS - Diagnostic</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }}
+            .container {{ background: white; padding: 30px; border-radius: 10px; max-width: 800px; margin: 0 auto; }}
+            h1 {{ color: #18bc9c; text-align: center; }}
+            .status {{ background: #e8f4f8; padding: 20px; border-radius: 5px; margin: 20px 0; }}
+            .environment {{ background: {'#d4edda' if is_render else '#fff3cd'}; padding: 15px; 
+                          border-radius: 5px; margin: 20px 0; text-align: center; font-weight: bold; }}
+            nav {{ text-align: center; margin-top: 30px; }}
+            nav a {{ display: inline-block; margin: 10px; padding: 10px 20px; 
+                     background: #18bc9c; color: white; text-decoration: none; border-radius: 5px; }}
+            nav a:hover {{ background: #16a085; }}
+            .footer {{ text-align: center; margin-top: 30px; color: #666; font-size: 0.9em; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🚀 TMS - Transport Management System</h1>
+            
+            <div class="environment">
+                {'🌐 Application déployée sur Render' if is_render else '💻 Application en développement local'}
+            </div>
+            
+            <div class="status">
+                <h3>État du système :</h3>
+                {status_html}
+            </div>
+            
+            <nav>
+                {links_html}
+            </nav>
+            
+            <div class="footer">
+                Version adaptative - Compatible Local & Render<br>
+                Dernière mise à jour: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+            </div>
+        </div>
+    </body>
+    </html>
     """
 
+# Route de diagnostic détaillé
+@app.route('/health')
+def health_check():
+    health_data = {
+        "status": "running",
+        "timestamp": datetime.now().isoformat(),
+        "environment": "render" if '/opt/render/' in project_root else "local",
+        "project_root": project_root,
+        "cwd": os.getcwd(),
+        "database_connected": engine is not None,
+        "models_imported": Commande is not None and Equipement is not None,
+        "application_dir_exists": os.path.exists(application_path),
+        "python_path": sys.path[:5]
+    }
+    
+    # Test de connexion à la base de données
+    if Session:
+        try:
+            session = Session()
+            # Test simple de requête
+            session.execute("SELECT 1")
+            session.close()
+            health_data["database_test"] = "OK"
+        except Exception as e:
+            health_data["database_test"] = f"ERROR: {str(e)}"
+    else:
+        health_data["database_test"] = "No session available"
+    
+    # Informations sur les fichiers
+    if os.path.exists(application_path):
+        health_data["application_contents"] = os.listdir(application_path)
+        
+        # Vérifier les fichiers critiques
+        critical_files = {
+            "database.py": os.path.exists(os.path.join(application_path, "database.py")),
+            "models/commande.py": os.path.exists(os.path.join(application_path, "models", "commande.py")),
+            "models/equipements.py": os.path.exists(os.path.join(application_path, "models", "equipements.py"))
+        }
+        health_data["critical_files"] = critical_files
+    
+    return jsonify(health_data)
+
+# Route de test API simple
+@app.route('/api/test')
+def api_test():
+    return jsonify({
+        "message": "API is working!",
+        "timestamp": datetime.now().isoformat(),
+        "environment": "render" if '/opt/render/' in project_root else "local",
+        "database_available": Session is not None,
+        "models_available": Commande is not None and Equipement is not None,
+        "project_root": project_root
+    })
+
+# Routes API conditionnelles (seulement si les modèles sont disponibles)
+if Session and Commande and Equipement:
+    
+    @app.route('/api/equipements', methods=['GET'])
+    def get_equipements():
+        session = Session()
+        try:
+            equipements = session.query(Equipement).all()
+            result = []
+            for eq in equipements:
+                result.append({
+                    'ID_equipement': eq.ID_equipement,
+                    'nomEquipement': eq.nomEquipement
+                })
+            return jsonify(result)
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+        finally:
+            session.close()
+
+    @app.route('/api/commandes', methods=['POST'])
+    def create_commande():
+        data = request.json
+        session = Session()
+        try:
+            commande = Commande(
+                id_client=data.get('id_client'),
+                id_equipement=data.get('id_equipement'),
+                nature_service=data.get('nature_service'),
+                type_vehicule=data.get('type_vehicule'),
+                quantite_requise=data.get('quantite_requise'),
+                lieu_chargement=data.get('lieu_chargement'),
+                date_commande=datetime.strptime(data.get('date_commande'), '%Y-%m-%d %H:%M:%S') if data.get('date_commande') else None,
+                date_livraison=datetime.strptime(data.get('date_livraison'), '%Y-%m-%d %H:%M:%S') if data.get('date_livraison') else None
+            )
+            session.add(commande)
+            session.commit()
+            return jsonify({'message': 'Commande créée', 'id_commande': commande.id_commande}), 201
+        except Exception as e:
+            session.rollback()
+            return jsonify({'error': str(e)}), 400
+        finally:
+            session.close()
+
+    @app.route('/api/commandes', methods=['GET'])
+    def get_commandes():
+        session = Session()
+        try:
+            commandes = session.query(Commande).join(Equipement, Commande.id_equipement == Equipement.ID_equipement).all()
+            result = []
+            for c in commandes:
+                result.append({
+                    'id_commande': c.id_commande,
+                    'id_client': c.id_client,
+                    'id_equipement': c.id_equipement,
+                    'nomEquipement': c.equipement.nomEquipement,
+                    'nature_service': c.nature_service,
+                    'type_vehicule': c.type_vehicule,
+                    'quantite_requise': c.quantite_requise,
+                    'lieu_chargement': c.lieu_chargement,
+                    'date_commande': c.date_commande.strftime('%Y-%m-%d %H:%M:%S') if c.date_commande else None,
+                    'date_livraison': c.date_livraison.strftime('%Y-%m-%d %H:%M:%S') if c.date_livraison else None
+                })
+            return jsonify(result)
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+        finally:
+            session.close()
+
+    @app.route('/commande/form')
+    def commande_form():
+        return HTML_FORM
+
+else:
+    # Routes de remplacement si les modèles ne sont pas disponibles
+    @app.route('/api/equipements')
+    @app.route('/api/commandes')
+    @app.route('/commande/form')
+    def unavailable_endpoint():
+        return jsonify({
+            "error": "Service unavailable",
+            "message": "Database or models not properly loaded",
+            "suggestion": "Check /health for more details",
+            "environment": "render" if '/opt/render/' in project_root else "local"
+        }), 503
+
+# Gestionnaire d'erreur 404
+@app.errorhandler(404)
+def not_found_error(error):
+    available_routes = ["/", "/health", "/api/test"]
+    if Session and Commande and Equipement:
+        available_routes.extend(["/api/commandes", "/api/equipements", "/commande/form"])
+    
+    return jsonify({
+        "error": "Not Found",
+        "message": "The requested URL was not found on the server",
+        "environment": "render" if '/opt/render/' in project_root else "local",
+        "available_routes": available_routes,
+        "project_root": project_root
+    }), 404
+
+# Gestionnaire d'erreur 500
+@app.errorhandler(500)
+def internal_error(error):
+    return jsonify({
+        "error": "Internal Server Error",
+        "message": "An internal error occurred",
+        "suggestion": "Check the application logs for more details",
+        "environment": "render" if '/opt/render/' in project_root else "local"
+    }), 500
+
 if __name__ == '__main__':
+    print("=" * 60)
+    print("🚀 Starting TMS Application - Version Adaptative")
+    print("=" * 60)
+    print(f"🌍 Environment: {'Render (Production)' if '/opt/render/' in project_root else 'Local (Development)'}")
+    print(f"📁 Project root: {project_root}")
+    print(f"📂 Application path: {application_path}")
+    print(f"📂 Application exists: {'✅' if os.path.exists(application_path) else '❌'}")
+    print(f"🗄️  Database: {'✅ Connected' if engine else '❌ Not connected'}")
+    print(f"📊 Models: {'✅ Loaded' if Commande and Equipement else '❌ Not loaded'}")
+    print(f"🔧 Session: {'✅ Available' if Session else '❌ Not available'}")
+    print("=" * 60)
+    
     port = int(os.environ.get('PORT', 5000))
-    app.run(debug=False, host='0.0.0.0', port=port)
+    debug_mode = not ('/opt/render/' in project_root)  # Debug seulement en local
+    
+    print(f"🚀 Starting server on port {port}")
+    print(f"🔧 Debug mode: {'ON' if debug_mode else 'OFF'}")
+    print("=" * 60)
+    
+    app.run(debug=debug_mode, host='0.0.0.0', port=port)
