@@ -1,7 +1,7 @@
-# database.py
+# application/database.py - Clean version without any AWS references
 import sys
 import os
-from sqlalchemy import create_engine, text  # IMPORTANT: Import text function
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from sqlalchemy.pool import QueuePool
 from sqlalchemy.exc import OperationalError
@@ -14,23 +14,31 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Reconfigure stdout encoding
-sys.stdout.reconfigure(encoding='utf-8')
+try:
+    sys.stdout.reconfigure(encoding='utf-8')
+except:
+    pass  # Skip if not available
 
-# Database configuration
 class DatabaseConfig:
     def __init__(self):
-        # Use environment variables for production, fallback for development
-        self.DB_HOST = os.getenv("DB_HOST", "sql8.freesqldatabase.com")
-        self.DB_USER = os.getenv("DB_USER", "sql8781735")
-        self.DB_PASSWORD = os.getenv("DB_PASSWORD", "YQ8d2QdLqV")
-        self.DB_NAME = os.getenv("DB_NAME", "sql8781735")
-        self.DB_PORT = int(os.getenv("DB_PORT", "3306"))
+        # ONLY use FreeSQLDatabase - no AWS references anywhere
+        self.DB_HOST = os.environ.get("DB_HOST", "sql8.freesqldatabase.com")
+        self.DB_USER = os.environ.get("DB_USER", "sql8781735")
+        self.DB_PASSWORD = os.environ.get("DB_PASSWORD", "YQ8d2QdLqV")
+        self.DB_NAME = os.environ.get("DB_NAME", "sql8781735")
+        self.DB_PORT = int(os.environ.get("DB_PORT", "3306"))
         
         # Construct database URL
-        self.DATABASE_URL = os.getenv(
+        self.DATABASE_URL = os.environ.get(
             "DATABASE_URL", 
             f"mysql+pymysql://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
         )
+        
+        # CRITICAL: Verify we're not using AWS database
+        if "amazonaws.com" in self.DATABASE_URL or "ec2-" in self.DATABASE_URL:
+            logger.error("❌ CRITICAL: AWS database detected in URL!")
+            logger.error(f"Current URL: {self.DATABASE_URL}")
+            raise ValueError("AWS database URL detected - this should not happen!")
         
         logger.info(f"Database configuration: {self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}")
 
@@ -38,7 +46,6 @@ class DatabaseConfig:
 class Base(DeclarativeBase):
     pass
 
-# Database manager class
 class DatabaseManager:
     def __init__(self):
         self.config = DatabaseConfig()
@@ -47,31 +54,30 @@ class DatabaseManager:
         self._initialize_engine()
     
     def _initialize_engine(self):
-        """Initialize database engine with robust configuration"""
+        """Initialize database engine"""
         try:
-            # Connection arguments optimized for FreeSQLDatabase
+            # Connection arguments for FreeSQLDatabase
             connect_args = {
                 "connect_timeout": 30,
                 "read_timeout": 30,
                 "write_timeout": 30,
                 "charset": "utf8mb4",
                 "autocommit": False,
-                "ssl_disabled": True,  # FreeSQLDatabase doesn't support SSL
+                "ssl_disabled": True,
                 "init_command": "SET SESSION sql_mode='STRICT_TRANS_TABLES'"
             }
             
             self.engine = create_engine(
                 self.config.DATABASE_URL,
                 poolclass=QueuePool,
-                pool_size=2,                    # Small pool for free tier
-                max_overflow=3,                 # Limited overflow
-                pool_pre_ping=True,             # Verify connections
-                pool_recycle=1800,              # 30 minutes
+                pool_size=2,
+                max_overflow=3,
+                pool_pre_ping=True,
+                pool_recycle=1800,
                 connect_args=connect_args,
-                echo=False  # Set to True for SQL debugging
+                echo=False
             )
             
-            # Create session factory
             self.SessionLocal = sessionmaker(
                 autocommit=False,
                 autoflush=False,
@@ -84,52 +90,36 @@ class DatabaseManager:
             logger.error(f"Failed to initialize database engine: {e}")
             raise
     
-    def test_connection(self, max_retries=3):
-        """Test database connection with retry logic - FIXED VERSION"""
+    def test_connection(self, max_retries=2):  # Reduced retries for faster startup
+        """Test database connection"""
         for attempt in range(max_retries):
             try:
                 with self.engine.connect() as connection:
-                    # FIX: Use text() to wrap the SQL string
                     result = connection.execute(text("SELECT 1 as test"))
                     row = result.fetchone()
                     if row and row[0] == 1:
                         logger.info("✅ Database connection successful!")
                         return True
                         
-            except OperationalError as e:
-                if "many connection errors" in str(e):
-                    logger.warning(f"Connection blocked due to many errors: {e}")
-                    if attempt < max_retries - 1:
-                        import time
-                        wait_time = (attempt + 1) * 10
-                        logger.info(f"Waiting {wait_time} seconds before retry...")
-                        time.sleep(wait_time)
-                    continue
-                else:
-                    logger.error(f"Database connection error: {e}")
-                    if attempt == max_retries - 1:
-                        return False
-                        
             except Exception as e:
-                logger.error(f"Attempt {attempt + 1}/{max_retries} failed: {e}")
+                logger.error(f"Database connection attempt {attempt + 1} failed: {e}")
                 if attempt < max_retries - 1:
                     import time
                     time.sleep(5)
                 else:
+                    logger.error("All database connection attempts failed")
                     return False
         
         return False
     
     @contextmanager
     def get_session(self):
-        """Context manager for database sessions - FIXED VERSION"""
+        """Context manager for database sessions"""
         if not self.SessionLocal:
             raise Exception("Database not initialized")
         
         session = self.SessionLocal()
         try:
-            # FIX: Use text() to wrap the SQL string
-            session.execute(text("SELECT 1"))
             yield session
             session.commit()
         except Exception as e:
@@ -145,63 +135,50 @@ class DatabaseManager:
             logger.info("Creating database tables...")
             Base.metadata.create_all(bind=self.engine)
             logger.info("✅ Database tables created successfully")
+            return True
         except Exception as e:
             logger.error(f"❌ Failed to create tables: {e}")
-            raise
-    
-    def close(self):
-        """Close database connections"""
-        if self.engine:
-            self.engine.dispose()
-            logger.info("Database connections closed")
+            return False
 
-# Create global database manager instance
+# Initialize database manager
 try:
     db_manager = DatabaseManager()
-    
-    # Export for backward compatibility
     engine = db_manager.engine
     SessionLocal = db_manager.SessionLocal
-    
-    # Test connection on import
-    if not db_manager.test_connection():
-        logger.warning("Database connection test failed during initialization")
-        
 except Exception as e:
     logger.error(f"Failed to initialize database manager: {e}")
-    # Create dummy objects to prevent import errors
+    db_manager = None
     engine = None
     SessionLocal = None
-    db_manager = None
 
 # Backward compatibility functions
 def test_connection():
-    """Legacy function for testing connection"""
     if db_manager:
         return db_manager.test_connection()
     return False
 
 def get_session():
-    """Legacy session getter"""
     if db_manager:
         return db_manager.get_session()
     else:
         raise Exception("Database manager not initialized")
 
 def init_db():
-    """Legacy database initialization"""
     if db_manager:
         return db_manager.init_db()
     else:
         raise Exception("Database manager not initialized")
 
-# For debugging - run this file directly to test connection
+# Test connection on import (non-blocking)
+if db_manager and __name__ != "__main__":
+    try:
+        db_manager.test_connection()
+    except:
+        pass  # Don't block startup
+
 if __name__ == "__main__":
     if db_manager:
         success = db_manager.test_connection()
-        if success:
-            print("✅ Database connection test passed!")
-        else:
-            print("❌ Database connection test failed!")
+        print("✅ Database test passed!" if success else "❌ Database test failed!")
     else:
-        print("❌ Database manager initialization failed!")
+        print("❌ Database manager not initialized!")
