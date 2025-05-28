@@ -1,7 +1,26 @@
 import sys
 import os
-# Ajouter le répertoire racine au PYTHONPATH
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+from flask import Flask, request, jsonify
+
+# Chemin vers la racine du projet
+project_root = '/opt/render/project/go/src/github.com/thilleliam/mythesis'
+sys.path.insert(0, project_root)
+
+# Debug - afficher le contenu
+print("DEBUG - Contenu de application/:", os.listdir(os.path.join(project_root, 'application')))
+print("DEBUG - PYTHONPATH:", sys.path[:3])
+
+try:
+    from application.database import engine
+    print("SUCCESS - Import réussi!")
+except ImportError as e:
+    print(f"ERROR - Import failed: {e}")
+    # Plan B - import direct
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("database", os.path.join(project_root, "application", "database.py"))
+    database_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(database_module)
+    engine = database_module.engine
 
 from flask import Flask, request, jsonify
 from sqlalchemy.orm import sessionmaker
