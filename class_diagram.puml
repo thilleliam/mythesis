@@ -1,0 +1,201 @@
+@startuml
+
+' Style général
+skinparam class {
+    BackgroundColor White
+    ArrowColor #2C3E50
+    BorderColor #2C3E50
+    AttributeFontColor #2C3E50
+    AttributeFontSize 12
+    StereotypeFontSize 12
+    FontSize 13
+    FontColor #2C3E50
+}
+skinparam linetype ortho
+skinparam page 2
+
+' Définition des couleurs pastel
+skinparam stereotypeCBackgroundColor #A8D5E5
+skinparam classBackgroundColor {
+    <<Ressource>> #E8F4EA
+    <<Transport>> #FCE8E8
+    <<Gestion>> #FFF3E0
+    <<Equipement>> #E3F2FD
+}
+
+' Layout
+left to right direction
+
+class Equipement <<Equipement>> {
+    + ID_equipement: Integer <<PK>>
+    + quantite: Integer
+    + nomEquipement: String(255)
+    + typeEquipement: String(255)
+    + etat: String(255)
+    + poids: Float {nullable} // en kilogrammes
+    + volume: Float {nullable} // en mètres cubes
+    --
+    # commandes: List<CommandeEquipement>
+    # transferer_equipements: List<TransfererEquipement>
+}
+
+class Vehicule <<Ressource>> {
+    + immatriculation: String <<PK>>
+    + numero_chassis: String
+    + numero_interne: String
+    + marque_modele: String
+    + type_vehicule: String
+    + capacite_tonne: Float
+    + capacite_volume: Float
+    + etat: Enum["Disponible", "En panne", "En service"]
+    --
+    + est_disponible(): Boolean
+    + affecter_a_tournee(session, id_conducteur, id_commande, objectif, lieu_depart, destination, itineraire, date_heure_depart): Tournee
+}
+
+class Conducteur <<Ressource>> {
+    + id_conducteur: String <<PK>>
+    + nom: String
+    + prenom: String
+    + numero_telephone: String
+    + categorie: String
+    + disponibilite: Enum["disponible", "conge", "autres"]
+    + commentaire_disponibilite: String
+    --
+    + total_parcouru(): Float
+    + affecter_a_tournee(id_commande, objectif, lieu_depart, destination, itineraire, date_heure_depart): void
+}
+
+class Tournee <<Transport>> {
+    + id_tournee: Integer <<PK>>
+    + id_conducteur: String <<FK>>
+    + immatriculation_vehicule: String <<FK>>
+    + id_commande: Integer <<FK>>
+    + objectif: String
+    + lieu_depart: String
+    + destination: String
+    + itineraire: String
+    + km_parcouru: Float
+    + date_heure_depart: DateTime
+    + date_heure_reception: DateTime
+    + date_heure_retour: DateTime
+    + date_heure_arrivee: DateTime
+    + duree: String
+    --
+    + calculer_duree(): String
+}
+
+class EtapeRotation <<Transport>> {
+    + id_etape: Integer <<PK>>
+    + id_tournee: Integer <<FK>>
+    + ordre: Integer
+    + type_etape: String
+}
+
+class Affectation <<Gestion>> {
+    + id_affectation: Integer <<PK>>
+    + id_conducteur: String <<FK>>
+    + immatriculation_vehicule: String <<FK>>
+    + id_tournee: Integer <<FK>>
+    + date_affectation: DateTime
+}
+
+class TransfererEquipement <<Equipement>> {
+    + id: Integer <<PK>>
+    + volet: String
+    + nom_equipement: String
+    + id_equipement: Integer <<FK>>
+    + modalite_transport: String
+    + total_equipements: Integer
+    + id_client: String <<FK>>
+    + douze_semaines_avant: Integer
+    + onze_semaines_avant: Integer
+    + dix_semaines_avant: Integer
+    + neuf_semaines_avant: Integer
+    + huit_semaines_avant: Integer
+    + sept_semaines_avant: Integer
+    + six_semaines_avant: Integer
+    + cinq_semaines_avant: Integer
+    + quatre_semaines_avant: Integer
+    + trois_semaines_avant: Integer
+    + deux_semaines_avant: Integer
+    + un_semaines_avant: Integer
+    + zero_semaines_avant: Integer
+    --
+    + get_equipement(session): Equipement
+}
+
+class Commande <<Gestion>> {
+    + id_commande: Integer <<PK>>
+    + id_client: String <<FK>>
+    + id_equipement: Integer <<FK>>
+    + nature_service: String
+    + type_vehicule: String
+    + quantite_requise: Float
+    + lieu_chargement: String
+    + date_commande: DateTime
+    + date_livraison: DateTime
+    + statut: String
+    --
+    + est_en_retard(date_actuelle): Boolean
+    + associer_tournee(id_tournee): void
+    + calculer_delai_livraison(distance, weight): Float
+}
+
+class CommandeEquipement <<Gestion>> {
+    + id_commande: Integer <<FK>>
+    + id_equipement: Integer <<FK>>
+    + quantite: Integer
+}
+
+class Chantier <<Gestion>> {
+    + id_client: String <<PK>>
+    + localisation: String
+    + latitude: Float
+    + longitude: Float
+    + nature_terrain: String
+    + distanceAllerGoudron: Float
+    + distanceAllerPiste: Float
+    + temps_aller: Float
+    --
+    + calculer_temps_aller(): Float
+}
+
+class Segment <<Transport>> {
+    + id: Integer <<PK>>
+    + point1_nom: String
+    + point1_latitude: Float
+    + point1_longitude: Float
+    + point1_type: String
+    + point1_id_reference: String
+    + point2_nom: String
+    + point2_latitude: Float
+    + point2_longitude: Float
+    + point2_type: String
+    + point2_id_reference: String
+    + distance_km: Float
+    + couleur: String
+    + epaisseur: Integer
+    + afficher_distance: Boolean
+    + nom_segment: String
+    + description: Text
+    + date_creation: DateTime
+    + date_modification: DateTime
+    + cree_par: String
+}
+
+' Relations avec cardinalités et descriptions
+Conducteur "1" -- "*" Tournee : conduit >
+Vehicule "1" -- "*" Tournee : est utilisé dans >
+Tournee "1" -- "*" EtapeRotation : contient >
+Tournee "1" -- "*" Affectation : possède >
+Conducteur "1" -- "*" Affectation : est affecté à >
+Vehicule "1" -- "*" Affectation : est assigné à >
+Equipement "1" -- "*" TransfererEquipement : est transféré >
+Equipement "1" -- "*" CommandeEquipement : est commandé >
+Commande "1" -- "*" CommandeEquipement : contient >
+Commande "1" -- "*" Tournee : génère >
+Chantier "1" -- "*" Tournee : est desservi par >
+Chantier "1" -- "*" Commande : passe >
+
+@enduml 
