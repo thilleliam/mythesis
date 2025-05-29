@@ -454,6 +454,37 @@ def emergency_alert():
     finally:
         session.close()
 
+@app.route('/api/tournees/<int:id_tournee>/etapes', methods=['GET'])
+def get_etapes_tournee(id_tournee):
+    """Récupérer les étapes d'une tournée spécifique"""
+    session = Session()
+    
+    try:
+        etapes = session.query(EtapeRotation).filter(
+            EtapeRotation.id_tournee == id_tournee
+        ).order_by(EtapeRotation.ordre).all()
+        
+        result = []
+        for etape in etapes:
+            result.append({
+                'id_etape': etape.id_etape,
+                'ordre': etape.ordre,
+                'nom': getattr(etape, 'nom', ''),
+                'description': getattr(etape, 'description', ''),
+                'date_etape': etape.date_etape.isoformat() if getattr(etape, 'date_etape', None) else None,
+                'heure': getattr(etape, 'heure', ''),
+                'duree': getattr(etape, 'duree', ''),
+                'priorite': getattr(etape, 'priorite', 'Normale'),
+                'statut': getattr(etape, 'statut', 'Planifiée')
+            })
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
 # =====================================
 # ROUTE POUR SERVIR L'APP CHAUFFEUR
 # =====================================
@@ -736,6 +767,118 @@ def chauffeur_app():
                 text-align: center;
             }
         }
+
+        /* Styles pour le menu contextuel */
+        .context-menu {
+            position: fixed;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            padding: 5px 0;
+            min-width: 150px;
+            z-index: 1000;
+        }
+
+        .context-menu-item {
+            padding: 8px 15px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .context-menu-item:hover {
+            background-color: #f0f0f0;
+        }
+
+        /* Styles pour la modale */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+
+        .modal-content {
+            position: relative;
+            background-color: white;
+            margin: 10% auto;
+            padding: 20px;
+            width: 80%;
+            max-width: 800px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .modal-close {
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .modal-close:hover {
+            color: #333;
+        }
+
+        .etape-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 4px solid #18bc9c;
+        }
+
+        .etape-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .etape-title {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .etape-status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .etape-status.planifiee { background: #e8f4f8; color: #2c3e50; }
+        .etape-status.en-cours { background: #fff3cd; color: #856404; }
+        .etape-status.terminee { background: #d4edda; color: #155724; }
+        .etape-status.annulee { background: #f8d7da; color: #721c24; }
+
+        .etape-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .etape-detail {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .etape-detail i {
+            width: 20px;
+            color: #666;
+        }
     </style>
 </head>
 <body>
@@ -832,6 +975,19 @@ def chauffeur_app():
             <i class="fas fa-sign-out-alt"></i>
             <span>Sortie</span>
         </button>
+    </div>
+
+    <!-- Modal pour les étapes -->
+    <div id="etapesModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-list-ul"></i> Étapes de la tournée</h2>
+                <span class="modal-close">&times;</span>
+            </div>
+            <div id="etapesContainer">
+                <!-- Les étapes seront chargées ici -->
+            </div>
+        </div>
     </div>
 
     <script>
@@ -1055,37 +1211,39 @@ def chauffeur_app():
             }
 
             missions.forEach(mission => {
-                const missionCard = `
-                    <div class="mission-card">
-                        <div class="mission-header">
-                            <h3>Mission #${mission.id_commande}</h3>
-                            <span class="badge">${mission.statut || 'Planifiée'}</span>
+                const missionCard = document.createElement('div');
+                missionCard.className = 'mission-card';
+                missionCard.oncontextmenu = (e) => showContextMenu(e, mission.id_tournee);
+                
+                missionCard.innerHTML = `
+                    <div class="mission-header">
+                        <h3>Mission #${mission.id_commande}</h3>
+                        <span class="badge">${mission.statut || 'Planifiée'}</span>
+                    </div>
+                    <div class="mission-body">
+                        <div class="mission-detail">
+                            <i class="fas fa-map-marker-alt"></i>
+                            <span><strong>Départ :</strong> ${mission.lieu_depart || 'À définir'}</span>
                         </div>
-                        <div class="mission-body">
-                            <div class="mission-detail">
-                                <i class="fas fa-map-marker-alt"></i>
-                                <span><strong>Départ :</strong> ${mission.lieu_depart || 'À définir'}</span>
-                            </div>
-                            <div class="mission-detail">
-                                <i class="fas fa-flag-checkered"></i>
-                                <span><strong>Destination :</strong> ${mission.destination || 'À définir'}</span>
-                            </div>
-                            <div class="mission-detail">
-                                <i class="fas fa-clock"></i>
-                                <span><strong>Départ prévu :</strong> ${new Date(mission.date_heure_depart).toLocaleString()}</span>
-                            </div>
-                            <div class="mission-detail">
-                                <i class="fas fa-target"></i>
-                                <span><strong>Objectif :</strong> ${mission.objectif || 'Transport'}</span>
-                            </div>
-                            
-                            <button class="btn btn-success" onclick="startMission(${mission.id_tournee})">
-                                <i class="fas fa-play"></i> Commencer la mission
-                            </button>
+                        <div class="mission-detail">
+                            <i class="fas fa-flag-checkered"></i>
+                            <span><strong>Destination :</strong> ${mission.destination || 'À définir'}</span>
                         </div>
+                        <div class="mission-detail">
+                            <i class="fas fa-clock"></i>
+                            <span><strong>Départ prévu :</strong> ${new Date(mission.date_heure_depart).toLocaleString()}</span>
+                        </div>
+                        <div class="mission-detail">
+                            <i class="fas fa-target"></i>
+                            <span><strong>Objectif :</strong> ${mission.objectif || 'Transport'}</span>
+                        </div>
+                        
+                        <button class="btn btn-success" onclick="startMission(${mission.id_tournee})">
+                            <i class="fas fa-play"></i> Commencer la mission
+                        </button>
                     </div>
                 `;
-                container.innerHTML += missionCard;
+                container.appendChild(missionCard);
             });
         }
 
@@ -1168,6 +1326,136 @@ def chauffeur_app():
             isOnline = false;
             showNotification('Connexion perdue', 'Mode hors ligne activé');
         });
+
+        // Gestion du menu contextuel
+        let contextMenu = null;
+
+        function showContextMenu(event, tourneeId) {
+            event.preventDefault();
+            
+            // Supprimer l'ancien menu s'il existe
+            if (contextMenu) {
+                document.body.removeChild(contextMenu);
+            }
+            
+            // Créer le nouveau menu
+            contextMenu = document.createElement('div');
+            contextMenu.className = 'context-menu';
+            contextMenu.innerHTML = `
+                <div class="context-menu-item" onclick="showEtapes(${tourneeId})">
+                    <i class="fas fa-list-ul"></i> Voir les étapes
+                </div>
+            `;
+            
+            // Positionner le menu
+            contextMenu.style.left = event.pageX + 'px';
+            contextMenu.style.top = event.pageY + 'px';
+            
+            // Ajouter le menu à la page
+            document.body.appendChild(contextMenu);
+            
+            // Fermer le menu au clic ailleurs
+            document.addEventListener('click', closeContextMenu);
+        }
+
+        function closeContextMenu() {
+            if (contextMenu) {
+                document.body.removeChild(contextMenu);
+                contextMenu = null;
+            }
+            document.removeEventListener('click', closeContextMenu);
+        }
+
+        // Gestion de la modale des étapes
+        const etapesModal = document.getElementById('etapesModal');
+        const modalClose = document.querySelector('.modal-close');
+
+        modalClose.onclick = function() {
+            etapesModal.style.display = "none";
+        }
+
+        window.onclick = function(event) {
+            if (event.target == etapesModal) {
+                etapesModal.style.display = "none";
+            }
+        }
+
+        async function showEtapes(tourneeId) {
+            closeContextMenu();
+            
+            try {
+                const response = await fetch(`/api/tournees/${tourneeId}/etapes`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const etapes = await response.json();
+                    displayEtapes(etapes, tourneeId);
+                } else {
+                    throw new Error('Erreur lors de la récupération des étapes');
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                alert('Impossible de charger les étapes');
+            }
+        }
+
+        function displayEtapes(etapes, tourneeId) {
+            const container = document.getElementById('etapesContainer');
+            container.innerHTML = '';
+            
+            if (etapes.length === 0) {
+                container.innerHTML = '<div class="alert alert-warning">Aucune étape pour cette tournée</div>';
+            } else {
+                etapes.forEach(etape => {
+                    const date = etape.date_etape ? new Date(etape.date_etape).toLocaleDateString() : 'Non définie';
+                    const statusClass = etape.statut.toLowerCase().replace('é', 'e');
+                    
+                    const etapeCard = `
+                        <div class="etape-card">
+                            <div class="etape-header">
+                                <span class="etape-title">
+                                    <i class="fas fa-map-marker-alt"></i>
+                                    ${etape.nom || `Étape ${etape.ordre}`}
+                                </span>
+                                <span class="etape-status ${statusClass}">
+                                    ${etape.statut}
+                                </span>
+                            </div>
+                            <div class="etape-details">
+                                <div class="etape-detail">
+                                    <i class="fas fa-calendar"></i>
+                                    <span>Date: ${date}</span>
+                                </div>
+                                <div class="etape-detail">
+                                    <i class="fas fa-clock"></i>
+                                    <span>Heure: ${etape.heure || 'Non définie'}</span>
+                                </div>
+                                <div class="etape-detail">
+                                    <i class="fas fa-hourglass-half"></i>
+                                    <span>Durée: ${etape.duree || 'Non définie'}</span>
+                                </div>
+                                <div class="etape-detail">
+                                    <i class="fas fa-exclamation-circle"></i>
+                                    <span>Priorité: ${etape.priorite}</span>
+                                </div>
+                            </div>
+                            ${etape.description ? `
+                                <div class="etape-description">
+                                    <i class="fas fa-info-circle"></i>
+                                    ${etape.description}
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                    container.innerHTML += etapeCard;
+                });
+            }
+            
+            etapesModal.style.display = "block";
+        }
     </script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
-from tkinter import messagebox, simpledialog, StringVar, filedialog, BooleanVar
+from tkinter import messagebox, simpledialog, StringVar, filedialog, BooleanVar, Menu
 from sqlalchemy.orm import sessionmaker, configure_mappers
 from application.database import engine
 from sqlalchemy import func
@@ -12,6 +12,7 @@ import os
 from ttkbootstrap.scrolled import ScrolledFrame
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from application.models.etape import EtapeRotation
 
 configure_mappers()
 
@@ -331,7 +332,11 @@ class TourneeApp:
         
         self.Tournee = Tournee
         
-        # Variables
+        # IMPORTANT: Initialiser ces variables AVANT create_notebook()
+        self.context_menu = None
+        self.selected_tournee_id = None
+        
+        # Variables pour le formulaire
         self.id_tournee_var = StringVar()
         self.id_conducteur_var = StringVar()
         self.immatriculation_var = StringVar()
@@ -378,43 +383,6 @@ class TourneeApp:
         self.create_notebook()
         # Charger les données
         self.charger_donnees()
-    
-    def create_notebook(self):
-        """Crée l'interface à onglets"""
-        self.notebook = ttk.Notebook(self.root)
-        self.notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        # Onglet Liste des tournées
-        self.list_tab = ttk.Frame(self.notebook)
-        self.notebook.add(self.list_tab, text="Liste des tournées")
-        
-        # Onglet Formulaire
-        self.form_tab = ttk.Frame(self.notebook)
-        self.notebook.add(self.form_tab, text="Ajouter/Modifier une tournée")
-        
-        # Onglet Statistiques
-        self.stats_tab = ttk.Frame(self.notebook)
-        self.notebook.add(self.stats_tab, text="Statistiques")
-        
-        # Construire chaque onglet
-        self.build_list_tab()
-        self.build_form_tab()
-        self.build_stats_tab()
-        
-        # Événement de changement d'onglet
-        self.notebook.bind("<<NotebookTabChanged>>", self.on_tab_changed)
-    
-    def on_tab_changed(self, event):
-        """Gestion du changement d'onglet"""
-        tab_id = self.notebook.index(self.notebook.select())
-        
-        # Si l'onglet des statistiques est sélectionné
-        if tab_id == 2:  # Stats tab
-            self.update_stats()
-    def nouvelle_tournee(self):
-        """Prépare le formulaire pour une nouvelle tournée"""
-        self.vider_formulaire()
-        self.notebook.select(1)  # Switch to the form tab
     
     def build_list_tab(self):
         """Construit l'onglet de liste des tournées"""
@@ -482,7 +450,7 @@ class TourneeApp:
         table_frame.columnconfigure(0, weight=1)
         table_frame.rowconfigure(0, weight=1)
         
-        # Définir les entêtes
+        # Définir les entêtes avec tri
         self.tree.heading("id_tournee", text="ID", command=lambda: self.treeview_sort_column("id_tournee", False))
         self.tree.heading("conducteur", text="Conducteur", command=lambda: self.treeview_sort_column("conducteur", False))
         self.tree.heading("vehicule", text="Véhicule", command=lambda: self.treeview_sort_column("vehicule", False))
@@ -510,14 +478,202 @@ class TourneeApp:
         self.tree.column("duree", width=80, minwidth=80)
         self.tree.column("statut", width=80, minwidth=80)
         
-        # Liaison à la sélection
+        # Liaison à la sélection et événements
         self.tree.bind("<Double-1>", self.on_tree_double_click)
         self.tree.bind("<ButtonRelease-1>", self.on_tree_select)
+        self.tree.bind("<Button-3>", self.show_context_menu)  # Clic droit
+        
+        # CRÉER LE MENU CONTEXTUEL ICI
+        self.create_context_menu()
         
         # Barre de statut
         self.status_var = StringVar()
         status_bar = ttk.Label(self.list_tab, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W)
         status_bar.pack(side=tk.BOTTOM, fill=tk.X, padx=5)
+    
+    def create_context_menu(self):
+        """Crée le menu contextuel"""
+        self.context_menu = tk.Menu(self.root, tearoff=0)
+        self.context_menu.add_command(label="Voir les étapes", command=self.afficher_etapes)
+        self.context_menu.add_command(label="Ajouter une étape", command=self.ajouter_etape)
+        self.context_menu.add_separator()
+        self.context_menu.add_command(label="Modifier la tournée", command=self.editer_tournee_selectionnee)
+        self.context_menu.add_command(label="Voir les détails", command=self.afficher_details)
+        self.context_menu.add_separator()
+        self.context_menu.add_command(label="Supprimer", command=self.supprimer)
+    
+    def show_context_menu(self, event):
+        """Affiche le menu contextuel au clic droit"""
+        # Identifier l'élément sous la souris
+        item = self.tree.identify_row(event.y)
+        if item:
+            # Sélectionner la ligne
+            self.tree.selection_set(item)
+            # Récupérer l'ID de la tournée
+            values = self.tree.item(item)['values']
+            if values:
+                self.selected_tournee_id = values[0]
+                print(f"Tournée sélectionnée: {self.selected_tournee_id}")  # Debug
+                
+                # Afficher le menu contextuel
+                try:
+                    self.context_menu.tk_popup(event.x_root, event.y_root)
+                except Exception as e:
+                    print(f"Erreur lors de l'affichage du menu: {e}")
+                finally:
+                    # Nettoyer le menu
+                    self.context_menu.grab_release()
+        else:
+            print("Aucun élément sous la souris")  # 
+    
+    def create_notebook(self):
+        """Crée l'interface à onglets"""
+        self.notebook = ttk.Notebook(self.root)
+        self.notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Onglet Liste des tournées
+        self.list_tab = ttk.Frame(self.notebook)
+        self.notebook.add(self.list_tab, text="Liste des tournées")
+        
+        # Onglet Formulaire
+        self.form_tab = ttk.Frame(self.notebook)
+        self.notebook.add(self.form_tab, text="Ajouter/Modifier une tournée")
+        
+        # Onglet Statistiques
+        self.stats_tab = ttk.Frame(self.notebook)
+        self.notebook.add(self.stats_tab, text="Statistiques")
+        
+        # Construire chaque onglet
+        self.build_list_tab()
+        self.build_form_tab()
+        self.build_stats_tab()
+        
+        # Événement de changement d'onglet
+        self.notebook.bind("<<NotebookTabChanged>>", self.on_tab_changed)
+    
+    def on_tab_changed(self, event):
+        """Gestion du changement d'onglet"""
+        tab_id = self.notebook.index(self.notebook.select())
+        
+        # Si l'onglet des statistiques est sélectionné
+        if tab_id == 2:  # Stats tab
+            self.update_stats()
+    def nouvelle_tournee(self):
+        """Prépare le formulaire pour une nouvelle tournée"""
+        self.vider_formulaire()
+        self.notebook.select(1)  # Switch to the form tab
+    
+    
+    def afficher_etapes(self):
+        """Affiche les étapes de la tournée sélectionnée"""
+        if not self.selected_tournee_id:
+            messagebox.showwarning("Attention", "Veuillez sélectionner une tournée")
+            return
+        
+        # Créer une nouvelle fenêtre
+        etapes_window = ttk.Toplevel(self.root)
+        etapes_window.title(f"Étapes de la tournée #{self.selected_tournee_id}")
+        etapes_window.geometry("800x600")
+        
+        # Frame principal
+        main_frame = ttk.Frame(etapes_window, padding=10)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # En-tête
+        header = ttk.Frame(main_frame)
+        header.pack(fill=tk.X, pady=(0, 10))
+        
+        ttk.Label(header, text=f"Étapes de la tournée #{self.selected_tournee_id}", 
+                 font=("TkDefaultFont", 12, "bold")).pack(side=tk.LEFT)
+        
+        # Tableau des étapes
+        columns = ("id_etape", "ordre", "nom", "description", "date", "heure", "duree", "priorite", "statut")
+        
+        # Frame pour le tableau avec scrollbars
+        tree_frame = ttk.Frame(main_frame)
+        tree_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Scrollbars
+        vsb = ttk.Scrollbar(tree_frame, orient="vertical")
+        hsb = ttk.Scrollbar(tree_frame, orient="horizontal")
+        
+        # Treeview
+        etapes_tree = ttk.Treeview(tree_frame, columns=columns, show="headings",
+                                  yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+        
+        # Configuration des scrollbars
+        vsb.config(command=etapes_tree.yview)
+        hsb.config(command=etapes_tree.xview)
+        
+        # Placement des widgets
+        etapes_tree.grid(row=0, column=0, sticky="nsew")
+        vsb.grid(row=0, column=1, sticky="ns")
+        hsb.grid(row=1, column=0, sticky="ew")
+        
+        # Configuration du grid
+        tree_frame.columnconfigure(0, weight=1)
+        tree_frame.rowconfigure(0, weight=1)
+        
+        # Configuration des colonnes
+        etapes_tree.heading("id_etape", text="ID")
+        etapes_tree.heading("ordre", text="Ordre")
+        etapes_tree.heading("nom", text="Nom")
+        etapes_tree.heading("description", text="Description")
+        etapes_tree.heading("date", text="Date")
+        etapes_tree.heading("heure", text="Heure")
+        etapes_tree.heading("duree", text="Durée")
+        etapes_tree.heading("priorite", text="Priorité")
+        etapes_tree.heading("statut", text="Statut")
+        
+        etapes_tree.column("id_etape", width=50, minwidth=50)
+        etapes_tree.column("ordre", width=50, minwidth=50)
+        etapes_tree.column("nom", width=150, minwidth=100)
+        etapes_tree.column("description", width=200, minwidth=150)
+        etapes_tree.column("date", width=100, minwidth=100)
+        etapes_tree.column("heure", width=80, minwidth=80)
+        etapes_tree.column("duree", width=80, minwidth=80)
+        etapes_tree.column("priorite", width=80, minwidth=80)
+        etapes_tree.column("statut", width=100, minwidth=100)
+        
+        # Charger les étapes
+        try:
+            etapes = session.query(EtapeRotation).filter(
+                EtapeRotation.id_tournee == self.selected_tournee_id
+            ).order_by(EtapeRotation.ordre).all()
+            
+            for etape in etapes:
+                date_str = ""
+                if hasattr(etape, 'date_etape') and etape.date_etape:
+                    date_str = etape.date_etape.strftime("%Y-%m-%d")
+                
+                values = (
+                    etape.id_etape,
+                    etape.ordre,
+                    getattr(etape, 'nom', ''),
+                    getattr(etape, 'description', ''),
+                    date_str,
+                    getattr(etape, 'heure', ''),
+                    getattr(etape, 'duree', ''),
+                    getattr(etape, 'priorite', 'Normale'),
+                    getattr(etape, 'statut', 'Planifiée')
+                )
+                
+                etapes_tree.insert("", "end", values=values)
+            
+            if not etapes:
+                ttk.Label(main_frame, text="Aucune étape trouvée pour cette tournée",
+                         font=("TkDefaultFont", 10, "italic")).pack(pady=20)
+        
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur lors du chargement des étapes : {str(e)}")
+        
+        # Bouton Fermer
+        ttk.Button(main_frame, text="Fermer", command=etapes_window.destroy).pack(pady=10)
+        
+        # Rendre la fenêtre modale
+        etapes_window.transient(self.root)
+        etapes_window.grab_set()
+        self.root.wait_window(etapes_window)
     
     def build_form_tab(self):
         """Construit l'onglet de formulaire"""
@@ -1446,6 +1602,90 @@ class TourneeApp:
             var.set("0")
         for var in [self.minute_depart, self.minute_arrivee, self.minute_reception, self.minute_retour]:
             var.set("0")
+
+    def ajouter_etape(self):
+        """Ajoute une nouvelle étape à la tournée sélectionnée"""
+        if not self.selected_tournee_id:
+            messagebox.showwarning("Attention", "Veuillez sélectionner une tournée")
+            return
+        
+        # Créer une nouvelle fenêtre
+        etape_window = ttk.Toplevel(self.root)
+        etape_window.title(f"Ajouter une étape à la tournée #{self.selected_tournee_id}")
+        etape_window.geometry("500x600")
+        
+        # Frame principal
+        main_frame = ttk.Frame(etape_window, padding=10)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Variables
+        nom_var = StringVar()
+        description_var = StringVar()
+        ordre_var = StringVar()
+        priorite_var = StringVar(value="Normale")
+        
+        # Formulaire
+        ttk.Label(main_frame, text="Nom de l'étape:").pack(anchor=tk.W, pady=5)
+        ttk.Entry(main_frame, textvariable=nom_var).pack(fill=tk.X, pady=2)
+        
+        ttk.Label(main_frame, text="Description:").pack(anchor=tk.W, pady=5)
+        ttk.Entry(main_frame, textvariable=description_var).pack(fill=tk.X, pady=2)
+        
+        ttk.Label(main_frame, text="Ordre:").pack(anchor=tk.W, pady=5)
+        ttk.Entry(main_frame, textvariable=ordre_var).pack(fill=tk.X, pady=2)
+        
+        ttk.Label(main_frame, text="Priorité:").pack(anchor=tk.W, pady=5)
+        priorite_cb = ttk.Combobox(main_frame, textvariable=priorite_var, values=["Basse", "Normale", "Haute", "Urgente"])
+        priorite_cb.pack(fill=tk.X, pady=2)
+        
+        # Date et heure
+        ttk.Label(main_frame, text="Date et heure:").pack(anchor=tk.W, pady=5)
+        
+        # Variables pour la date
+        jour_var = StringVar(value=str(datetime.now().day))
+        mois_var = StringVar(value=str(datetime.now().month))
+        annee_var = StringVar(value=str(datetime.now().year))
+        
+        date_frame = DateTimeEntry(main_frame, jour_var, mois_var, annee_var)
+        date_frame.pack(fill=tk.X, pady=2)
+        
+        def sauvegarder_etape():
+            try:
+                # Créer une nouvelle étape
+                etape = EtapeRotation(
+                    id_tournee=self.selected_tournee_id,
+                    nom=nom_var.get(),
+                    description=description_var.get(),
+                    ordre=int(ordre_var.get()),
+                    priorite=priorite_var.get(),
+                    date_etape=date_frame.get_datetime(),
+                    statut="Planifiée"
+                )
+                
+                session.add(etape)
+                session.commit()
+                
+                messagebox.showinfo("Succès", "Étape ajoutée avec succès")
+                etape_window.destroy()
+                
+                # Rafraîchir l'affichage des étapes si la fenêtre est ouverte
+                self.afficher_etapes()
+                
+            except Exception as e:
+                session.rollback()
+                messagebox.showerror("Erreur", f"Impossible d'ajouter l'étape : {str(e)}")
+        
+        # Boutons
+        buttons_frame = ttk.Frame(main_frame)
+        buttons_frame.pack(fill=tk.X, pady=10)
+        
+        ttk.Button(buttons_frame, text="Sauvegarder", command=sauvegarder_etape).pack(side=tk.LEFT, padx=5)
+        ttk.Button(buttons_frame, text="Annuler", command=etape_window.destroy).pack(side=tk.LEFT, padx=5)
+        
+        # Rendre la fenêtre modale
+        etape_window.transient(self.root)
+        etape_window.grab_set()
+        self.root.wait_window(etape_window)
 
 if __name__ == "__main__":
     root = ttk.Window(themename="cosmo")
