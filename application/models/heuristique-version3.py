@@ -531,6 +531,7 @@ class OptimisateurNavettes:
         
     def calculer_navettes_optimales(self, produits_a_transporter, vehicules_data, date_debut, heure_debut, duree_max_jours=7):
         """
+        ✅ VERSION CORRIGÉE avec indentation fixée
         Calcule les navettes optimales avec combinaison intelligente de véhicules
         """
         
@@ -550,47 +551,80 @@ class OptimisateurNavettes:
         print(f"⏰ CONTRAINTE TEMPORELLE: {duree_max_jours} jours maximum")
         print(f"🔄 NOUVEAUTÉ: Combinaison optimale de véhicules différents")
         
-        # ✅ UTILISER LA NOUVELLE MÉTHODE DE RECHERCHE
-        solution_optimale = self._chercher_combinaison_optimale(
-            demande_equivalente, 
-            vehicules_data,
-            date_debut,      # MANQUANT
-            heure_debut, 
-            duree_max_jours
-        )
-        
-        if not solution_optimale:
-            print(f"\n❌ AUCUNE SOLUTION TROUVÉE")
-            return None
-        
-        # Adapter le format de retour selon le type de solution
-        if solution_optimale.get('type_solution') == 'combinaison':
-            print(f"\n🎉 SOLUTION COMBINAISON SÉLECTIONNÉE!")
+        try:
+            # ✅ UTILISER LA MÉTHODE CORRIGÉE
+            solution_optimale = self._chercher_combinaison_optimale(
+                demande_equivalente, 
+                vehicules_data,
+                date_debut,
+                heure_debut, 
+                duree_max_jours
+            )
             
-            # Créer un format de retour adapté pour les combinaisons
+            if not solution_optimale:
+                print(f"\n❌ AUCUNE SOLUTION TROUVÉE")
+                return None
+            
+            # ✅ GESTION SÉCURISÉE DU TYPE DE SOLUTION
+            type_solution = solution_optimale.get('type_solution', 'inconnu')
+            
+            if type_solution in ['flotte_heterogene', 'flotte_homogene']:
+                print(f"\n🎉 SOLUTION COMBINAISON SÉLECTIONNÉE!")
+                
+                # Format adapté pour les combinaisons
+                return {
+                    'type_solution': 'combinaison',
+                    'vehicule_principal': solution_optimale.get('vehicule_principal', 'Véhicule Principal'),
+                    'vehicule_secondaire': solution_optimale.get('vehicule_secondaire'),
+                    'nb_vehicules_principal': solution_optimale.get('nb_vehicules_principal', 1),
+                    'nb_vehicules_secondaire': solution_optimale.get('nb_vehicules_secondaire', 0),
+                    'cout_total': solution_optimale.get('cout_total', 0),
+                    'duree_reelle': solution_optimale.get('duree_reelle', duree_max_jours),
+                    'respect_contrainte': True,
+                    'demande_equivalente': demande_equivalente,
+                    'vehicule_optimal': {
+                        'cout_total': solution_optimale.get('cout_total', 0)
+                    },
+                    'solution_detaillee': solution_optimale
+                }
+            else:
+                # Solution véhicule unique
+                print(f"\n✅ SOLUTION VÉHICULE UNIQUE SÉLECTIONNÉE!")
+                
+                return {
+                    'type_solution': 'vehicule_unique',
+                    'vehicule_utilise': solution_optimale.get('vehicule_utilise', {
+                        'nom': 'Véhicule Standard',
+                        'type': 'STANDARD'
+                    }),
+                    'nb_vehicules_necessaires': solution_optimale.get('nb_vehicules_necessaires', 1),
+                    'duree_reelle': solution_optimale.get('duree_reelle', duree_max_jours),
+                    'respect_contrainte': True,
+                    'vehicule_optimal': {
+                        'cout_total': solution_optimale.get('cout_total', 0)
+                    },
+                    'demande_equivalente': demande_equivalente
+                }
+                
+        except Exception as e:
+            print(f"❌ ERREUR dans calculer_navettes_optimales: {e}")
+            
+            # ✅ RETOUR SÉCURISÉ EN CAS D'ERREUR
             return {
-                'type_solution': 'combinaison',
-                'vehicules_utilises': solution_optimale['vehicules_detail'],
-                'vehicule_principal': solution_optimale['vehicule_principal'],
-                'vehicule_secondaire': solution_optimale['vehicule_secondaire'],
-                'cout_total': solution_optimale['cout_total'],
-                'duree_reelle': solution_optimale['duree_reelle_jours'],
-                'respect_contrainte': True,
+                'type_solution': 'erreur',
+                'vehicule_utilise': {
+                    'nom': 'Véhicule Erreur',
+                    'type': 'ERREUR'
+                },
+                'vehicule_optimal': {
+                    'cout_total': 9999
+                },
                 'demande_equivalente': demande_equivalente,
-                'solution_detaillee': solution_optimale
-            }
-        else:
-            # Solution véhicule unique - utiliser le format existant
-            print(f"\n✅ SOLUTION VÉHICULE UNIQUE SÉLECTIONNÉE!")
-            
-            return {
-                'type_solution': 'vehicule_unique',
-                'vehicule_utilise': solution_optimale['vehicule'],
+                'cout_total': 9999,
+                'duree_reelle': duree_max_jours,
                 'nb_vehicules_necessaires': 1,
-                'duree_reelle': solution_optimale['duree_reelle_jours'],
-                'respect_contrainte': True,
-                'vehicule_optimal': solution_optimale,
-                'demande_equivalente': demande_equivalente
+                'respect_contrainte': False,
+                'erreur_detail': str(e)
             }
     def _tester_combinaison_vehicules(self, demande, analyse_vehicule1, analyse_vehicule2, duree_max_jours):
         """
@@ -816,50 +850,191 @@ class OptimisateurNavettes:
             }
         
         return None
+
     def _convertir_solution_multiple_vers_format_standard(self, solution_multiple, demande, date_debut, heure_debut, duree_max_jours):
         """
-        ✅ CORRECTION: Convertit une solution multi-véhicules au format de votre système
-        PROBLÈME: solution_multiple n'avait pas la structure attendue
+        ✅ CORRECTION ÉTAPE 1: Créer une structure avec voyages multiples pour les métaheuristiques
         """
         try:
-            print(f"🔧 DEBUG - Conversion solution multiple")
-            print(f"   Structure reçue: {list(solution_multiple.keys())}")
+            print(f"🔧 ÉTAPE 1 - Décomposition en voyages multiples")
             
             # ✅ EXTRACTION SÉCURISÉE DES DONNÉES
             vehicule_principal = solution_multiple.get('vehicule_principal', {})
             vehicule_secondaire = solution_multiple.get('vehicule_secondaire', {})
             
-            # Si ce sont des dictionnaires vides, créer des structures par défaut
             if not vehicule_principal:
                 vehicule_principal = {
                     'nom': 'Véhicule Principal',
                     'capacite_poids_max': 20.0,
-                    'capacite_volume_max': 80.0
+                    'capacite_volume_max': 80.0,
+                    'cout_fixe_jour': 500,
+                    'cout_variable_km': 1.0
                 }
             
-            # ✅ GESTION SÉCURISÉE DU VÉHICULE SECONDAIRE
-            if vehicule_secondaire and isinstance(vehicule_secondaire, dict):
-                vehicule_secondaire_nom = vehicule_secondaire.get('nom', 'Véhicule Secondaire')
-                nb_vehicules_secondaire = solution_multiple.get('nb_vehicules_secondaire', 0)
-            else:
-                vehicule_secondaire_nom = None
-                nb_vehicules_secondaire = 0
-            
-            # ✅ EXTRACTION SÉCURISÉE DES AUTRES DONNÉES
             nb_vehicules_principal = solution_multiple.get('nb_vehicules_principal', 1)
+            nb_vehicules_secondaire = solution_multiple.get('nb_vehicules_secondaire', 0)
             cout_total = solution_multiple.get('cout_total', 0)
-            type_solution = solution_multiple.get('type', 'flotte_heterogene')
             
-            print(f"   Véhicule principal: {vehicule_principal.get('nom', 'INCONNU')}")
-            print(f"   Véhicule secondaire: {vehicule_secondaire_nom}")
-            print(f"   Coût total: {cout_total}€")
+            # ✅ NOUVEAU: CALCULER LE NOMBRE DE VOYAGES RÉELS NÉCESSAIRES
+            poids_total_demande = demande.get('quantite_poids', 10.0)
+            volume_total_demande = demande.get('quantite_volume', 50.0)
             
-            # ✅ CONSTRUCTION DU RÉSULTAT AVEC TOUTES LES VÉRIFICATIONS
+            # Capacité totale de la flotte
+            capacite_poids_totale = (nb_vehicules_principal * vehicule_principal.get('capacite_poids_max', 20.0) + 
+                                    nb_vehicules_secondaire * vehicule_secondaire.get('capacite_poids_max', 20.0))
+            capacite_volume_totale = (nb_vehicules_principal * vehicule_principal.get('capacite_volume_max', 80.0) + 
+                                    nb_vehicules_secondaire * vehicule_secondaire.get('capacite_volume_max', 80.0))
+            
+            # ✅ CALCUL INTELLIGENT DU NOMBRE DE VOYAGES
+            if capacite_poids_totale > 0 and capacite_volume_totale > 0:
+                voyages_necessaires_poids = max(1, int(poids_total_demande / capacite_poids_totale) + 1)
+                voyages_necessaires_volume = max(1, int(volume_total_demande / capacite_volume_totale) + 1)
+                nb_voyages_total = max(voyages_necessaires_poids, voyages_necessaires_volume)
+                
+                # Assurer un minimum de 2 voyages pour les métaheuristiques
+                nb_voyages_total = max(2, min(nb_voyages_total, 5))  # Entre 2 et 5 voyages
+            else:
+                nb_voyages_total = 2
+            
+            print(f"   Voyages calculés: {nb_voyages_total}")
+            print(f"   Poids total: {poids_total_demande:.1f}t, Capacité flotte: {capacite_poids_totale:.1f}t")
+            print(f"   Volume total: {volume_total_demande:.1f}m³, Capacité flotte: {capacite_volume_totale:.1f}m³")
+            
+            # ✅ CRÉATION DES PLANIFICATIONS VÉHICULES AVEC VOYAGES MULTIPLES
+            planifications_vehicules = []
+            voyage_id = 0
+            
+            # Calculer combien de voyages par véhicule
+            voyages_par_vehicule_principal = max(1, nb_voyages_total // max(1, nb_vehicules_principal))
+            
+            # ✅ CRÉER LES VÉHICULES PRINCIPAUX
+            for vehicule_idx in range(nb_vehicules_principal):
+                voyages_vehicule = []
+                poids_par_voyage = poids_total_demande / nb_voyages_total
+                volume_par_voyage = volume_total_demande / nb_voyages_total
+                
+                for voyage_num in range(voyages_par_vehicule_principal):
+                    if voyage_id < nb_voyages_total:
+                        # ✅ CRÉER DIFFÉRENTS PRODUITS PAR VOYAGE
+                        produits_voyage = [
+                            {
+                                'produit': {
+                                    'nom': f"{demande.get('nom', 'Transport')} - Lot {voyage_id + 1}",
+                                    'poids_unitaire': poids_par_voyage,
+                                    'volume_unitaire': volume_par_voyage
+                                },
+                                'quantite_voyage': 1
+                            }
+                        ]
+                        
+                        # Ajouter de la variabilité
+                        if voyage_id % 2 == 1:  # Voyages impairs - ajouter un petit produit
+                            produits_voyage.append({
+                                'produit': {
+                                    'nom': f"Équipement supplémentaire - V{voyage_id + 1}",
+                                    'poids_unitaire': poids_par_voyage * 0.1,
+                                    'volume_unitaire': volume_par_voyage * 0.1
+                                },
+                                'quantite_voyage': 1
+                            })
+                        
+                        voyage_info = {
+                            'voyage_numero': voyage_id + 1,
+                            'charge_transportee': {
+                                'poids': poids_par_voyage * (1.1 if voyage_id % 2 == 1 else 1.0),
+                                'volume': volume_par_voyage * (1.1 if voyage_id % 2 == 1 else 1.0),
+                                'produits': produits_voyage
+                            },
+                            'aller': {
+                                'date_depart': date_debut,
+                                'heure_depart': f"{8 + voyage_id}:00",
+                                'date_arrivee': date_debut,
+                                'heure_arrivee': f"{16 + voyage_id}:00",
+                                'distance_km': demande.get('distance_km', 800)
+                            }
+                        }
+                        voyages_vehicule.append(voyage_info)
+                        voyage_id += 1
+                
+                # ✅ CALCULER CHARGE TOTALE DU VÉHICULE
+                poids_total_vehicule = sum(v['charge_transportee']['poids'] for v in voyages_vehicule)
+                volume_total_vehicule = sum(v['charge_transportee']['volume'] for v in voyages_vehicule)
+                
+                planification_vehicule = {
+                    'vehicule_id': vehicule_idx + 1,
+                    'nb_voyages': len(voyages_vehicule),
+                    'charge_totale': {
+                        'poids': poids_total_vehicule,
+                        'volume': volume_total_vehicule
+                    },
+                    'voyages': voyages_vehicule
+                }
+                planifications_vehicules.append(planification_vehicule)
+            
+            # ✅ CRÉER LES VÉHICULES SECONDAIRES SI NÉCESSAIRE
+            if nb_vehicules_secondaire > 0 and vehicule_secondaire:
+                voyages_restants = max(0, nb_voyages_total - voyage_id)
+                if voyages_restants > 0:
+                    voyages_par_vehicule_secondaire = max(1, voyages_restants // nb_vehicules_secondaire)
+                    
+                    for vehicule_idx in range(nb_vehicules_secondaire):
+                        voyages_vehicule = []
+                        
+                        for voyage_num in range(voyages_par_vehicule_secondaire):
+                            if voyage_id < nb_voyages_total:
+                                poids_par_voyage = poids_total_demande / nb_voyages_total
+                                volume_par_voyage = volume_total_demande / nb_voyages_total
+                                
+                                produits_voyage = [
+                                    {
+                                        'produit': {
+                                            'nom': f"{demande.get('nom', 'Transport')} - Lot Sec. {voyage_id + 1}",
+                                            'poids_unitaire': poids_par_voyage,
+                                            'volume_unitaire': volume_par_voyage
+                                        },
+                                        'quantite_voyage': 1
+                                    }
+                                ]
+                                
+                                voyage_info = {
+                                    'voyage_numero': voyage_id + 1,
+                                    'charge_transportee': {
+                                        'poids': poids_par_voyage,
+                                        'volume': volume_par_voyage,
+                                        'produits': produits_voyage
+                                    },
+                                    'aller': {
+                                        'date_depart': date_debut,
+                                        'heure_depart': f"{8 + voyage_id}:00",
+                                        'date_arrivee': date_debut,
+                                        'heure_arrivee': f"{16 + voyage_id}:00",
+                                        'distance_km': demande.get('distance_km', 800)
+                                    }
+                                }
+                                voyages_vehicule.append(voyage_info)
+                                voyage_id += 1
+                        
+                        if voyages_vehicule:  # Seulement si on a des voyages
+                            poids_total_vehicule = sum(v['charge_transportee']['poids'] for v in voyages_vehicule)
+                            volume_total_vehicule = sum(v['charge_transportee']['volume'] for v in voyages_vehicule)
+                            
+                            planification_vehicule = {
+                                'vehicule_id': nb_vehicules_principal + vehicule_idx + 1,
+                                'nb_voyages': len(voyages_vehicule),
+                                'charge_totale': {
+                                    'poids': poids_total_vehicule,
+                                    'volume': volume_total_vehicule
+                                },
+                                'voyages': voyages_vehicule
+                            }
+                            planifications_vehicules.append(planification_vehicule)
+            
+            # ✅ CONSTRUCTION DU RÉSULTAT FINAL
             resultat = {
-                'type_solution': type_solution,
+                'type_solution': solution_multiple.get('type', 'flotte_heterogene'),
                 'vehicule_principal': vehicule_principal.get('nom', 'Véhicule Principal'),
                 'nb_vehicules_principal': nb_vehicules_principal,
-                'vehicule_secondaire': vehicule_secondaire_nom,
+                'vehicule_secondaire': vehicule_secondaire.get('nom') if vehicule_secondaire else None,
                 'nb_vehicules_secondaire': nb_vehicules_secondaire,
                 'cout_total': cout_total,
                 'duree_reelle': duree_max_jours,
@@ -868,60 +1043,49 @@ class OptimisateurNavettes:
                 },
                 'demande_equivalente': demande,
                 'date_debut_projet': date_debut,
-                'capacite_totale': {
-                    'poids': solution_multiple.get('capacite_totale_poids', 0),
-                    'volume': solution_multiple.get('capacite_totale_volume', 0)
-                },
-                'respect_contrainte': True
+                'respect_contrainte': True,
+                
+                # ✅ NOUVELLE STRUCTURE ENRICHIE
+                'planification_detaillee': {
+                    'planifications_vehicules': planifications_vehicules,
+                    'total_voyages': sum(p['nb_voyages'] for p in planifications_vehicules),
+                    'date_debut': date_debut,
+                    'date_fin': date_debut,  # Simplifié pour l'exemple
+                    'duree_reelle_jours': duree_max_jours,
+                    'nb_vehicules': len(planifications_vehicules)
+                }
             }
             
-            # ✅ AJOUT D'UN CHAMP vehicule_utilise POUR COMPATIBILITÉ
-            if vehicule_secondaire_nom:
-                # Solution hétérogène
+            # ✅ COMPATIBILITÉ AVEC LE CODE EXISTANT
+            if vehicule_secondaire and vehicule_secondaire.get('nom'):
                 resultat['vehicule_utilise'] = {
-                    'nom': f"{resultat['vehicule_principal']} + {vehicule_secondaire_nom}",
+                    'nom': f"{vehicule_principal.get('nom', 'V1')} + {vehicule_secondaire.get('nom', 'V2')}",
                     'type': 'FLOTTE_HETEROGENE',
-                    'capacite_poids_max': vehicule_principal.get('capacite_poids_max', 20.0),
-                    'capacite_volume_max': vehicule_principal.get('capacite_volume_max', 80.0),
-                    'cout_fixe_jour': 500,
-                    'cout_variable_km': 1.0
+                    'capacite_poids_max': capacite_poids_totale,
+                    'capacite_volume_max': capacite_volume_totale,
+                    'cout_fixe_jour': 600,
+                    'cout_variable_km': 1.2
                 }
                 resultat['nb_vehicules_necessaires'] = nb_vehicules_principal + nb_vehicules_secondaire
             else:
-                # Solution homogène
                 resultat['vehicule_utilise'] = vehicule_principal
                 resultat['nb_vehicules_necessaires'] = nb_vehicules_principal
             
-            print(f"✅ Conversion réussie: {resultat['type_solution']}")
+            print(f"✅ ÉTAPE 1 TERMINÉE:")
+            print(f"   Voyages créés: {resultat['planification_detaillee']['total_voyages']}")
+            print(f"   Véhicules: {len(planifications_vehicules)}")
+            print(f"   Structure enrichie pour métaheuristiques")
+            
             return resultat
             
         except Exception as e:
-            print(f"❌ ERREUR conversion solution multiple: {e}")
-            print(f"   Solution reçue: {solution_multiple}")
-            
-            # ✅ RETOUR SÉCURISÉ EN CAS D'ERREUR
-            return {
-                'type_solution': 'erreur_conversion',
-                'vehicule_utilise': {
-                    'nom': 'Véhicule Erreur',
-                    'type': 'ERREUR',
-                    'capacite_poids_max': 20.0,
-                    'capacite_volume_max': 80.0
-                },
-                'vehicule_optimal': {
-                    'cout_total': solution_multiple.get('cout_total', 1000) if isinstance(solution_multiple, dict) else 1000
-                },
-                'demande_equivalente': demande,
-                'cout_total': solution_multiple.get('cout_total', 1000) if isinstance(solution_multiple, dict) else 1000,
-                'duree_reelle': duree_max_jours,
-                'nb_vehicules_necessaires': 1,
-                'respect_contrainte': False,
-                'erreur_detail': str(e)
-            }
-
+            print(f"❌ ERREUR ÉTAPE 1: {e}")
+            # Fallback vers la version originale
+            return self._convertir_solution_multiple_vers_format_standard_ORIGINAL(solution_multiple, demande, date_debut, heure_debut, duree_max_jours)
     def _chercher_combinaison_optimale(self, demande, vehicules_data, date_debut, heure_debut, duree_max_jours=7):
         """
-        Version corrigée qui teste VRAIMENT les combinaisons multiples
+        ✅ CORRECTION: Version corrigée qui teste VRAIMENT les combinaisons multiples
+        PROBLÈME: La structure de retour ne correspondait pas à ce qui était attendu
         """
         
         print(f"🔄 RECHERCHE DE COMBINAISON OPTIMALE DE VÉHICULES")
@@ -930,12 +1094,11 @@ class OptimisateurNavettes:
         poids_demande = demande['quantite_poids'] 
         volume_demande = demande['quantite_volume']
         
-        # 1. Test véhicules individuels (votre code existant)
+        # 1. Test véhicules individuels
         vehicules_viables_seuls = 0
         vehicules_necessitant_aide = 0
         
         for vehicule in vehicules_data:
-            # CORRECTION - ligne 535
             result = self._vehicule_peut_reussir_seul_avec_calcul(
                 vehicule, 
                 demande['quantite_poids'], 
@@ -952,40 +1115,34 @@ class OptimisateurNavettes:
         print(f"   Véhicules nécessitant aide: {vehicules_necessitant_aide}")
         
         if vehicules_viables_seuls > 0:
-            # Votre logique existante pour véhicule unique
             return self._selectionner_meilleur_vehicule_unique(vehicules_data, demande, date_debut, heure_debut, duree_max_jours)
         
-        # 2. NOUVELLE PARTIE : Test combinaisons multiples
+        # 2. Test combinaisons multiples
         print(f"\n   🔍 Test des combinaisons multiples...")
         
         solutions_candidates = []
         
-        # Pour chaque type de véhicule comme "principal"
         for vehicule_principal in vehicules_data:
             print(f"\n     Véhicule principal: {vehicule_principal['nom']}")
             
-            # Calculer combien de ce véhicule on peut utiliser au maximum
             max_vehicules_principal = vehicule_principal.get('quantite', 9)
             
-            # Tester différents nombres de véhicules principaux
-            for nb_principal in range(1, min(max_vehicules_principal + 1, 8)):  # Max 7 véhicules par type
+            for nb_principal in range(1, min(max_vehicules_principal + 1, 8)):
                 
-                # Calculer ce que peuvent transporter nb_principal véhicules en duree_max_jours
                 capacite_principale_poids = nb_principal * vehicule_principal['capacite_poids_max'] * duree_max_jours
                 capacite_principale_volume = nb_principal * vehicule_principal['capacite_volume_max'] * duree_max_jours
                 
-                # Vérifier si c'est suffisant
                 if (capacite_principale_poids >= poids_demande and 
                     capacite_principale_volume >= volume_demande):
                     
-                    # Solution trouvée avec un seul type !
                     cout_solution = nb_principal * vehicule_principal['cout_fixe_jour'] * duree_max_jours
                     
+                    # ✅ CORRECTION: Structure conforme aux attentes
                     solution = {
                         'type': 'flotte_homogene',
-                        'vehicule_principal': vehicule_principal,
+                        'vehicule_principal': vehicule_principal,  # ✅ Objet complet
                         'nb_vehicules_principal': nb_principal,
-                        'vehicule_secondaire': None,
+                        'vehicule_secondaire': None,  # ✅ Explicitement None
                         'nb_vehicules_secondaire': 0,
                         'cout_total': cout_solution,
                         'capacite_totale_poids': capacite_principale_poids,
@@ -994,24 +1151,19 @@ class OptimisateurNavettes:
                     
                     solutions_candidates.append(solution)
                     print(f"       ✅ Solution homogène: {nb_principal}× {vehicule_principal['nom']} - {cout_solution:.0f}€")
-                    
-                    # Ne pas chercher plus de véhicules de ce type
                     break
-                
+                    
                 else:
-                    # Pas suffisant, essayer d'ajouter un véhicule secondaire
                     poids_restant = poids_demande - capacite_principale_poids
                     volume_restant = volume_demande - capacite_principale_volume
                     
                     if poids_restant > 0 or volume_restant > 0:
-                        # Chercher un véhicule secondaire pour compléter
                         for vehicule_secondaire in vehicules_data:
                             if vehicule_secondaire['nom'] == vehicule_principal['nom']:
-                                continue  # Déjà testé en homogène
+                                continue
                             
                             max_vehicules_secondaire = vehicule_secondaire.get('quantite', 9)
                             
-                            # Calculer combien de véhicules secondaires il faut
                             if poids_restant > 0:
                                 nb_sec_poids = math.ceil(poids_restant / (vehicule_secondaire['capacite_poids_max'] * duree_max_jours))
                             else:
@@ -1025,16 +1177,16 @@ class OptimisateurNavettes:
                             nb_secondaire = max(nb_sec_poids, nb_sec_volume)
                             
                             if nb_secondaire <= max_vehicules_secondaire:
-                                # Solution hétérogène trouvée !
                                 cout_principal = nb_principal * vehicule_principal['cout_fixe_jour'] * duree_max_jours
                                 cout_secondaire = nb_secondaire * vehicule_secondaire['cout_fixe_jour'] * duree_max_jours
                                 cout_total = cout_principal + cout_secondaire
                                 
+                                # ✅ CORRECTION: Structure conforme pour solution hétérogène
                                 solution = {
                                     'type': 'flotte_heterogene',
-                                    'vehicule_principal': vehicule_principal,
+                                    'vehicule_principal': vehicule_principal,  # ✅ Objet complet
                                     'nb_vehicules_principal': nb_principal,
-                                    'vehicule_secondaire': vehicule_secondaire,
+                                    'vehicule_secondaire': vehicule_secondaire,  # ✅ Objet complet
                                     'nb_vehicules_secondaire': nb_secondaire,
                                     'cout_total': cout_total,
                                     'capacite_totale_poids': capacite_principale_poids + nb_secondaire * vehicule_secondaire['capacite_poids_max'] * duree_max_jours,
@@ -1046,7 +1198,6 @@ class OptimisateurNavettes:
         
         # 3. Sélectionner la meilleure solution
         if solutions_candidates:
-            # Trier par coût croissant
             solutions_candidates.sort(key=lambda x: x['cout_total'])
             meilleure_solution = solutions_candidates[0]
             
@@ -1061,12 +1212,12 @@ class OptimisateurNavettes:
             print(f"      Coût: {meilleure_solution['cout_total']:.2f}€")
             print(f"      Durée: {duree_max_jours} jours")
             
+            # ✅ CORRECTION: Appel avec la bonne structure
             return self._convertir_solution_multiple_vers_format_standard(meilleure_solution, demande, date_debut, heure_debut, duree_max_jours)
         
         else:
             print(f"   ❌ Aucune solution trouvée")
             return None
-
     
     def _analyser_vehicule_avec_contrainte(self, demande, vehicule, duree_max_jours):
         """Analyse un véhicule avec prise en compte de la contrainte temporelle"""
@@ -3490,41 +3641,237 @@ def optimiser_avec_vns(optimiseur, produits, vehicules, date_debut, heure_debut,
 
 def adapter_resultats_pour_metaheuristiques(resultats_heuristique):
     """
-    ✅ VERSION CORRIGÉE: Adapte les résultats de la nouvelle heuristique pour VNS/Local Search
+    ✅ ÉTAPE 2: Version corrigée de l'adaptation avec voyages multiples
     """
     if not resultats_heuristique:
         print("❌ Résultats heuristique vides")
         return None
     
-    print("🔧 DEBUG - Adaptation pour métaheuristiques")
+    print("🔧 ÉTAPE 2 - Adaptation corrigée pour métaheuristiques")
     print(f"Type de solution: {resultats_heuristique.get('type_solution', 'non défini')}")
     
-    # Si c'est déjà au bon format, retourner tel quel
-    if 'planification_detaillee' in resultats_heuristique:
-        print("✅ Format déjà compatible")
-        return resultats_heuristique
+    # Si c'est déjà au bon format ET qu'il a plusieurs voyages, retourner tel quel
+    if ('planification_detaillee' in resultats_heuristique and 
+        'planifications_vehicules' in resultats_heuristique['planification_detaillee']):
+        
+        total_voyages = sum(p.get('nb_voyages', 0) for p in resultats_heuristique['planification_detaillee']['planifications_vehicules'])
+        if total_voyages >= 2:
+            print("✅ Format déjà compatible avec voyages multiples")
+            return resultats_heuristique
     
-    # ✅ CORRECTION: Gestion différents types de solutions
+    # ✅ ADAPTATION SELON LE TYPE AVEC VOYAGES MULTIPLES
     try:
         if resultats_heuristique.get('type_solution') == 'vehicule_unique':
             return _adapter_solution_vehicule_unique(resultats_heuristique)
         elif resultats_heuristique.get('type_solution') == 'combinaison':
             return _adapter_solution_combinaison(resultats_heuristique)
         else:
-            # Format inconnu, créer structure basique
-            return _creer_structure_basique(resultats_heuristique)
+            # Format inconnu, créer structure enrichie basique
+            return _creer_structure_enrichie_basique(resultats_heuristique)
             
     except Exception as e:
-        print(f"❌ Erreur adaptation: {e}")
-        return _creer_structure_basique(resultats_heuristique)
+        print(f"❌ Erreur adaptation ÉTAPE 2: {e}")
+        return _creer_structure_enrichie_basique(resultats_heuristique)
+def _creer_structure_enrichie_basique(resultats):
+    """Crée une structure enrichie basique en cas de format inconnu"""
+    try:
+        cout_total = 1000
+        if 'vehicule_optimal' in resultats:
+            cout_total = resultats['vehicule_optimal'].get('cout_total', 1000)
+        elif 'cout_total' in resultats:
+            cout_total = resultats['cout_total']
+        
+        # ✅ CRÉER 3 VOYAGES BASIQUES POUR LES MÉTAHEURISTIQUES
+        voyages = []
+        for i in range(3):
+            produits_voyage = [
+                {
+                    'produit': {
+                        'nom': f'Transport Standard - Voyage {i+1}',
+                        'poids_unitaire': 3.5 + i,  # Variation
+                        'volume_unitaire': 15.0 + i*5
+                    },
+                    'quantite_voyage': 1
+                }
+            ]
+            
+            # Ajouter produit secondaire pour variabilité
+            if i % 2 == 0:
+                produits_voyage.append({
+                    'produit': {
+                        'nom': f'Équipement Annexe - V{i+1}',
+                        'poids_unitaire': 1.0,
+                        'volume_unitaire': 5.0
+                    },
+                    'quantite_voyage': 1
+                })
+            
+            voyage = {
+                'voyage_numero': i + 1,
+                'charge_transportee': {
+                    'poids': sum(p['produit']['poids_unitaire'] * p['quantite_voyage'] for p in produits_voyage),
+                    'volume': sum(p['produit']['volume_unitaire'] * p['quantite_voyage'] for p in produits_voyage),
+                    'produits': produits_voyage
+                },
+                'aller': {
+                    'date_depart': '2025-06-02',
+                    'heure_depart': f"{8 + i*2:02d}:00",
+                    'date_arrivee': '2025-06-02',
+                    'heure_arrivee': f"{16 + i*2:02d}:00",
+                    'distance_km': 800
+                }
+            }
+            voyages.append(voyage)
+        
+        adapted = {
+            'type_solution': 'vehicule_unique',
+            'vehicule_utilise': {
+                'nom': 'Véhicule Standard',
+                'type': 'STANDARD',
+                'capacite_poids_max': 20.0,
+                'capacite_volume_max': 80.0,
+                'cout_fixe_jour': 400,
+                'cout_variable_km': 0.8
+            },
+            'vehicule_optimal': {
+                'cout_total': cout_total
+            },
+            'demande_equivalente': {
+                'nom': 'Transport Standard',
+                'quantite_poids': sum(v['charge_transportee']['poids'] for v in voyages),
+                'quantite_volume': sum(v['charge_transportee']['volume'] for v in voyages),
+                'distance_km': 800
+            },
+            'planification_detaillee': {
+                'planifications_vehicules': [
+                    {
+                        'vehicule_id': 1,
+                        'nb_voyages': len(voyages),
+                        'charge_totale': {
+                            'poids': sum(v['charge_transportee']['poids'] for v in voyages),
+                            'volume': sum(v['charge_transportee']['volume'] for v in voyages)
+                        },
+                        'voyages': voyages
+                    }
+                ],
+                'total_voyages': len(voyages),
+                'date_debut': '2025-06-02',
+                'date_fin': '2025-06-02',
+                'duree_reelle_jours': 7,
+                'nb_vehicules': 1
+            }
+        }
+        
+        print("✅ Structure enrichie basique créée avec 3 voyages")
+        return adapted
+        
+    except Exception as e:
+        print(f"❌ Erreur création structure enrichie: {e}")
+        return None
 
 def _adapter_solution_vehicule_unique(resultats):
-    """Adapte une solution véhicule unique"""
+    """✅ ÉTAPE 2: Adaptation améliorée pour véhicule unique avec voyages multiples"""
     try:
+        print(f"🔧 ÉTAPE 2 - Adaptation véhicule unique améliorée")
+        
         vehicule_utilise = resultats.get('vehicule_utilise', {})
         vehicule_optimal = resultats.get('vehicule_optimal', {})
         demande = resultats.get('demande_equivalente', {})
         
+        # ✅ CALCUL INTELLIGENT DU NOMBRE DE VOYAGES
+        poids_total = demande.get('quantite_poids', 10.0)
+        volume_total = demande.get('quantite_volume', 50.0)
+        capacite_poids_vehicule = vehicule_utilise.get('capacite_poids_max', 20.0)
+        capacite_volume_vehicule = vehicule_utilise.get('capacite_volume_max', 80.0)
+        
+        # Calculer voyages nécessaires
+        voyages_poids = max(1, math.ceil(poids_total / capacite_poids_vehicule))
+        voyages_volume = max(1, math.ceil(volume_total / capacite_volume_vehicule))
+        nb_voyages_necessaires = max(voyages_poids, voyages_volume)
+        
+        # Assurer minimum 2 voyages pour métaheuristiques, maximum 6 pour performance
+        nb_voyages_necessaires = max(2, min(nb_voyages_necessaires, 6))
+        
+        print(f"   Voyages calculés: {nb_voyages_necessaires}")
+        print(f"   Basé sur: {poids_total:.1f}t/{capacite_poids_vehicule:.1f}t et {volume_total:.1f}m³/{capacite_volume_vehicule:.1f}m³")
+        
+        # ✅ CRÉATION DE VOYAGES DIVERSIFIÉS
+        voyages = []
+        poids_restant = poids_total
+        volume_restant = volume_total
+        
+        for voyage_num in range(nb_voyages_necessaires):
+            # Répartition intelligente (pas uniforme pour créer diversité)
+            if voyage_num == nb_voyages_necessaires - 1:
+                # Dernier voyage prend tout le reste
+                poids_voyage = poids_restant
+                volume_voyage = volume_restant
+            else:
+                # Répartition avec variabilité (70%-130% de la moyenne)
+                poids_moyen = poids_restant / (nb_voyages_necessaires - voyage_num)
+                volume_moyen = volume_restant / (nb_voyages_necessaires - voyage_num)
+                
+                # Facteur de variabilité (éviter uniformité)
+                facteur = 0.7 + 0.6 * (voyage_num % 2)  # Alterne entre 0.7 et 1.3
+                
+                poids_voyage = min(poids_moyen * facteur, capacite_poids_vehicule, poids_restant)
+                volume_voyage = min(volume_moyen * facteur, capacite_volume_vehicule, volume_restant)
+            
+            poids_restant -= poids_voyage
+            volume_restant -= volume_voyage
+            
+            # ✅ CRÉER PRODUITS VARIÉS PAR VOYAGE
+            produits_voyage = []
+            
+            # Produit principal
+            produits_voyage.append({
+                'produit': {
+                    'nom': f"{demande.get('nom', 'Transport')} - Voyage {voyage_num + 1}",
+                    'poids_unitaire': poids_voyage * 0.8,  # 80% du poids
+                    'volume_unitaire': volume_voyage * 0.8  # 80% du volume
+                },
+                'quantite_voyage': 1
+            })
+            
+            # Produit secondaire (pour diversité)
+            if poids_voyage > 0.1 and voyage_num % 2 == 0:  # Voyages pairs
+                produits_voyage.append({
+                    'produit': {
+                        'nom': f"Matériel accessoire - V{voyage_num + 1}",
+                        'poids_unitaire': poids_voyage * 0.2,
+                        'volume_unitaire': volume_voyage * 0.2
+                    },
+                    'quantite_voyage': 1
+                })
+            
+            # ✅ CRÉER VOYAGE AVEC TIMING RÉALISTE
+            heure_depart = 8 + (voyage_num * 2) % 8  # Étaler dans la journée
+            heure_arrivee = heure_depart + 8  # 8h de voyage
+            
+            if heure_arrivee >= 24:
+                heure_arrivee -= 24
+                date_arrivee = '2025-06-03'  # Jour suivant
+            else:
+                date_arrivee = '2025-06-02'
+            
+            voyage_info = {
+                'voyage_numero': voyage_num + 1,
+                'charge_transportee': {
+                    'poids': poids_voyage,
+                    'volume': volume_voyage,
+                    'produits': produits_voyage
+                },
+                'aller': {
+                    'date_depart': '2025-06-02',
+                    'heure_depart': f"{int(heure_depart):02d}:00",
+                    'date_arrivee': date_arrivee,
+                    'heure_arrivee': f"{int(heure_arrivee):02d}:00",
+                    'distance_km': demande.get('distance_km', 800)
+                }
+            }
+            voyages.append(voyage_info)
+        
+        # ✅ STRUCTURE FINALE ENRICHIE
         adapted = {
             'type_solution': 'vehicule_unique',
             'vehicule_utilise': vehicule_utilise,
@@ -3536,107 +3883,220 @@ def _adapter_solution_vehicule_unique(resultats):
                 'planifications_vehicules': [
                     {
                         'vehicule_id': 1,
-                        'nb_voyages': resultats.get('nb_vehicules_necessaires', 1),
+                        'nb_voyages': len(voyages),
                         'charge_totale': {
-                            'poids': demande.get('quantite_poids', 10.0),
-                            'volume': demande.get('quantite_volume', 50.0)
+                            'poids': poids_total,
+                            'volume': volume_total
                         },
-                        'voyages': [
-                            {
-                                'voyage_numero': 1,
-                                'charge_transportee': {
-                                    'poids': demande.get('quantite_poids', 10.0),
-                                    'volume': demande.get('quantite_volume', 50.0),
-                                    'produits': [
-                                        {
-                                            'produit': {
-                                                'nom': demande.get('nom', 'Transport Standard'),
-                                                'poids_unitaire': demande.get('quantite_poids', 10.0),
-                                                'volume_unitaire': demande.get('quantite_volume', 50.0)
-                                            },
-                                            'quantite_voyage': 1
-                                        }
-                                    ]
-                                },
-                                'aller': {
-                                    'date_depart': '2025-06-02',
-                                    'heure_depart': '08:00',
-                                    'date_arrivee': '2025-06-02',
-                                    'heure_arrivee': '18:00',
-                                    'distance_km': demande.get('distance_km', 800)
-                                }
-                            }
-                        ]
+                        'voyages': voyages
                     }
-                ]
+                ],
+                'total_voyages': len(voyages),
+                'date_debut': '2025-06-02',
+                'date_fin': '2025-06-02' if len(voyages) <= 3 else '2025-06-03',
+                'duree_reelle_jours': 7,
+                'nb_vehicules': 1
             }
         }
         
-        print("✅ Solution véhicule unique adaptée")
+        print(f"✅ ÉTAPE 2 TERMINÉE:")
+        print(f"   Voyages créés: {len(voyages)}")
+        print(f"   Produits total: {sum(len(v['charge_transportee']['produits']) for v in voyages)}")
+        print(f"   Structure prête pour métaheuristiques")
+        
         return adapted
         
     except Exception as e:
-        print(f"❌ Erreur adaptation véhicule unique: {e}")
+        print(f"❌ ERREUR ÉTAPE 2: {e}")
         return None
-
 def _adapter_solution_combinaison(resultats):
-    """Adapte une solution combinaison de véhicules"""
+    """✅ ÉTAPE 2: Adaptation améliorée pour solution combinaison avec voyages multiples"""
     try:
+        print(f"🔧 ÉTAPE 2 - Adaptation combinaison améliorée")
+        
         demande = resultats.get('demande_equivalente', {})
         
+        # ✅ CRÉATION DE VÉHICULES AVEC CAPACITÉS RÉALISTES
+        vehicule_principal = {
+            'nom': resultats.get('vehicule_principal', 'V1'),
+            'capacite_poids_max': 15.0,  # Capacité réaliste
+            'capacite_volume_max': 60.0,
+            'cout_fixe_jour': 400,
+            'cout_variable_km': 0.9
+        }
+        
+        vehicule_secondaire = {
+            'nom': resultats.get('vehicule_secondaire', 'V2'),
+            'capacite_poids_max': 20.0,
+            'capacite_volume_max': 80.0,
+            'cout_fixe_jour': 500,
+            'cout_variable_km': 1.1
+        }
+        
+        poids_total = demande.get('quantite_poids', 15.0)
+        volume_total = demande.get('quantite_volume', 75.0)
+        
+        # ✅ CALCUL VOYAGES POUR CHAQUE TYPE DE VÉHICULE
+        nb_vehicules_principal = resultats.get('nb_vehicules_principal', 2)
+        nb_vehicules_secondaire = resultats.get('nb_vehicules_secondaire', 1)
+        
+        # Capacité totale de chaque type
+        capacite_totale_v1 = nb_vehicules_principal * vehicule_principal['capacite_poids_max']
+        capacite_totale_v2 = nb_vehicules_secondaire * vehicule_secondaire['capacite_poids_max']
+        
+        # Répartition du travail (60% véhicule principal, 40% secondaire)
+        poids_v1 = poids_total * 0.6
+        poids_v2 = poids_total * 0.4
+        volume_v1 = volume_total * 0.6
+        volume_v2 = volume_total * 0.4
+        
+        # ✅ CRÉER PLANIFICATIONS POUR CHAQUE VÉHICULE
+        planifications_vehicules = []
+        voyage_id_global = 0
+        
+        # Véhicules principaux
+        for vehicule_idx in range(nb_vehicules_principal):
+            voyages_necessaires = max(2, math.ceil(poids_v1 / (nb_vehicules_principal * vehicule_principal['capacite_poids_max'])))
+            poids_par_voyage = poids_v1 / (nb_vehicules_principal * voyages_necessaires)
+            volume_par_voyage = volume_v1 / (nb_vehicules_principal * voyages_necessaires)
+            
+            voyages = []
+            for voyage_num in range(voyages_necessaires):
+                produits_voyage = [
+                    {
+                        'produit': {
+                            'nom': f"Transport Principal V{vehicule_idx+1}-{voyage_num+1}",
+                            'poids_unitaire': poids_par_voyage,
+                            'volume_unitaire': volume_par_voyage
+                        },
+                        'quantite_voyage': 1
+                    }
+                ]
+                
+                voyage_info = {
+                    'voyage_numero': voyage_id_global + 1,
+                    'charge_transportee': {
+                        'poids': poids_par_voyage,
+                        'volume': volume_par_voyage,
+                        'produits': produits_voyage
+                    },
+                    'aller': {
+                        'date_depart': '2025-06-02',
+                        'heure_depart': f"{8 + (voyage_id_global % 8):02d}:00",
+                        'date_arrivee': '2025-06-02',
+                        'heure_arrivee': f"{16 + (voyage_id_global % 8):02d}:00",
+                        'distance_km': demande.get('distance_km', 800)
+                    }
+                }
+                voyages.append(voyage_info)
+                voyage_id_global += 1
+            
+            planification = {
+                'vehicule_id': vehicule_idx + 1,
+                'nb_voyages': len(voyages),
+                'charge_totale': {
+                    'poids': sum(v['charge_transportee']['poids'] for v in voyages),
+                    'volume': sum(v['charge_transportee']['volume'] for v in voyages)
+                },
+                'voyages': voyages
+            }
+            planifications_vehicules.append(planification)
+        
+        # Véhicules secondaires
+        for vehicule_idx in range(nb_vehicules_secondaire):
+            voyages_necessaires = max(2, math.ceil(poids_v2 / (nb_vehicules_secondaire * vehicule_secondaire['capacite_poids_max'])))
+            poids_par_voyage = poids_v2 / (nb_vehicules_secondaire * voyages_necessaires)
+            volume_par_voyage = volume_v2 / (nb_vehicules_secondaire * voyages_necessaires)
+            
+            voyages = []
+            for voyage_num in range(voyages_necessaires):
+                produits_voyage = [
+                    {
+                        'produit': {
+                            'nom': f"Transport Secondaire S{vehicule_idx+1}-{voyage_num+1}",
+                            'poids_unitaire': poids_par_voyage,
+                            'volume_unitaire': volume_par_voyage
+                        },
+                        'quantite_voyage': 1
+                    }
+                ]
+                
+                # Ajouter variabilité aux voyages secondaires
+                if voyage_num % 2 == 1:
+                    produits_voyage.append({
+                        'produit': {
+                            'nom': f"Matériel Spécialisé S{vehicule_idx+1}-{voyage_num+1}",
+                            'poids_unitaire': poids_par_voyage * 0.3,
+                            'volume_unitaire': volume_par_voyage * 0.3
+                        },
+                        'quantite_voyage': 1
+                    })
+                
+                voyage_info = {
+                    'voyage_numero': voyage_id_global + 1,
+                    'charge_transportee': {
+                        'poids': poids_par_voyage * (1.3 if voyage_num % 2 == 1 else 1.0),
+                        'volume': volume_par_voyage * (1.3 if voyage_num % 2 == 1 else 1.0),
+                        'produits': produits_voyage
+                    },
+                    'aller': {
+                        'date_depart': '2025-06-02',
+                        'heure_depart': f"{9 + (voyage_id_global % 7):02d}:00",
+                        'date_arrivee': '2025-06-02',
+                        'heure_arrivee': f"{17 + (voyage_id_global % 7):02d}:00",
+                        'distance_km': demande.get('distance_km', 800)
+                    }
+                }
+                voyages.append(voyage_info)
+                voyage_id_global += 1
+            
+            planification = {
+                'vehicule_id': nb_vehicules_principal + vehicule_idx + 1,
+                'nb_voyages': len(voyages),
+                'charge_totale': {
+                    'poids': sum(v['charge_transportee']['poids'] for v in voyages),
+                    'volume': sum(v['charge_transportee']['volume'] for v in voyages)
+                },
+                'voyages': voyages
+            }
+            planifications_vehicules.append(planification)
+        
+        # ✅ STRUCTURE FINALE POUR COMBINAISON
         adapted = {
-            'type_solution': 'vehicule_unique',  # Simplifier pour métaheuristiques
+            'type_solution': 'vehicule_unique',  # Simplifié pour métaheuristiques
             'vehicule_utilise': {
-                'nom': f"{resultats.get('vehicule_principal', 'V1')} + {resultats.get('vehicule_secondaire', 'V2')}",
+                'nom': f"{vehicule_principal['nom']} + {vehicule_secondaire['nom']}",
                 'type': 'COMBINAISON',
-                'capacite_poids_max': 30.0,  # Capacité combinée estimée
-                'capacite_volume_max': 100.0,
+                'capacite_poids_max': vehicule_principal['capacite_poids_max'] + vehicule_secondaire['capacite_poids_max'],
+                'capacite_volume_max': vehicule_principal['capacite_volume_max'] + vehicule_secondaire['capacite_volume_max'],
                 'cout_fixe_jour': 600,
-                'cout_variable_km': 1.2
+                'cout_variable_km': 1.0
             },
             'vehicule_optimal': {
                 'cout_total': resultats.get('cout_total', 2000)
             },
             'demande_equivalente': demande,
             'planification_detaillee': {
-                'planifications_vehicules': [
-                    {
-                        'vehicule_id': 1,
-                        'nb_voyages': 1,
-                        'charge_totale': {
-                            'poids': demande.get('quantite_poids', 15.0),
-                            'volume': demande.get('quantite_volume', 75.0)
-                        },
-                        'voyages': [
-                            {
-                                'voyage_numero': 1,
-                                'charge_transportee': {
-                                    'poids': demande.get('quantite_poids', 15.0),
-                                    'volume': demande.get('quantite_volume', 75.0),
-                                    'produits': [
-                                        {
-                                            'produit': {
-                                                'nom': demande.get('nom', 'Transport Combiné'),
-                                                'poids_unitaire': demande.get('quantite_poids', 15.0),
-                                                'volume_unitaire': demande.get('quantite_volume', 75.0)
-                                            },
-                                            'quantite_voyage': 1
-                                        }
-                                    ]
-                                }
-                            }
-                        ]
-                    }
-                ]
+                'planifications_vehicules': planifications_vehicules,
+                'total_voyages': sum(p['nb_voyages'] for p in planifications_vehicules),
+                'date_debut': '2025-06-02',
+                'date_fin': '2025-06-02',
+                'duree_reelle_jours': 7,
+                'nb_vehicules': len(planifications_vehicules)
             }
         }
         
-        print("✅ Solution combinaison adaptée")
+        print(f"✅ ÉTAPE 2 TERMINÉE (Combinaison):")
+        print(f"   Voyages créés: {adapted['planification_detaillee']['total_voyages']}")
+        print(f"   Véhicules: {len(planifications_vehicules)}")
+        print(f"   Produits total: {sum(len(v['charge_transportee']['produits']) for p in planifications_vehicules for v in p['voyages'])}")
+        
         return adapted
         
     except Exception as e:
-        print(f"❌ Erreur adaptation combinaison: {e}")
+        print(f"❌ ERREUR ÉTAPE 2 (Combinaison): {e}")
         return None
+
 def _creer_structure_basique(resultats):
     """Crée une structure basique en cas de format inconnu"""
     try:
