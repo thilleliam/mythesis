@@ -3899,7 +3899,7 @@ def appliquer_vns(resultats_heuristique, max_iterations=150):
         print(f"🔍 VNS CORRIGÉ - Variable Neighborhood Search")
         
         # 1. ✅ UTILISER L'ADAPTATION CORRIGÉE
-        resultats_adaptes = adapter_resultats_pour_metaheuristiques_CORRIGE(resultats_heuristique)
+        resultats_adaptes = adapter_resultats_pour_metaheuristiques(resultats_heuristique)
         
         if not resultats_adaptes:
             print("❌ Adaptation échouée pour VNS")
@@ -3908,7 +3908,7 @@ def appliquer_vns(resultats_heuristique, max_iterations=150):
         # 2. Créer optimiseur VNS corrigé
         try:
             vns = VNSOptimiseur()
-            return vns.optimiser_vns_corrige(resultats_adaptes, max_iterations)
+            return vns.optimiser_vns(resultats_adaptes, max_iterations)
         except Exception as e:
             print(f"❌ Erreur VNS: {e}")
             return resultats_heuristique
