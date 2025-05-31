@@ -1,0 +1,58 @@
+version: '2'
+rules:
+- id: dont-shadow-arguments
+  description: Don't shadow `arguments`.
+  explanation: |
+    Never name a parameter `arguments`.
+    This will take precedence over the arguments object that is given to every function scope.
+
+    From the [Airbnb JavaScript Style Guide](https://airbnb.io/javascript/#functions--arguments-shadow)
+  language:
+  - javascript
+  # - typescript
+  tags:
+  - airbnb-javascript-style-guide
+  - airbnb
+  - default
+  all:
+  - pattern: arguments
+  # give this capture a name
+  - pattern: ${capture}
+  - inside:
+      # check if `arguments` is a parameter
+      any:
+      - pattern: |
+          (..., ${capture}, ...)
+        as-in: |
+          function ${pattern} {}
+      - pattern: |
+          (..., ${capture}=..., ...)
+        as-in: |
+          function ${pattern} {}
+      - pattern: |
+          (..., ...${capture}, ...)
+        as-in: |
+          function ${pattern} {}
+  tests:
+  - match: |
+      function foo(name, options, arguments) {
+        something();
+      }
+  - match: |
+      function foo(name, options, arguments=something) {
+        something();
+      }
+  - no-match: |
+      function foo(name, options, arg=arguments()) {
+        something();
+      }
+  - match: |
+      (name, arguments, options) => {}
+  - match: |
+      function foo(name, options, ...arguments) {
+        something();
+      }
+  - no-match: |
+      function foo(name, options, args) {
+        something();
+      }

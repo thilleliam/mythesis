@@ -1,0 +1,28 @@
+version: '2'
+rules:
+- id: remove-redundant-slice-index
+  description: Remove a redundant index from the array `.slice()` method.
+    # Note this is somewhat different to the Python version
+  explanation: |
+    Parameters in the array prototype `.slice(start, end)` method are optional, and by convention you should only use
+    the necessary ones, to simplify readability. The `end` is not necessary if you want to slice to the end of the
+    array. The `start` is additionally not necessary if you want to slice from the start of the array.
+  language:
+  - javascript
+  - typescript
+  tags:
+  - default
+  any:
+  - pattern: ${arr}.slice(${start}, ${arr}.length)
+    replacement: ${arr}.slice(${start})
+  - pattern: ${arr}.slice(0)
+    replacement: ${arr}.slice()
+  tests:
+  - match: const toEnd = numbers.slice(3, numbers.length)
+    expect: const toEnd = numbers.slice(3)
+  - match: const copy = numbers.slice(0, numbers.length)
+    expect: const copy = numbers.slice(0)
+  - match: const copy = numbers.slice(0)
+    expect: const copy = numbers.slice()
+  - no-match: const sub = numbers.slice(1, 5)
+  - no-match: const sub = numbers.slice(1)

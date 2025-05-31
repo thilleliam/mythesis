@@ -1,0 +1,59 @@
+version: '2'
+rules:
+- id: remove-redundant-boolean
+  description: Remove unnecessary boolean value
+  explanation: |
+    This rule removes unnecessary `true` values from `&&` boolean operators, since
+    `something && true` has exactly the same meaning as `something`
+  language:
+  - javascript
+  - typescript
+  tags:
+  - default
+# TODO We haven't currently got the node dependency checks to remove falses or things in ors
+  any:
+  - pattern: true && ...
+    replacement: '...'
+  - pattern: '... && true'
+    replacement: '...'
+  tests:
+  - match: |
+      while (first_condition && true && second_condition) {
+        do_something();
+      }
+    expect: |
+      while (first_condition && second_condition) {
+        do_something();
+      }
+  - match: |
+      if (true && second_condition) {
+        do_something();
+      }
+    expect: |
+      if (second_condition) {
+        do_something();
+      }
+  - match: |
+      if (first_condition && true) {
+        do_something();
+      }
+    expect: |
+      if (first_condition) {
+        do_something();
+      }
+  - match: |
+      if (true && true) {
+        doSomething();
+      }
+    expect: |
+      if (true) {
+        doSomething();
+      }
+  - no-match: |
+      if (true) {
+        do_something();
+      }
+  - no-match: |
+      if (true || second_condition) {
+        do_something();
+      }

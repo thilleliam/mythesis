@@ -1,0 +1,83 @@
+version: '2'
+rules:
+- id: while-guard-to-condition
+  description: Move a guard clause in a while statement's body into its test
+  language: python
+  tags:
+  - default
+  any:
+  - pattern: |
+      while True:
+          if ${cond_b}:
+              break
+          ${statements*}
+    replacement: |
+      while not ${cond_b}:
+          ${statements}
+  - pattern: |
+      while ${cond_a}:
+          if ${cond_b}:
+              break
+          ${statements*}
+    replacement: |
+      while ${cond_a} and not ${cond_b}:
+          ${statements}
+  explanation: |
+    Removing the guard clause simplifies the code and makes clearer the intention of
+    the loop.
+  tests:
+  - match: |
+      location = "Work"
+      destination = "Home"
+      while True:
+          if location == destination:
+              break
+          location = travel()
+    expect: |
+      location = "Work"
+      destination = "Home"
+      while not location == destination:
+          location = travel()
+  - match: |
+      while True:
+          if not things:
+              break
+          do_something()
+    expect: |
+      while not not things:
+          do_something()
+  - match: |
+      while True:
+          if things:
+              break
+          do_something()
+    expect: |
+      while not things:
+          do_something()
+  - match: |
+      while things_a:
+         if things_b:
+             break
+         do_something()
+    expect: |
+      while things_a and not things_b:
+          do_something()
+  - match: |
+      x = 10
+      while x:
+          if not (x := x - 1):
+              break
+          print(x)
+    expect: |
+      x = 10
+      while x and not not (x := x - 1):
+          print(x)
+  - no-match: |
+      while things_a:
+          do_things_first()
+          if things_b:
+              break
+          do_things_after()
+  - no-match: |
+      while True:
+          do_something()

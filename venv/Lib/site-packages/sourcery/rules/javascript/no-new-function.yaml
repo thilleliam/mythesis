@@ -1,0 +1,24 @@
+version: '2'
+rules:
+- id: no-new-function
+  description: Never use the `Function` constructor.
+  explanation: |
+    Creating a function using the `Function` constructor evaluates a string similarly to `eval()` which may open
+    up vulnerabilities.
+
+    From the [Airbnb JavaScript Style Guide](https://airbnb.io/javascript/#functions--constructor)
+  language:
+  - javascript
+  - typescript
+  tags:
+  - airbnb-javascript-style-guide
+  - airbnb
+  - default
+  any:
+  - pattern: Function(...)
+  - pattern: new Function(...)
+  tests:
+  - match: |
+      var subtract = Function('a', 'b', 'return a - b');
+  - match: |
+      var add = new Function('a', 'b', 'return a + b');

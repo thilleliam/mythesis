@@ -1,0 +1,10 @@
+@startuml
+start
+:Ouvrir l'application desktop;
+:S'authentifier;
+:Consulter / modifier le planning;
+:Affecter véhicules et chauffeurs;
+:Exporter les rapports (Excel, PDF);
+:Consulter les KPI (taux de remplissage, retards...);
+stop
+@enduml

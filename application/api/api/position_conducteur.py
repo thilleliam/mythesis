@@ -1216,31 +1216,31 @@ def chauffeur_app():
                 missionCard.oncontextmenu = (e) => showContextMenu(e, mission.id_tournee);
                 
                 missionCard.innerHTML = `
-                    <div class="mission-header">
-                        <h3>Mission #${mission.id_commande}</h3>
-                        <span class="badge">${mission.statut || 'Planifiée'}</span>
-                    </div>
-                    <div class="mission-body">
-                        <div class="mission-detail">
-                            <i class="fas fa-map-marker-alt"></i>
-                            <span><strong>Départ :</strong> ${mission.lieu_depart || 'À définir'}</span>
+                        <div class="mission-header">
+                            <h3>Mission #${mission.id_commande}</h3>
+                            <span class="badge">${mission.statut || 'Planifiée'}</span>
                         </div>
-                        <div class="mission-detail">
-                            <i class="fas fa-flag-checkered"></i>
-                            <span><strong>Destination :</strong> ${mission.destination || 'À définir'}</span>
-                        </div>
-                        <div class="mission-detail">
-                            <i class="fas fa-clock"></i>
-                            <span><strong>Départ prévu :</strong> ${new Date(mission.date_heure_depart).toLocaleString()}</span>
-                        </div>
-                        <div class="mission-detail">
-                            <i class="fas fa-target"></i>
-                            <span><strong>Objectif :</strong> ${mission.objectif || 'Transport'}</span>
-                        </div>
-                        
-                        <button class="btn btn-success" onclick="startMission(${mission.id_tournee})">
-                            <i class="fas fa-play"></i> Commencer la mission
-                        </button>
+                        <div class="mission-body">
+                            <div class="mission-detail">
+                                <i class="fas fa-map-marker-alt"></i>
+                                <span><strong>Départ :</strong> ${mission.lieu_depart || 'À définir'}</span>
+                            </div>
+                            <div class="mission-detail">
+                                <i class="fas fa-flag-checkered"></i>
+                                <span><strong>Destination :</strong> ${mission.destination || 'À définir'}</span>
+                            </div>
+                            <div class="mission-detail">
+                                <i class="fas fa-clock"></i>
+                                <span><strong>Départ prévu :</strong> ${new Date(mission.date_heure_depart).toLocaleString()}</span>
+                            </div>
+                            <div class="mission-detail">
+                                <i class="fas fa-target"></i>
+                                <span><strong>Objectif :</strong> ${mission.objectif || 'Transport'}</span>
+                            </div>
+                            
+                            <button class="btn btn-success" onclick="startMission(${mission.id_tournee})">
+                                <i class="fas fa-play"></i> Commencer la mission
+                            </button>
                     </div>
                 `;
                 container.appendChild(missionCard);

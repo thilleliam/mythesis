@@ -1,0 +1,22 @@
+version: '2'
+rules:
+- id: no-eval
+  description: Never use `eval()`
+  explanation: |
+    Using `eval` opens your code up to serious security risks - it executes
+    code with the privileges of the caller, leading to all sorts of possible attacks.
+
+    It can also cause performance issues, preventing javascript minifiers and interpreters
+    from making many efficiency gains.
+  any:
+  - pattern: eval(${value})
+  - pattern: window.eval(${value})
+  - pattern: globalThis.eval(${value})
+  tags:
+  - default
+  language:
+  - javascript
+  - typescript
+  tests:
+  - match: eval("throw 1")
+  - no-match: obj.eval("throw 1")

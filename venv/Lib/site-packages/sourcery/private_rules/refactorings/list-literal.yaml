@@ -1,0 +1,40 @@
+rules:
+- id: list-literal
+  language: python
+  description: Replace `list()` with `[]`
+  tags:
+  - default
+  pattern: list()
+  condition: not pattern.in_match_case_clause()
+  replacement: '[]'
+  explanation: |
+    The most concise and Pythonic way to create a list is to use the `[]` notation.
+
+    This fits in with the way we create lists with elements, saving a bit of mental
+    energy that might be taken up with thinking about two different ways of creating
+    lists.
+
+    ```python
+    x = ["first", "second"]
+    ```
+
+    Doing things this way has the added advantage of being a nice little performance
+    improvement.
+
+    Here are the timings before and after the change:
+
+    ```
+    $ python3 -m timeit "x = list()"
+    5000000 loops, best of 5: 63.3 nsec per loop
+    ```
+
+    ```
+    $ python3 -m timeit "x = []"
+    20000000 loops, best of 5: 15.8 nsec per loop
+    ```
+
+    Similar reasoning and performance results hold for replacing `dict()` with `{}`.
+  tests:
+  - match: x = list()
+    expect: x = []
+  - no-match: x = dict()

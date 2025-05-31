@@ -1,0 +1,16 @@
+@startuml
+actor Client
+participant "Interface Web" as Web
+participant "Serveur"
+
+Client -> Web : Accéder à l'interface
+Client -> Web : S'authentifier
+Web -> Serveur : Vérifier identifiants
+Serveur --> Web : Résultat (OK/Erreur)
+
+Client -> Web : Déposer une commande
+Web -> Serveur : Enregistrer commande
+
+Client -> Web : Confirmer commande
+Web -> Serveur : Valider commande
+@enduml

@@ -1,0 +1,34 @@
+version: '2'
+rules:
+- id: dont-reassign-foreach-variables
+  description: Don't reassign the for-each variable ${var}
+  explanation: |
+    Reassigning the iteratee in a for-of loop may lead to unexpected behaviour, and the variable should be treated as
+    if it were constant.
+  language:
+  - javascript
+  - typescript
+  tags:
+  - default
+  all:
+  - pattern: ${var} = ${value};
+  - inside:
+      pattern: |
+        for (var ${var} of ${vars}) {
+          ...
+        }
+  tests:
+  - match: |
+      for (var str of strings) {
+        str = "";
+      }
+  - no-match: |
+      for (var str of strings) {
+        let str = "";
+      }
+  - no-match: |
+      for (var str of strings) {
+        strLowerCase = str.toLowerCase();
+        something = anything();
+        console.log(strLowerCase);
+      }

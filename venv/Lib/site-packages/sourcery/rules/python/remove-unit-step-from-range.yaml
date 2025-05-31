@@ -1,0 +1,28 @@
+version: '2'
+rules:
+- id: remove-unit-step-from-range
+  description: Replace range(x, y, 1) with range(x, y)
+  language: python
+  tags:
+  - default
+  pattern: range(${a}, ${b}, 1)
+  replacement: range(${a}, ${b})
+  explanation: |
+    The default `step` value for a call to `range()` is `1`, so it is unnecessary to
+    explicitly define it. This refactoring removes this argument, slightly
+    shortening the code.
+  tests:
+  - match: |
+      for i in range(y, len(x), 1):
+          do_t()
+    expect: |
+      for i in range(y, len(x)):
+          do_t()
+  - match: squares = range(0, x, 1)
+    expect: squares = range(0, x)
+  - match: squares = range(1, 5, 1)
+    expect: squares = range(1, 5)
+  - no-match: squares = range(0, x, '1')
+  - no-match: squares = range(0, x, 2)
+  - no-match: squares = range(x, 1)
+  - no-match: self.range(1, 5, 1)

@@ -1,0 +1,37 @@
+version: '2'
+rules:
+- id: use-or-for-fallback
+  description: Use `or` for providing a fallback value
+  language: python
+  tags:
+  - default
+  pattern: |
+    ${value} = ${first}
+    if not ${value}:
+      ${value} = ${fallback}
+  replacement: |
+    ${value} = ${first} or ${fallback}
+  explanation: |
+    Thanks to the flexibility of Python's `or` operator, you can use a single
+    assignment statement, even if a variable can retrieve its value from various
+    sources. This is shorter and easier to read than using multiple assignments with
+    `if not` conditions.
+  tests:
+  - match: |
+      pattern = provided_pattern
+      if not pattern:
+          pattern = pattern_from_config
+    expect: pattern = provided_pattern or pattern_from_config
+  - match: |
+      path = config.option.installpkg
+      if not path:
+        path = config.sdistsrc
+    expect: path = config.option.installpkg or config.sdistsrc
+  - no-match: |
+      path = config.option.installpkg
+      if path:
+        path = config.sdistsrc
+  - no-match: |
+      path = config.option.installpkg
+      if not path and has_special_config():
+        path = config.sdistsrc

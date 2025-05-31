@@ -1,0 +1,57 @@
+@startuml
+left to right direction
+' On inverse ici pour obtenir un affichage vertical
+
+skinparam actorStyle awesome
+
+actor Conducteur
+actor Client
+actor Planificateur
+
+rectangle "Conducteur – Application Mobile" {
+  (Lancer l'application mobile)
+  (S'authentifier via mobile)
+  (Consulter missions planifiées)
+  (Démarrer une mission)
+  (Valider étapes mission)
+  (Clôturer la mission)
+  (Synchroniser avec serveur)
+
+  Conducteur --> (Lancer l'application mobile)
+  Conducteur --> (S'authentifier via mobile)
+  Conducteur --> (Consulter missions planifiées)
+  Conducteur --> (Démarrer une mission)
+  Conducteur --> (Valider étapes mission)
+  Conducteur --> (Clôturer la mission)
+  Conducteur --> (Synchroniser avec serveur)
+}
+
+rectangle "Client – Web Service" {
+  (Accéder à l'interface web)
+  (S'authentifier via web)
+  (Déposer une commande)
+  (Confirmer la commande)
+
+  Client --> (Accéder à l'interface web)
+  Client --> (S'authentifier via web)
+  Client --> (Déposer une commande)
+  Client --> (Confirmer la commande)
+}
+
+rectangle "Gestionnaire – Interface Desktop" {
+  (Lancer l'application desktop)
+  (S'authentifier via desktop)
+  (Modifier planning des tournées)
+  (Affecter véhicules et chauffeurs)
+  (Exporter rapports)
+  (Visualiser KPI)
+
+  Planificateur --> (Lancer l'application desktop)
+  Planificateur --> (S'authentifier via desktop)
+  Planificateur --> (Modifier planning des tournées)
+  Planificateur --> (Affecter véhicules et chauffeurs)
+  Planificateur --> (Exporter rapports)
+  Planificateur --> (Visualiser KPI)
+}
+@enduml
+

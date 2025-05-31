@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+    font-family: "Messina Sans";
+    src: url("./MessinaSansWeb-Regular.woff");
+}
+
+@font-face {
+    font-family: "Messina Sans";
+    font-weight: bold;
+    src: url("./MessinaSansWeb-Bold.woff");
+}
+
+@font-face {
+    font-family: "Messina Sans Mono";
+    src: url("./MessinaSansMonoWeb-Regular.woff");
+}
+
+@font-face {
+    font-family: "Messina Sans Mono";
+    font-weight: bold;
+    src: url("./MessinaSansMonoWeb-Bold.woff");
+}

@@ -1,0 +1,54 @@
+version: '2'
+rules:
+- id: merge-nested-ifs
+  description: Merge nested if conditions
+  explanation: |
+    Reading deeply nested conditional code is confusing, since you have to keep track of which
+    conditions relate to which levels. We therefore strive to reduce nesting where
+    possible, and the situation where two `if` conditions can be combined using
+    `and` is an easy win.
+  pattern: |
+    if (${condition}) {
+        if (${inner_condition}) {
+          ...
+        }
+    }
+  replacement: |
+    if (${condition} && ${inner_condition}) {
+          ...
+    }
+  tags:
+  - default
+  language:
+  - javascript
+  - typescript
+  tests:
+  - match: |
+      if (a && b) {
+          if (c) {
+            something();
+            d = other_thing;
+          }
+      }
+    expect: |
+      if (a && b && c) {
+          something();
+          d = other_thing;
+      }
+  - no-match: |
+      if (a && b) {
+          other();
+          if (c) {
+            something();
+            d = other_thing;
+          }
+      }
+  - no-match: |
+      if (a && b) {
+          if (c) {
+            something();
+            d = other_thing;
+          }
+      } else if (something) {
+          something()
+      }

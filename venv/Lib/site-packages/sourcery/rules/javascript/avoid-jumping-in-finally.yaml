@@ -1,0 +1,91 @@
+version: '2'
+rules:
+- id: avoid-jumping-in-finally
+  description: Avoid the use of jump statements in `finally` blocks.
+  explanation: |
+    Returning results or throwing exceptions in `finally` blocks (of `try..catch..finally`) suppresses propagation of unhandled exceptions.
+    The `return`, `break`, `throw`, and `continue` statements should therefore not be used within a finally block.
+  any:
+  - all:
+    - kind: [return_statement, throw_statement]
+    - inside:
+        kind: finally_clause
+      until:
+        # If a function is defined inside the finally block, it can contain a return.
+        kind:
+        - function
+        - function_declaration
+        - generator_function
+        - generator_function_declaration
+        - arrow_function
+        - class_static_block
+  - all:
+    - kind: [break_statement, continue_statement]
+    - inside:
+        kind: finally_clause
+      until:
+        kind:
+        - for_statement
+        - for_in_statement
+        - while_statement
+        - do_statement
+        - function
+        - function_declaration
+        - generator_function
+        - generator_function_declaration
+        - arrow_function
+        - class_static_block
+
+  language:
+  - javascript
+  - typescript
+  tags:
+  - default
+  tests:
+  - match: |
+      try {
+        stuff();
+      } finally {
+        for (thing of things) {
+          return;
+        }
+      }
+  - match: |
+      try {
+        stuff();
+      } finally {
+        continue;
+      }
+  - match: |
+      function func(){
+        try {
+          stuff();
+        } finally {
+          return;
+        }
+      }
+  - no-match: |
+      try {
+        stuff();
+      } finally {
+        for (thing of things) {
+          break;
+        }
+      }
+  - no-match: |
+      try {
+        stuff();
+        return;
+      } finally {
+        other_stuff();
+      }
+  - no-match: |
+      return x;
+  - no-match: |
+      try {
+        stuff();
+      } finally {
+        function func() {
+          return;
+        }
+      }

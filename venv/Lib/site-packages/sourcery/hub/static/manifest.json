@@ -1,0 +1,9 @@
+{
+  "short_name": "Sourcery Hub",
+  "name": "Sourcery Interactive Authentication and Settings Management",
+  "icons": [],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#FFA13D",
+  "background_color": "#12171F"
+}

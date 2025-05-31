@@ -1,0 +1,2 @@
+[console_scripts]
+sourcery = sourcery.wrapper:main

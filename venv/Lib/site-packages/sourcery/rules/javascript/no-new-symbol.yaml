@@ -1,0 +1,21 @@
+version: '2'
+rules:
+- id: no-new-symbol
+  description: An instance of `Symbol` can only be created using `Symbol` as a function
+  explanation: |
+    `Symbol` is not intended to be used with the `new` operator, but called as a function.
+  language:
+  - javascript
+  - typescript
+  tags:
+  - default
+  pattern: new Symbol(...)
+  replacement: Symbol(...)
+  tests:
+  - match: new Symbol("abc")
+    expect: Symbol("abc")
+  - match: const abc = new Symbol("def")
+    expect: const abc = Symbol("def")
+  - no-match: Symbol("def")
+  - no-match: |
+      let obj = { symbol: Symbol("def") }

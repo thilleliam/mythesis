@@ -1,0 +1,35 @@
+version: '2'
+rules:
+  # This combines with `combine-object-destructuring` to convert a series of property accesses into a single destructuring access.
+
+- id: use-object-destructuring
+  description: Prefer object destructuring when accessing and using properties.
+  explanation: |
+    Object destructuring can often remove an unnecessary temporary reference, as well as making your code more succinct.
+
+    From the [Airbnb Javascript Style Guide](https://airbnb.io/javascript/#destructuring--object)
+  language:
+  - javascript
+  - typescript
+  tags:
+  - airbnb-javascript-style-guide
+  - airbnb
+  - default
+  any:
+  - pattern: |
+      const ${property} = ${object}.${property}
+    replacement: |
+      const {${property}} = ${object}
+  - pattern: |
+      let ${property} = ${object}.${property}
+    replacement: |
+      let {${property}} = ${object}
+  tests:
+  - match: |
+      const firstName = user.firstName;
+    expect: |
+      const {firstName} = user;
+  - match: |
+      let firstName = user.firstName;
+    expect: |
+      let {firstName} = user;

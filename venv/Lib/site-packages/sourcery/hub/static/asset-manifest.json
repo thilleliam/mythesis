@@ -1,0 +1,24 @@
+{
+  "files": {
+    "main.css": "/static/static/css/main.ed53125f.css",
+    "main.js": "/static/static/js/main.658b590c.js",
+    "static/media/icons.svg?": "/static/static/media/icons.33055a2699783178df55.svg",
+    "static/media/simple-bg.svg": "/static/static/media/simple-bg.5d316ef4d19ee3b7987c.svg",
+    "static/media/lower-bg.svg": "/static/static/media/lower-bg.ef732f44d29337d626ef.svg",
+    "static/media/icons.eot?": "/static/static/media/icons.e3d35e8153c5ffaa069f.eot",
+    "static/media/icons.ttf?": "/static/static/media/icons.fdecd2d880938cae502a.ttf",
+    "static/media/icons.woff?": "/static/static/media/icons.07ed0b60c13965581675.woff",
+    "static/media/icons.woff2?": "/static/static/media/icons.f39232cd335dc12e7d4f.woff2",
+    "static/media/sourcery-logo.svg": "/static/static/media/sourcery-logo.ab9811e301fd9354cd78e9d3500b014d.svg",
+    "static/media/python-original.svg": "/static/static/media/python-original.ffa1251f749f6ab8768c5f32548e5b14.svg",
+    "static/media/javascript-original.svg": "/static/static/media/javascript-original.7398a2b698ded0287e177bf456f9fd50.svg",
+    "static/media/typescript-original.svg": "/static/static/media/typescript-original.3505cfe6fdd885b1efaa87decf82f4d9.svg",
+    "index.html": "/static/index.html",
+    "main.ed53125f.css.map": "/static/static/css/main.ed53125f.css.map",
+    "main.658b590c.js.map": "/static/static/js/main.658b590c.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.ed53125f.css",
+    "static/js/main.658b590c.js"
+  ]
+}

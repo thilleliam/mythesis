@@ -1,0 +1,58 @@
+version: '2'
+rules:
+- id: while-guard-to-condition
+  description: Move a guard clause in a while statement's body into its test
+  explanation: |
+    A guard clause with a `break` that is the first thing in a `while` body is
+    equivalent to having the condition contained in the `while` itself.
+  language:
+  - javascript
+  - typescript
+  tags:
+  - default
+  any:
+  - pattern: |
+      while (${cond_a}) {
+          if (${cond_b}) {
+              break;
+          }
+          ...
+      }
+  replacement: |
+    while (${cond_a} && !${cond_b}) {
+        ...
+    }
+  tests:
+  - match: |
+      while (true) {
+          if (condition) {
+              break;
+          }
+          do_some_stuff();
+      }
+    expect: |
+      while (true && !condition) {
+          do_some_stuff();
+      }
+  - match: |
+      while (first_condition) {
+          if (condition) {
+              break;
+          }
+          do_some_stuff();
+      }
+    expect: |
+      while (first_condition && !condition) {
+          do_some_stuff();
+      }
+  - match: |
+      while (a || b) {
+          if (c && d) {
+              break;
+          }
+          do_some_stuff();
+      }
+    expect: |
+      while ((a || b) && !(c && d)) {
+          do_some_stuff();
+      }

@@ -1,0 +1,56 @@
+version: '2'
+rules:
+- id: assignment-operator
+  description: Replace assignment with assignment operator
+  explanation: |
+    The augmented assignment operators, such as `+=` are a more streamlined and easy to understand way
+    to add values. Using them removes a little bit of repetition and makes the code slightly easier to
+    understand.
+  language:
+  - javascript
+  - typescript
+  tags:
+  - default
+  any:
+  # All assignment operators - https://www.w3schools.com/js/js_assignment.asp
+  # Standard operators
+  - pattern: ${var} = ${var} + ${value}
+    replacement: ${var} += ${value}
+  - pattern: ${var} = ${var} - ${value}
+    replacement: ${var} -= ${value}
+  - pattern: ${var} = ${var} * ${value}
+    replacement: ${var} *= ${value}
+  - pattern: ${var} = ${var} / ${value}
+    replacement: ${var} /= ${value}
+  - pattern: ${var} = ${var} % ${value}
+    replacement: ${var} %= ${value}
+  - pattern: ${var} = ${var} ** ${value}
+    replacement: ${var} **= ${value}
+  # Shift operators
+  - pattern: ${var} = ${var} << ${value}
+    replacement: ${var} <<= ${value}
+  - pattern: ${var} = ${var} >> ${value}
+    replacement: ${var} >>= ${value}
+  - pattern: ${var} = ${var} >>> ${value}
+    replacement: ${var} >>>= ${value}
+  # Bitwise operators
+  - pattern: ${var} = ${var} & ${value}
+    replacement: ${var} &= ${value}
+  - pattern: ${var} = ${var} | ${value}
+    replacement: ${var} |= ${value}
+  - pattern: ${var} = ${var} ^ ${value}
+    replacement: ${var} ^= ${value}
+  tests:
+  - match: x = x + 1
+    expect: x += 1
+  - match: x = x - 2
+    expect: x -= 2
+  - match: x = x ** 1
+    expect: x **= 1
+  - match: x = x >> x
+    expect: x >>= x
+  - match: x.y = x.y + x.z
+    expect: x.y += x.z
+  - no-match: x = y + x
+  - no-match: x, y = x + 1
+  - no-match: x = y = x + 1

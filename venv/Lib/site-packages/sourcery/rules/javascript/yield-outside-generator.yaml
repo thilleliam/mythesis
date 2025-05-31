@@ -1,0 +1,36 @@
+version: '2'
+rules:
+- id: yield-outside-generator
+  description: Cannot use `yield` outside a generator function
+  explanation: |
+    The `yield` keyword is used to pause and resume a generator function.
+    If `yield` is used outside a generator function or method it will throw a `SyntaxError`
+  language:
+  - javascript
+  - typescript
+  tags:
+  - default
+  all:
+  - kind: yield_expression
+  - not:
+      inside:
+        kind:
+        - generator_function
+        - generator_function_declaration
+        - method_definition
+  tests:
+  - match: |
+      yield
+  - match: |
+      function*() {}
+      yield* [ 1 ]
+  - no-match: |
+      function* gen() { yield }
+  - no-match: |
+      const fn = function* gen() { yield }
+  - no-match: |
+      const obj = {
+        *entries() {
+          yield [ruleId, load()];
+        }
+      };

@@ -1,0 +1,65 @@
+version: '2'
+rules:
+- id: generators-should-yield
+  description: Avoid writing generators that don't `yield` any values.
+  explanation: |
+    Generators without `yield` statements are confusing, since they defy a reader's expectations.
+  all:
+  - kind: [generator_function, generator_function_declaration]
+  - not:
+      contains:
+        kind: yield_expression
+      until:
+        kind: [generator_function, generator_function_declaration]
+  language:
+  - javascript
+  - typescript
+  tags:
+  - default
+  tests:
+  - match: |
+      function* wrongGen(x) {
+        let val = 0;
+        val += x;
+      }
+  - match: |
+      const fn = function* wrongGen(x) {
+        let val = 0;
+        val += x;
+      }
+# TODO Extend to this case once we've figured out method definitions
+#  - match: |
+#      class Foo {
+#        *generator() {
+#          x++;
+#        }
+#      }
+  - no-match: |
+      function* wrongGen(x) {
+        let val = 0;
+        val += x;
+        yield val;
+      }
+  - no-match: |
+      function* wrongGen(x) {
+        let val = 0;
+        val += x;
+        yield* otherGen();
+      }
+  - match: |
+      function* wrongGen(x) {
+        let val = 0;
+        val += x;
+        function* nestedGen() {
+          yield* otherGen();
+        }
+      }
+  - match: |
+      function* wrongGen(x) {
+        let val = 0;
+        val += x;
+        yield* otherGen();
+        function* nestedGen() {
+          ;
+        }
+      }

@@ -1,0 +1,81 @@
+version: '2'
+rules:
+- id: dont-reassign-parameters
+  description: Don't reassign parameter - ${param}
+  explanation: |
+    Reassigning parameters can lead to unexpected behavior, especially when accessing the arguments object.
+    It can also cause optimization issues, especially in V8.
+
+    From the [Airbnb JavaScript Style Guide](https://airbnb.io/javascript/#functions--reassign-params)
+  language:
+  - javascript
+  # - typescript
+  tags:
+  - airbnb-javascript-style-guide
+  - airbnb
+  - default
+  all:
+  - pattern: |
+      ${param} = ${value};
+  - inside:
+      any:
+      # TODO Add all the const/var/let declaration patterns
+      #      e.g. var fn = function ...
+      - pattern: |
+          function (..., ${param}, ...) {
+            ...
+          }
+      - pattern: |
+          function ${fn}(..., ${param}, ...) {
+            ...
+          }
+      - pattern: |
+          function* ${fn}(..., ${param}, ...) {
+            ...
+          }
+      - pattern: |
+          function* (..., ${param}, ...) {
+            ...
+          }
+      - pattern: |
+          (..., ${param}, ...) => {
+            ...
+          }
+  tests:
+  - match: |
+      function foo(name, options, arguments) {
+        name = 1;
+      }
+  - match: |
+      function* foo(name, options, arguments) {
+        if (thing) {
+          name = 1;
+        }
+      }
+  - match: |
+      function* (name, options, arguments) {
+        if (thing) {
+          name = 1;
+        }
+      }
+  - match: |
+      (x, y) => {
+        x = 1;
+        return x + y;
+      }
+  - match: |
+      const f = function (number) {
+        number = 2;
+      };
+  - match: |
+      function foo(name, options, arguments) {
+        let a = (name = 1);
+      }
+  - no-match: |
+      function foo(name, options, args) {
+        something = 3;
+      }
+  - no-match: |
+      function foo(name, options, args) {
+        let args = 3;
+      }

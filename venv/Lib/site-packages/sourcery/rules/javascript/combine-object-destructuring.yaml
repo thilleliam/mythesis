@@ -1,0 +1,43 @@
+version: '2'
+rules:
+- id: combine-object-destructuring
+  description: Combine destructure assignments.
+  explanation: |
+    Object destructuring can often remove an unnecessary temporary reference, as well as making your code more succinct.
+
+    From the [Airbnb Javascript Style Guide](https://airbnb.io/javascript/#destructuring--object)
+  language:
+  - javascript
+  - typescript
+  tags:
+  - default
+  any:
+  - pattern: |
+      const {...} = ${object};
+      const {...} = ${object};
+    replacement: |
+      const {..., ...} = ${object};
+  - pattern: |
+      let {...} = ${object};
+      let {...} = ${object};
+    replacement: let {..., ...} = ${object};
+  tests:
+  - match: |
+      const {firstName} = user;
+      const {lastName} = user;
+    expect: const {firstName, lastName} = user;
+  - match: |
+      let {firstName} = user;
+      let {lastName} = user;
+    expect: let {firstName, lastName} = user;
+  - match: |
+      const {a, b} = alphabet;
+      const {c, d} = alphabet;
+    expect: |
+      const {a, b, c, d} = alphabet;
+  - no-match: |
+      const {firstUserName} = firstUser;
+      const {secondUserName} = secondUser;
+  - no-match: |
+      let {firstUserName} = firstUser;
+      const {secondUserName} = firstUser;

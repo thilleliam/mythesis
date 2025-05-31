@@ -1,0 +1,132 @@
+version: '2'
+rules:
+- id: no-loop-in-tests
+  description: |
+    Avoid loops in tests.
+  language: python
+  tags:
+  - default
+  all:
+  - kind:
+    - for_statement
+    - while_statement
+  - inside:
+      pattern: |
+        def ${fn}(...): ...
+      condition: fn.matches_regex("^test_")
+  # Include only pytest test modules after the related bugs have been fixed:
+  # * SOU-1277
+  # * SOU-1278
+  # https://linear.app/sourcery/issue/SOU-1277/paths-field-in-hypergraph-rules-doesnt-work-with-globes
+  # https://linear.app/sourcery/issue/SOU-1278/paths-field-in-hypergraph-rules-doesnt-accept-a-at-the-beginning-of-a
+  explanation: |
+    Avoid complex code, like loops, in test functions.
+
+    Google's software engineering guidelines says:
+    "Clear tests are trivially correct upon inspection"
+    To reach that avoid complex code in tests:
+    * loops
+    * conditionals
+
+    Some ways to fix this:
+
+    * Use parametrized tests to get rid of the loop.
+    * Move the complex logic into helpers.
+    * Move the complex part into pytest fixtures.
+
+    > Complexity is most often introduced in the form of logic. Logic is defined via the imperative parts of programming languages such as operators, loops, and conditionals. When a piece of code contains logic, you need to do a bit of mental computation to determine its result instead of just reading it off of the screen. It doesn't take much logic to make a test more difficult to reason about.
+
+    Software Engineering at Google / [Don't Put Logic in Tests](https://abseil.io/resources/swe-book/html/ch12.html#donapostrophet_put_logic_in_tests)
+  tests:
+  - match: |
+      def test_something():
+          some_code()
+          for i in range(len(currencies)):
+              verify(currencies[i])
+  - match: |
+      def test_something():
+          some_code()
+          while i < 10:
+            execute_test(i)
+  - no-match: |
+      def helper_function():
+          some_code()
+          for i in range(len(currencies)):
+              verify(currencies[i])
+  - no-match: |
+      def helper_function():
+          some_code()
+          while i < 10:
+            do_some_setup(i)
+
+- id: no-conditionals-in-tests
+  description: |
+    Avoid conditionals in tests.
+  language: python
+  tags:
+  - default
+  all:
+  - kind:
+    - if_statement
+  - inside:
+      pattern: |
+        def ${fn}(...): ...
+      condition: fn.matches_regex("^test_")
+  # Include only pytest test modules after the related bugs have been fixed:
+  # * SOU-1277
+  # * SOU-1278
+  # https://linear.app/sourcery/issue/SOU-1277/paths-field-in-hypergraph-rules-doesnt-work-with-globes
+  # https://linear.app/sourcery/issue/SOU-1278/paths-field-in-hypergraph-rules-doesnt-accept-a-at-the-beginning-of-a
+  explanation: |
+    Avoid complex code, like conditionals, in test functions.
+
+    Google's software engineering guidelines says:
+    "Clear tests are trivially correct upon inspection"
+    To reach that avoid complex code in tests:
+    * loops
+    * conditionals
+
+    Some ways to fix this:
+
+    * Use parametrized tests to get rid of the loop.
+    * Move the complex logic into helpers.
+    * Move the complex part into pytest fixtures.
+
+    > Complexity is most often introduced in the form of logic. Logic is defined via the imperative parts of programming languages such as operators, loops, and conditionals. When a piece of code contains logic, you need to do a bit of mental computation to determine its result instead of just reading it off of the screen. It doesn't take much logic to make a test more difficult to reason about.
+
+    Software Engineering at Google / [Don't Put Logic in Tests](https://abseil.io/resources/swe-book/html/ch12.html#donapostrophet_put_logic_in_tests)
+  tests:
+  - match: |
+      def test_something():
+          some_code()
+          if nr < 42:
+              verify_small_number(nr)
+          else:
+              verify_big_number(nr)
+
+- id: dont-import-test-modules
+  description: |
+    Don't import test modules.
+  language: python
+  tags:
+  - default
+  any:
+  - pattern: from ${module_name} import ...
+    condition: module_name.matches_regex("^test") and not module_name.matches_regex("helper")
+  - pattern: import ${module_name}
+    condition: module_name.matches_regex("^test") and not module_name.matches_regex("helper")
+  explanation: |
+    Don't import test modules.
+
+    Tests should be self-contained and don't depend on each other.
+
+    If a helper function is used by multiple tests,
+    define it in a helper module,
+    instead of importing one test from the other.
+  tests:
+  - match: import test.unit.test_something
+  - match: from test.unit.test_something import custom_helper
+  - match: from test.unit.test_something import test_basic
+  - match: from test.unit.test_something import FakeDb
+  - no-match: import test.unit.helper
+  - no-match: from test_something.unit.helpers import custom_helper

@@ -1,0 +1,159 @@
+Metadata-Version: 2.1
+Name: sourcery-cli
+Version: 1.18.0
+Summary: Magically refactor Python
+Home-page: https://github.com/sourcery-ai/sourcery
+Author: Sourcery AI
+Author-email: hello@sourcery.ai
+License: Proprietary
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Environment :: Console
+Classifier: Environment :: Plugins
+Classifier: Intended Audience :: Developers
+Classifier: License :: Other/Proprietary License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python
+Classifier: Topic :: Software Development :: Quality Assurance
+Classifier: Topic :: Text Editors :: Integrated Development Environments (IDE)
+Description-Content-Type: text/markdown
+
+![Sourcery Logo](https://sourcery.ai/sourcery-dark.svg)
+
+# _Sourcery_ Command Line Interface
+
+## Installation and usage
+
+### Installation
+
+_Sourcery_ command line interface can be installed by running:
+
+```
+pip install sourcery
+```
+
+### Login
+
+Once installed you need to log in with:
+
+```
+sourcery login
+```
+
+which will open up a browser tab and ask for confirmation. This is only needed
+once per computer.
+
+You can also log in via providing your token:
+
+```
+sourcery login --token YOUR_TOKEN
+```
+
+## Usage
+
+To review a file or a directory (recursively) with Sourcery, use the
+`sourcery review` command:
+
+```
+sourcery review example_file.py
+```
+
+To apply the changes suggested by Sourcery, use the `--fix` option:
+
+```
+sourcery review --fix {file_or_directory}
+```
+
+## Command Line Options
+
+_Sourcery_ provides a few options for running. You can list them by running
+`sourcery review --help`
+
+```
+sourcery review --help
+
+
+Usage: sourcery review [OPTIONS] [SRC]...
+
+  Review SRC files/directories. Reads from stdin when SRC is -
+
+Options:
+  --diff TEXT               Run only on changed code with diff command (e.g.
+                            "git diff")
+  --enable TEXT             Only run the specified rule or tag. This option
+                            can be used multiple times.
+  --disable TEXT            Skip the specified rule or tag. This option can
+                            be used multiple times.
+  --check                   Return exit code 1 if unsolved issues found.
+  --fix                     Automatically fix issues where possible.
+  --config FILE             Location of the Sourcery YAML config file. Can be
+                            a file or URL.
+  --csv                     Output in CSV format
+  --verbose                 Verbose output with explanation and code
+                            snippets.
+  --summary / --no-summary  Flag to determine whether to print a summary of
+                            the review. Default: true.
+  -h, --help                Show this message and exit.
+```
+
+## Configuration
+
+_Sourcery_ reads configuration settings from `.sourcery.yaml` in the project
+directory. Full details are described
+[here](https://docs.sourcery.ai/Configuration/).
+
+## Pre-commit Hook
+
+_Sourcery_ works great with [pre-commit](https://pre-commit.com). Once you
+[have it installed](https://pre-commit.com/#install), add this to the
+`.pre-commit-config.yaml` in your repository:
+
+<!-- x-release-please-start-version -->
+
+```yaml
+repos:
+  - repo: https://github.com/sourcery-ai/sourcery
+    rev: v1.18.0
+    hooks:
+      - id: sourcery
+        # The best way to use Sourcery in a pre-commit hook:
+        # * review only changed lines:
+        # * omit the summary
+        args: [--diff=git diff HEAD, --no-summary]
+```
+
+<!-- x-release-please-end -->
+
+To review all changes compared to the `main` branch:
+
+```yaml
+args: [--diff=git diff main]
+```
+
+If you want Sourcery to automatically apply the suggested changes,add the
+`--fix` option:
+
+```yaml
+args: [--diff=git diff HEAD, --fix]
+```
+
+If Sourcery is the first pre-commit hook that you've added to your project,
+you'll also need to run `pre-commit install`.
+
+## Continuous Integration
+
+For the majority of projects, the best usage of Sourcery in the CI is to review
+only the code of the current PR.
+
+You can use the script below to detect Sourcery violations that are present in
+the current code but not in the `main` branch:
+
+```bash
+pip install sourcery
+# Store your Sourcery token as a secret in your CI environment.
+sourcery login --token $SOURCERY_TOKEN
+sourcery review --diff "git diff main" .
+```
+
+Instead of `main`, you can pick another branch as well. For example, in GitHub
+Actions you can use
+`--diff="git diff ${{ github.event.pull_request.base.sha }}"`

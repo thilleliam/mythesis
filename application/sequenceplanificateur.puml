@@ -1,0 +1,25 @@
+@startuml
+actor Planificateur
+participant "App Desktop (Python + ttkbootstrap)" as Desktop
+database "Base MySQL" as MySQL
+
+Planificateur -> Desktop : Lancer l'application
+Planificateur -> Desktop : S'authentifier
+Desktop -> MySQL : Vérifier identifiants
+MySQL --> Desktop : Résultat (OK/Erreur)
+
+Planificateur -> Desktop : Modifier planning
+Desktop -> MySQL : UPDATE planning
+
+Planificateur -> Desktop : Affecter véhicules
+Desktop -> MySQL : UPDATE affectations
+
+Planificateur -> Desktop : Exporter rapports
+Desktop -> MySQL : SELECT données
+MySQL --> Desktop : Résultat
+
+Planificateur -> Desktop : Visualiser KPI
+Desktop -> MySQL : SELECT indicateurs
+MySQL --> Desktop : Indicateurs
+@enduml
+

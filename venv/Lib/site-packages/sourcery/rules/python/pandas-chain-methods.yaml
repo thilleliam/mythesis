@@ -1,0 +1,59 @@
+version: '2'
+rules:
+- id: method_chaining
+  language: python
+  description: Chaining methods improves readability
+  tags:
+  - pandas
+  pattern: |
+    ${df} = ${df}.${method1}(${arg1*})
+    ${df} = ${df}.${method2}(${arg2*})
+  condition: | #TODO add in type condition for pandas.DataFrame & pandas.Series, currently not supported
+    method1.matches_regex(r"^dropna|reset_index|sort_values|drop_duplicates") and
+    method2.matches_regex(r"^dropna|reset_index|sort_values|drop_duplicates") and
+    arg1.matches_regex(r"^((?!inplace=True).)*$") and arg2.matches_regex(r"^((?!inplace=True).)*$")
+  replacement: |
+    ${df} = ${df}.${method1}(${arg1*}).${method2}(${arg2*})
+  explanation: |
+    Chaining methods together can improve readability and performance in Pandas.
+    Instead of applying methods one after another, try chaining them together to
+    create a single expression.
+  tests:
+  - match: |
+      df = df.drop_duplicates()
+      df = df.reset_index(drop=True)
+    expect: |
+      df = df.drop_duplicates().reset_index(drop=True)
+  - match: |
+      df: pandas.DataFrame
+      df = df.sort_values("A")
+      df = df.reset_index(drop=True)
+    expect: |
+      df:pandas.DataFrame
+      df = df.sort_values("A").reset_index(drop=True)
+  - match: |
+      df: pandas.DataFrame
+      df = ({"A": [1, 2, 3], "B": [4, 5, 6]})
+      df = df.dropna()
+      df = df.drop_duplicates()
+    expect: |
+      df: pandas.DataFrame
+      df = ({"A": [1, 2, 3], "B": [4, 5, 6]})
+      df = df.dropna().drop_duplicates()
+  - match: |
+      df: pandas.Series
+      series = ([1, 2, 3, 4, 5])
+      series = series.drop_duplicates()
+      series = series.reset_index(drop=True)
+    expect: |
+      df: pandas.Series
+      series = ([1, 2, 3, 4, 5])
+      series = series.drop_duplicates().reset_index(drop=True)
+  - no-match: |
+      df: pandas.DataFrame
+      df = ({"A": [1, 2, 3], "B": [4, 5, 6]})
+      df = df.drop_duplicates()
+  - no-match: |
+      df: pandas.DataFrame
+      df = ({"A": [1, 2, 3], "B": [4, 5, 6]})
+      df = df.reset_index(drop=True)

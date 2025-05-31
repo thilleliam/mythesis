@@ -1,0 +1,59 @@
+version: '2'
+rules:
+- id: possible-incorrect-bitwise-operator
+  description: Flags possibly incorrect use of bitwise operators `|` and `&`.
+  explanation: |
+    Although bitwise operators are valid in boolean contexts, it's more likely to be a programming error, as it's
+    easy to mix up `&` with `&&` and `|` with `||`.
+  language:
+  - javascript
+  - typescript
+  tags:
+  - default
+  # TODO: can the below be improved using sub-field matching?
+  any:
+  - pattern: |
+      if (${left} & ${right}) {...}
+  - pattern: |
+      if (${left} & ${right}) {...} else {...}
+  - pattern: |
+      !(${left} & ${right})
+  - pattern: |
+      (${left} & ${right}) ? ... : ...
+  - pattern: |
+      while (${left} & ${right}) {...}
+  - pattern: |
+      do {...} while (${left} & ${right})
+#  - pattern: |
+#      for (${init}; ${left} & ${right}; ${inc}) {...}
+  - pattern: |
+      if (${left} | ${right}) {...}
+  - pattern: |
+      if (${left} | ${right}) {...} else {...}
+  - pattern: |
+      !(${left} | ${right})
+  - pattern: |
+      (${left} | ${right}) ? ... : ...
+  - pattern: |
+      while (${left} | ${right}) {...}
+  - pattern: |
+      do {...} while (${left} | ${right})
+#  - pattern: |
+#      for (${init?}; ${left} | ${right}; ${inc?}) {...}
+  tests:
+  - match: |
+      if (x & y) {}
+  - match: |
+      if (!(x | y)) {console.log("error");}
+  - match: |
+      const p = (await someValue() | await otherValue()) ? await oneThing() : await anotherThing();
+  - match: |
+      while (processAlive & result) { processAlive = pollProcess(); result = readLine(); }
+  - match: |
+      do { processAlive = pollProcess(); result = readLine(); } while (processAlive | result)
+#  - match: |
+#      for (; (x < 10) & (y < 10);) { console.log(x, y); x++; y++; }
+  - no-match: |
+      x && y ? 5 : 10
+  - no-match: |
+      x || y ? 5 : 10

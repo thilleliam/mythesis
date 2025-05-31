@@ -1,0 +1,28 @@
+version: '2'
+rules:
+- id: dont-negate-is-instanceof-operands
+  description: '`in` and `instanceof` have lower precedence than negation operators.'
+  explanation: |
+    Since negation is applied first, checking `!key in dict` checks whether `!key` is in dict
+    rather than whether the `key` is not in the `dict`, and similarly with `instanceof`.
+
+    This rule warns when the left operand of `is` or `instanceof` is negated.
+  tags:
+  - default
+  any:
+  - pattern: '!${var} in ${thing}'
+  - pattern: '!${var} instanceof ${thing}'
+  language:
+  - javascript
+  - typescript
+  tests:
+  - match: |
+      if (!"prop" in myObj) {  // Noncompliant;  "in" operator is checking property "false"
+        doTheThing();  // this block will be never executed
+      }
+  - match: |
+      let var = !thing instanceof MyClass;
+  - no-match: |
+      if (!("prop" in myObj)) {
+        doTheThing();
+      }

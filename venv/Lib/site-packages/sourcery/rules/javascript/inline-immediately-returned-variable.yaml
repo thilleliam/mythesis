@@ -1,0 +1,67 @@
+version: '2'
+rules:
+- id: inline-immediately-returned-variable
+  description: Inline variable that is immediately returned
+  explanation: |
+    Something that we often see in people's code is assigning to a result variable
+    and then immediately returning it.
+
+    Returning the result directly shortens the code and removes an unnecessary
+    variable, reducing the mental load of reading the function.
+
+    Where intermediate variables can be useful is if they then get used as a
+    parameter or a condition, and the name can act like a comment on what the
+    variable represents. In the case where you're returning it from a function, the
+    function name is there to tell you what the result is, so the variable name
+    is unnecessary.
+  language:
+  - javascript
+  - typescript
+  tags:
+  - default
+  any:
+  - pattern: |
+      const ${variable} = ${return_value};
+      return ${variable};
+    replacement: |
+      return ${return_value};
+  - pattern: |
+      let ${variable} = ${return_value};
+      return ${variable};
+    replacement: |
+      return ${return_value};
+# TODO Would need to check that variable was defined inside this function with let or const.
+#  - pattern: |
+#      ${variable} = ${return_value};
+#      return ${variable};
+#    replacement: |
+#      return ${return_value};
+# TODO I think I'm right in thinking that removing vars is in general unsafe without further checks
+#  - pattern: |
+#      var ${variable} = ${return_value}
+#      return ${variable}
+#    replacement: |
+#      return ${return_value}
+  tests:
+  - match: |
+      const var = 1;
+      return var;
+    expect: |
+      return 1;
+  - match: |
+      let other = function func() { ; };
+      return other;
+    expect: |
+      return function func() { ; };
+  - no-match: |
+      function outer() {
+        let x = 1;
+        function inner() {
+          x = 5;
+          return x;
+        }
+      }
+  - no-match: |
+      const var = 1;
+      const thing = 3;
+      return var;

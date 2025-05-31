@@ -1,0 +1,53 @@
+version: '2'
+rules:
+- id: binary-operator-identity
+  description: Simplify binary operation
+  explanation: |
+    Some identities can be applied to simplify certain binary operations. For example
+    writing `x - x` is a complicated way of saying `0`.
+  language:
+  - javascript
+  - typescript
+  tags:
+  - default
+  any:
+  # Arithmetic operators
+  - pattern: ${value} - ${value}
+    replacement: '0'
+  - pattern: ${value} / ${value}
+    condition: value != 0
+    replacement: '1'
+  - pattern: ${value} % ${value}
+    replacement: '0'
+  # Boolean operators
+  - pattern: ${value} && ${value}  # could be true or false, probably a mistake
+  - pattern: ${value} > ${value}
+    replacement: 'false'
+  - pattern: ${value} < ${value}
+    replacement: 'false'
+  # Bitwise operators
+  - pattern: ${value} | ${value}
+    replacement: ${value}
+  - pattern: ${value} & ${value}
+    replacement: ${value}
+  - pattern: ${value} ^ ${value}
+    replacement: '0'
+  tests:
+  - match: 2 - 2
+    expect: '0'
+  - match: 3 / 3
+    expect: '1'
+  - no-match: 0 / 0
+  - match: 4 % 4
+    expect: '0'
+  - match: 5 | 5
+    expect: '5'
+  - match: 6 & 6
+    expect: '6'
+  - match: 7 ^ 7
+    expect: '0'
+  - match: |
+      if (a == b && a == b) { doX(); }
+  - match: |
+      if (a > a) { doW(); }
+    expect: if (false) { doW(); }

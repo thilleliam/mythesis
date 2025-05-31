@@ -1,0 +1,74 @@
+version: '2'
+rules:
+- id: raise-specific-error
+  description: Raise a specific error instead of the general `Exception` or `BaseException`
+  language: python
+  tags:
+  - default
+  any:
+  - pattern: raise Exception
+  - pattern: raise Exception from ${cause}
+  - pattern: raise Exception(...)
+  - pattern: raise Exception(...) from ${cause}
+  - pattern: raise BaseException
+  - pattern: raise BaseException from ${cause}
+  - pattern: raise BaseException(...)
+  - pattern: raise BaseException(...) from ${cause}
+  explanation: |
+    If a piece of code raises a specific exception type
+    rather than the generic
+    [`BaseException`](https://docs.python.org/3/library/exceptions.html#BaseException)
+    or [`Exception`](https://docs.python.org/3/library/exceptions.html#Exception),
+    the calling code can:
+
+    - get more information about what type of error it is
+    - define specific exception handling for it
+
+    This way, callers of the code can handle the error appropriately.
+
+    How can you solve this?
+
+    - Use one of the [built-in exceptions](https://docs.python.org/3/library/exceptions.html) of the standard library.
+    - [Define your own error class](https://docs.python.org/3/tutorial/errors.html#tut-userexceptions) that subclasses `Exception`.
+
+    So instead of having code raising `Exception` or `BaseException` like
+
+    ```python
+    if incorrect_input(value):
+        raise Exception("The input is incorrect")
+    ```
+
+    you can have code raising a specific error like
+
+    ```python
+    if incorrect_input(value):
+        raise ValueError("The input is incorrect")
+    ```
+
+    or
+
+    ```python
+    class IncorrectInputError(Exception):
+        pass
+
+
+    if incorrect_input(value):
+        raise IncorrectInputError("The input is incorrect")
+    ```
+  tests:
+  - match: raise Exception
+  - match: raise Exception()
+  - match: raise Exception("some error message")
+  - match: raise BaseException
+  - match: raise BaseException()
+  - match: raise BaseException("some error message")
+  - no-match: raise ValueError
+  - no-match: raise CodingAssistantError("Booommm")
+  - match: raise Exception from other
+  - match: raise Exception() from e
+  - match: raise Exception("some error message") from e
+  - match: raise BaseException from other
+  - match: raise BaseException() from e
+  - match: raise BaseException("some error message") from e
+  - no-match: raise ValueError from e
+  - no-match: raise CodingAssistantError("Booommm") from other_error

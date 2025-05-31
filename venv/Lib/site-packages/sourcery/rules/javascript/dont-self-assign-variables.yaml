@@ -1,0 +1,20 @@
+version: '2'
+rules:
+- id: dont-self-assign-variables
+  description: Assigning a variable to itself has no effect.
+  explanation: |
+    Assigning a variable to itself has no effect, and is therefore either redundant or a mistake.
+  pattern: ${a} = ${a}
+  replacement: ''
+  language:
+  - javascript
+  - typescript
+  tags:
+  - default
+  tests:
+  - match: a = a
+  - match: this.thing = this.thing
+  - no-match: a = b
+  - no-match: this.name = name
+  - no-match: let a = a
+  - no-match: var _private = my._private = my._private || {}

@@ -1,0 +1,155 @@
+version: '2'
+rules:
+- id: max-min-identity
+  description: Use max/min instead of if statement
+  explanation: |
+    We often need to work out the smallest or largest of two values, and the
+    most readable way to do this is to use the built-in `min` and `max`
+    functions. This results in a shorter and clearer way to achieve the same result.
+  language:
+  - javascript
+  - typescript
+  tags:
+  - default
+  any:
+  # TODO There's so many varieties here that we could really use macros
+  # - use `var` to assign the variables
+  - pattern: |
+      if (${a} < ${b}) {
+        ${c} = ${a}
+      } else {
+        ${c} = ${b}
+      }
+    replacement: |
+      ${c} = Math.min(${a}, ${b})
+  - pattern: |
+      if (${a} <= ${b}) {
+        ${c} = ${a}
+      } else {
+        ${c} = ${b}
+      }
+    replacement: |
+      ${c} = Math.min(${a}, ${b})
+  - pattern: |
+      if (${a} >= ${b}) {
+        ${c} = ${b}
+      } else {
+        ${c} = ${a}
+      }
+    replacement: |
+      ${c} = Math.min(${a}, ${b})
+  - pattern: |
+      if (${a} > ${b}) {
+        ${c} = ${b}
+      } else {
+        ${c} = ${a}
+      }
+    replacement: |
+      ${c} = Math.min(${a}, ${b})
+  - pattern: |
+      if (${a} < ${b}) {
+        ${c} = ${b}
+      } else {
+        ${c} = ${a}
+      }
+    replacement: |
+      ${c} = Math.max(${a}, ${b})
+  - pattern: |
+      if (${a} <= ${b}) {
+        ${c} = ${b}
+      } else {
+        ${c} = ${a}
+      }
+    replacement: |
+      ${c} = Math.max(${a}, ${b})
+  - pattern: |
+      if (${a} >= ${b}) {
+        ${c} = ${a}
+      } else {
+        ${c} = ${b}
+      }
+    replacement: |
+      ${c} = Math.max(${a}, ${b})
+  - pattern: |
+      if (${a} > ${b}) {
+        ${c} = ${a}
+      } else {
+        ${c} = ${b}
+      }
+    replacement: |
+      ${c} = Math.max(${a}, ${b})
+  - pattern: |
+      if (${a} >= ${b}) {
+        ${a} = ${b}
+      }
+    replacement: |
+      ${a} = Math.min(${a}, ${b});
+  - pattern: |
+      if (${a} > ${b}) {
+        ${a} = ${b}
+      }
+    replacement: |
+      ${a} = Math.min(${a}, ${b});
+  - pattern: |
+      if (${a} <= ${b}) {
+        ${a} = ${b}
+      }
+    replacement: |
+      ${a} = Math.max(${a}, ${b})
+  - pattern: |
+      if (${a} < ${b}) {
+        ${a} = ${b}
+      }
+    replacement: |
+      ${a} = Math.max(${a}, ${b})
+  tests:
+  - match: |
+      if (a < b) {
+        c = a
+      } else {
+        c = b
+      }
+    expect: |
+      c = Math.min(a, b)
+  - match: |
+      if (a < b) {
+        a = b
+      }
+    expect: |
+      a = Math.max(a, b)
+  - no-match: |
+      if (a < b) {
+        c = b;
+      }
+# TODO: get this to work when side-effect analysis is available, e.g. not b.has_side_effects()
+#  - no-match: |
+#      if (a >= something()) {
+#        a = something();
+#      }
+  - no-match: |
+      if (a < b) {
+        c = a
+      } else if (b > a) {
+        c = b
+      }
+  # TODO
+  # - match: |
+  #     if (a < b) {
+  #       var c = a
+  #     } else {
+  #       var c = b
+  #     }
+  #   expect: |
+  #     var c = Math.min(a, b)
+  # TODO
+  # - match: |
+  #     if (a < b) {
+  #       a = b
+  #     }
+  #   expect: |
+  #     a = Math.max(a, b)
+  # TODO
+  # - match: |
+  #     a = a < b ? a : b
+  #   expect: |
+  #     a = Math.min(a, b)

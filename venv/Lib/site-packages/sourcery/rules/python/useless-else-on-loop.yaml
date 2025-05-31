@@ -1,0 +1,191 @@
+version: '2'
+rules:
+- id: useless-else-on-loop
+  description: Loop's else clause is always executed - move code to same level as loop
+  language: python
+  tags:
+  - default
+  all:
+  - any:
+    - pattern: |
+        for ${item} in ${collection}:
+            ${statements+}
+        else:
+            ${else_statements+}
+      replacement: |
+        for ${item} in ${collection}:
+            ${statements}
+        ${else_statements}
+    - pattern: |
+        while ${test}:
+            ${statements+}
+        else:
+            ${else_statements+}
+      replacement: |
+        while ${test}:
+            ${statements}
+        ${else_statements}
+  - not:
+      contains:
+        kind: break_statement
+  explanation: |
+    Loops should only have an `else` clause if they can exit early with a `break`
+    statement. If there is no `break` then the code in the `else` is always
+    executed. In this case the `else` statements can be moved to the same scope as
+    the loop itself, making the code slightly easier to understand (no need to look
+    up what the `else` does).
+  tests:
+  - match: |
+      evens = []
+      for n in numbers:
+          if n % 2:
+              evens.append(n)
+      else:
+          print("Done!")
+    expect: |
+      evens = []
+      for n in numbers:
+          if n % 2:
+              evens.append(n)
+      print("Done!")
+  - match: |
+      def func():
+        for n in numbers:
+          yield n
+        else:
+          do_y()
+    expect: |
+      def func():
+        for n in numbers:
+          yield n
+        do_y()
+  - match: |
+      def func():
+        i = 0
+        while i < 3:
+          print(1)
+          if a:
+            print(2)
+          i += 1
+        else:
+          do_y()
+    expect: |
+      def func():
+        i = 0
+        while i < 3:
+          print(1)
+          if a:
+            print(2)
+          i += 1
+        do_y()
+  - match: |
+      def func():
+        for n in numbers:
+          yield n
+        else:
+          do_y()
+          print('Yeah!')
+    expect: |
+      def func():
+        for n in numbers:
+          yield n
+        do_y()
+        print('Yeah!')
+  - match: |
+      def func():
+        while False:
+          yield n
+        else:
+          do_y()
+          print('Yeah!')
+    expect: |
+      def func():
+        while False:
+          yield n
+        do_y()
+        print('Yeah!')
+  - match: |
+      def func():
+        for n in numbers:
+          do_x()
+          continue
+        else:
+          do_y()
+    expect: |
+      def func():
+        for n in numbers:
+          do_x()
+          continue
+        do_y()
+  - match: |
+      def func():
+        i = 0
+        while i < 3:
+          i += 1
+          print(1)
+          if i == 1:
+            continue
+          print(2)
+        else:
+          print(1)
+    expect: |
+      def func():
+        i = 0
+        while i < 3:
+          i += 1
+          print(1)
+          if i == 1:
+            continue
+          print(2)
+        print(1)
+  - no-match: |
+      def func():
+        for n in numbers:
+          do_x()
+          if y:
+            break
+        else:
+          do_y()
+  - no-match: |
+      def func():
+        while True:
+          do_x()
+          if y:
+            break
+        else:
+          do_y()
+  - no-match: |
+      for i in range(n):
+          for j in range(n):
+              if j % 2 == 0:
+                  # This break stop the inner else being
+                  break
+          else:
+              # This break means the outer else can be skipped
+              break
+      else:
+          break
+  - no-match: |
+      for thing in things:
+          for other_thing in other_things:
+              pass  # inner body
+          else:
+              break
+      else:
+          explode_computer()
+# TODO Restore this once we can cleanly determine breaks in loop bodies vs the else clause
+#  - match: |
+#      def func():
+#        for thing in things:
+#          for other in others:
+#            x()
+#            break
+#        else:
+#          print(1)
+#    expect: |
+#      def func():
+#        for thing in things:
+#          for other in others:
+#            x()
+#            break
+#        print(1)

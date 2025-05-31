@@ -1,0 +1,116 @@
+version: '2'
+rules:
+- id: avoid-infinite-loops
+  description: Avoid loops with missing or constant end conditions.
+  explanation: |
+    Loops with a constant condition, or no terminator, can be useful in certain contexts, but it's easy to forget
+    to break out of them. This rule highlights loops which may never end.
+  language:
+  - javascript
+  - typescript
+  tags:
+  - default
+  all:
+  - any:
+    - pattern: |
+        for (${init?};;${inc?}) {...}
+    - pattern: |
+        do {...} while (true)
+    - pattern: |
+        while (true) {...}
+      # TODO: extend with type analysis/constant propagation
+      # See https://linear.app/sourcery/issue/SOU-545/extend-avoid-infinite-loops-with-appropriate-type-analysisconstant
+      # - pattern: |
+      #     while (${cond}) {...}
+      #   condition: cond.is_truthy()
+  - not:
+      contains:
+        kind: break_statement
+      # TODO: analyze which loop the break statement is applied to (labeled breaks)
+      # See commented match * below.
+  - not:
+      contains:
+        kind:
+        - return_statement
+        - throw_statement
+      until:
+        kind:
+        - function
+        - function_declaration
+        - generator_function
+        - generator_function_declaration
+        - arrow_function
+  tests:
+  - match: |
+      for (;;) {console.log("forever")}
+  - match: |
+      for (var x = 1;;x++) {console.log(`forever ${x}`);}
+  - match: |
+      var j = 0;
+      while (true) {
+        j++
+      }
+  # *
+  # - match: |
+  #     var x = 0;
+  #     var y = 0;
+  #     while (true) {
+  #       x++;
+  #       while (true) {
+  #         y++;
+  #         console.log(x, y);
+  #         if (y > 10) {
+  #           break;
+  #         }
+  #       }
+  #     }
+  - no-match: |
+      while (true) {
+        if (condition) {
+          break
+        }
+      }
+  - no-match: |
+      for (var i = 1; i < 10; i++) {
+        console.log("10 times")
+      }
+  - no-match: |
+      function sayItNTimes(n) {
+        for (;;) {
+          console.log("it");
+          i++;
+          if (i > n) {
+            return;
+          }
+        }
+      }
+  - no-match: |
+      var x = 0;
+      var y = 0;
+      while (true) {
+        x++;
+        while (true) {
+          y++;
+          console.log(x, y);
+          if (y > 10) {
+            break;
+          }
+        }
+        if (x > 10) {
+          break;
+        }
+      }
+  - match: |
+      do {
+        something();
+        for (var x = 0; x < 10; x++) {
+          console.log(x);
+        }
+      } while (true);
+  - no-match: |
+      while (true) {
+        let fn = function () {
+          return;
+        }
+        return;
+      }

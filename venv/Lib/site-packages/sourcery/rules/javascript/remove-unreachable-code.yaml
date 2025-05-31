@@ -1,0 +1,179 @@
+version: '2'
+rules:
+- id: remove-unreachable-code
+  description: Remove unreachable code.
+  explanation: |
+    Statements after a `return`, `break`, `continue` or `throw` will never be executed.
+    Leaving them in the code confuses the reader, who may believe that these
+    statements have some effect. They should therefore be removed.
+  language:
+  - javascript
+  - typescript
+  tags:
+  - default
+  all:
+  - any:
+    - pattern: |
+        return ...;
+        ${statements+}
+      replacement: |
+        return ...;
+    - pattern: |
+        break ...;
+        ${statements+}
+      replacement: |
+        break ...;
+    - pattern: |
+        continue ...;
+        ${statements+}
+      replacement: |
+        continue ...;
+    - pattern: |
+        throw ...;
+        ${statements+}
+      replacement: |
+        throw ...;
+  # These can be hoisted, so affect code before them
+  - not:
+      contains:
+        kind:
+        - variable_declaration
+        - function_declaration
+        - generator_function_declaration
+        - class_declaration
+        - lexical_declaration
+  tests:
+  - match: |
+      if (true) {
+        return;
+        do_something();
+      }
+    expect: |
+      if (true) {
+        return;
+      }
+  - match: |
+      return value;
+      do_something();
+    expect: |
+      return value;
+  - match: |
+      while (i < 6) {
+        if (i === 3) {
+          break;
+          x();
+        }
+        i = i + 1;
+      }
+    expect: |
+      while (i < 6) {
+        if (i === 3) {
+          break;
+        }
+        i = i + 1;
+      }
+  # TODO Fix this comment removal - have added an issue
+  - match: |
+      outerBlock: {
+        innerBlock: {
+          console.log("1");
+          break outerBlock; // breaks out of both inner_block and outer_block
+          console.log(":-("); // skipped
+        }
+        console.log("2"); // skipped
+      }
+    expect: |
+      outerBlock: {
+        innerBlock: {
+          console.log("1");
+          break outerBlock; // skipped
+        }
+        console.log("2"); // skipped
+      }
+  - match: |
+      continue;
+      do_something();
+    expect: |
+      continue;
+  - match: |
+      continue;
+      do_something();
+    expect: |
+      continue;
+  - match: |
+      continue label;
+      do_something();
+    expect: |
+      continue label;
+  - match: |
+      try {
+        let x;
+        throw n; // throws an exception with a numeric value
+        something++;
+        x();
+      } catch (e) {
+        if (e <= 50) {
+          // statements to handle exceptions 1-50
+        } else {
+          // cannot handle this exception, so rethrow
+          throw e;
+        }
+      }
+    expect: |
+      try {
+        let x;
+        throw n;
+      } catch (e) {
+        if (e <= 50) {
+          // statements to handle exceptions 1-50
+        } else {
+          // cannot handle this exception, so rethrow
+          throw e;
+        }
+      }
+  - no-match: |
+      let MOUSE_HAS_BUTTONS = (function() {
+        try {
+          return new MouseEvent('test', {buttons: 1}).buttons === 1;
+        } catch (e) {
+          return false;
+        }
+      })();
+  - no-match: |
+      return x;
+      var y;
+  - no-match: |
+      if (thing) {
+        let y;
+        throw x;
+        function foo(y) { ; };
+      }
+  - no-match: |
+      return ast;
+
+      /**
+        * - `toOverrideNode` must be the last thing in `toBeOverriddenNode`
+        * - do nothing if there's a semicolon on `toOverrideNode.end` (no need to fix)
+      */
+      function overrideLocEnd(toBeOverriddenNode, toOverrideNode) {
+        if (options.originalText[locEnd(toOverrideNode)] === ";") {
+          return;
+        }
+      }
+  - no-match: |
+      return ast;
+
+      /**
+        * - `toOverrideNode` must be the last thing in `toBeOverriddenNode`
+        * - do nothing if there's a semicolon on `toOverrideNode.end` (no need to fix)
+      */
+
+      /**
+        * - `toOverrideNode` must be the last thing in `toBeOverriddenNode`
+        * - do nothing if there's a semicolon on `toOverrideNode.end` (no need to fix)
+      */
+      function overrideLocEnd(toBeOverriddenNode, toOverrideNode) {
+        if (options.originalText[locEnd(toOverrideNode)] === ";") {
+          return;
+        }
+      }

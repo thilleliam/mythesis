@@ -9,9 +9,11 @@ import datetime
 import copy
 from datetime import datetime, timedelta
 
+
 class Instance:
     def __init__(self, id_client=None, cible_longitude=None, cible_latitude=None):
         """
+        dans cette approche nous avons comparee toute les paires de vehicules au lieu den prendre un seul vehicule et le dupliquer
         Initialisation d'une instance du problème de transport par navettes entre les sites A et B
         sur un horizon de 12 semaines, avec transport uniquement dans le sens A vers B.
         
@@ -529,28 +531,7 @@ class OptimisateurNavettes:
         
     def calculer_navettes_optimales(self, produits_a_transporter, vehicules_data, date_debut, heure_debut, duree_max_jours=7):
         """
-        Calcule les navettes optimales en minimisant les coûts totaux avec contrainte temporelle
-        
-        produits_a_transporter: liste de dictionnaires avec:
-        - nom: nom du produit
-        - quantite: nombre d'unités
-        - poids_unitaire: poids par unité (en tonnes)
-        - volume_unitaire: volume par unité (en m³)
-        
-        Autres paramètres: distance_km, vitesse_kmh
-        
-        vehicules_data: liste de dictionnaires avec:
-        - nom: nom du véhicule
-        - type: 'LEGER' ou 'LOURD'
-        - capacite_poids_max: capacité maximale en poids (tonnes)
-        - capacite_volume_max: capacité maximale en volume (m³)
-        - vitesse_kmh: vitesse du véhicule
-        - cout_fixe_jour: coût fixe par jour d'utilisation
-        - cout_variable_km: coût variable par kilomètre
-        
-        date_debut: date de début (format YYYY-MM-DD)
-        heure_debut: heure de début (format HH:MM)
-        duree_max_jours: durée maximale autorisée (défaut: 7 jours)
+        Calcule les navettes optimales avec combinaison intelligente de véhicules
         """
         
         # Calculer les totaux de la demande
@@ -559,161 +540,294 @@ class OptimisateurNavettes:
         
         demande_equivalente = {
             'nom': 'TRANSPORT MULTI-PRODUITS A→B',
-            'distance_km': produits_a_transporter[0].get('distance_km', 800),  # Valeur par défaut
-            'vitesse_kmh': produits_a_transporter[0].get('vitesse_kmh', 80),   # Valeur par défaut
+            'distance_km': produits_a_transporter[0].get('distance_km', 800),
+            'vitesse_kmh': produits_a_transporter[0].get('vitesse_kmh', 80),
             'quantite_poids': poids_total,
             'quantite_volume': volume_total
         }
         
-        print(f"\n=== OPTIMISATION DES COÛTS POUR TRANSPORT MULTI-PRODUITS AVEC MÉLANGE ===")
-        print(f"⏰ CONTRAINTE TEMPORELLE: Terminé en {duree_max_jours} jours maximum")
-        print(f"🔄 STRATÉGIE: Remplissage homogène puis mélange optimal")
-        print(f"Nombre de types de produits: {len(produits_a_transporter)}")
+        print(f"\n=== OPTIMISATION AVEC COMBINAISON INTELLIGENTE DE VÉHICULES ===")
+        print(f"⏰ CONTRAINTE TEMPORELLE: {duree_max_jours} jours maximum")
+        print(f"🔄 NOUVEAUTÉ: Combinaison optimale de véhicules différents")
         
-        # Affichage détaillé des produits
-        print(f"\n📦 DÉTAIL DES PRODUITS À TRANSPORTER:")
-        for i, produit in enumerate(produits_a_transporter, 1):
-            poids_produit = produit['quantite'] * produit['poids_unitaire']
-            volume_produit = produit['quantite'] * produit['volume_unitaire']
-            
-            print(f"  {i}. {produit['nom']}:")
-            print(f"     - Quantité: {produit['quantite']} unités")
-            print(f"     - Poids unitaire: {produit['poids_unitaire']} tonnes/unité")
-            print(f"     - Volume unitaire: {produit['volume_unitaire']} m³/unité")
-            print(f"     - Poids total: {poids_produit:.2f} tonnes")
-            print(f"     - Volume total: {volume_produit:.2f} m³")
-        
-        print(f"\n📊 TOTAUX:")
-        print(f"Poids total: {poids_total:.2f} tonnes")
-        print(f"Volume total: {volume_total:.2f} m³")
-        print(f"Distance A-B: {demande_equivalente['distance_km']} km")
-        print(f"Nombre de types de véhicules disponibles: {len(vehicules_data)}")
-        
-        # Analyser chaque type de véhicule avec contrainte temporelle
-        analyses_vehicules = []
-        
-        for vehicule in vehicules_data:
-            analyse = self._analyser_vehicule_avec_contrainte(demande_equivalente, vehicule, duree_max_jours)
-            analyses_vehicules.append(analyse)
-            
-            print(f"\n{vehicule['nom']} ({vehicule['type']}):")
-            print(f"  Capacités: {vehicule['capacite_poids_max']} tonnes, {vehicule['capacite_volume_max']} m³")
-            print(f"  Voyages par véhicule: {analyse['voyages_par_vehicule']} (contrainte: {analyse['contrainte_dominante']})")
-            print(f"  Durée avec 1 véhicule: {analyse['duree_un_vehicule']} jour(s)")
-            
-            if analyse['respect_contrainte']:
-                print(f"  ✅ RESPECTE LA CONTRAINTE DE {duree_max_jours} JOURS")
-                print(f"  Nombre de véhicules nécessaires: {analyse['nb_vehicules_necessaires']}")
-                print(f"  Coût fixe total: {analyse['cout_fixe_total']:.2f}€")
-                print(f"  Coût variable total: {analyse['cout_variable_total']:.2f}€")
-                print(f"  💰 COÛT TOTAL: {analyse['cout_total']:.2f}€")
-                print(f"  📊 Coût par véhicule: {analyse['cout_par_vehicule']:.2f}€")
-            else:
-                print(f"  ❌ NE RESPECTE PAS LA CONTRAINTE DE {duree_max_jours} JOURS")
-                print(f"  Durée minimale nécessaire: {analyse['duree_un_vehicule']} jours")
-                print(f"  SOLUTION NON VIABLE dans le délai imparti")
-        
-        # Filtrer les véhicules viables (qui respectent la contrainte)
-        vehicules_viables = [a for a in analyses_vehicules if a['respect_contrainte']]
-        
-        if not vehicules_viables:
-            print(f"\n❌ AUCUN VÉHICULE NE PEUT RESPECTER LA CONTRAINTE DE {duree_max_jours} JOURS")
-            print("Recommandations:")
-            print("- Augmenter la durée autorisée")
-            print("- Utiliser des véhicules avec plus de capacité")
-            print("- Diviser la demande en plusieurs lots")
-            return None
-        
-        # Sélectionner le véhicule le plus économique parmi les viables
-        vehicule_optimal = min(vehicules_viables, key=lambda x: x['cout_total'])
-        
-        print(f"\n🏆 VÉHICULE OPTIMAL SÉLECTIONNÉ: {vehicule_optimal['vehicule']['nom']}")
-        print(f"💰 COÛT TOTAL: {vehicule_optimal['cout_total']:.2f}€")
-        print(f"🚛 NOMBRE DE VÉHICULES: {vehicule_optimal['nb_vehicules_necessaires']}")
-        print(f"⏱️ DURÉE RÉELLE: {vehicule_optimal['duree_reelle_jours']} jour(s)")
-        
-        print(f"\n📊 ÉCONOMIES vs autres véhicules viables:")
-        for analyse in vehicules_viables:
-            if analyse != vehicule_optimal:
-                economie = analyse['cout_total'] - vehicule_optimal['cout_total']
-                print(f"  vs {analyse['vehicule']['nom']}: +{economie:.2f}€ ({economie/vehicule_optimal['cout_total']*100:.1f}% plus cher)")
-        
-        # Effectuer la planification détaillée avec mélange des produits
-        resultats_planification = self._planifier_multi_vehicules_melange(
-            produits_a_transporter,
-            demande_equivalente,
-            vehicule_optimal, 
-            date_debut, 
-            heure_debut,
+        # ✅ UTILISER LA NOUVELLE MÉTHODE DE RECHERCHE
+        solution_optimale = self._chercher_combinaison_optimale(
+            demande_equivalente, 
+            vehicules_data, 
             duree_max_jours
         )
         
+        if not solution_optimale:
+            print(f"\n❌ AUCUNE SOLUTION TROUVÉE")
+            return None
+        
+        # Adapter le format de retour selon le type de solution
+        if solution_optimale.get('type_solution') == 'combinaison':
+            print(f"\n🎉 SOLUTION COMBINAISON SÉLECTIONNÉE!")
+            
+            # Créer un format de retour adapté pour les combinaisons
+            return {
+                'type_solution': 'combinaison',
+                'vehicules_utilises': solution_optimale['vehicules_detail'],
+                'vehicule_principal': solution_optimale['vehicule_principal'],
+                'vehicule_secondaire': solution_optimale['vehicule_secondaire'],
+                'cout_total': solution_optimale['cout_total'],
+                'duree_reelle': solution_optimale['duree_reelle_jours'],
+                'respect_contrainte': True,
+                'demande_equivalente': demande_equivalente,
+                'solution_detaillee': solution_optimale
+            }
+        else:
+            # Solution véhicule unique - utiliser le format existant
+            print(f"\n✅ SOLUTION VÉHICULE UNIQUE SÉLECTIONNÉE!")
+            
+            return {
+                'type_solution': 'vehicule_unique',
+                'vehicule_utilise': solution_optimale['vehicule'],
+                'nb_vehicules_necessaires': 1,
+                'duree_reelle': solution_optimale['duree_reelle_jours'],
+                'respect_contrainte': True,
+                'vehicule_optimal': solution_optimale,
+                'demande_equivalente': demande_equivalente
+            }
+    def _tester_combinaison_vehicules(self, demande, analyse_vehicule1, analyse_vehicule2, duree_max_jours):
+        """
+        Teste si deux véhicules travaillant en parallèle peuvent respecter la contrainte
+        """
+        vehicule1 = analyse_vehicule1['vehicule']
+        vehicule2 = analyse_vehicule2['vehicule']
+        
+        # Calculer la capacité combinée
+        capacite_poids_combinee = vehicule1['capacite_poids_max'] + vehicule2['capacite_poids_max']
+        capacite_volume_combinee = vehicule1['capacite_volume_max'] + vehicule2['capacite_volume_max']
+        
+        # Calculer les voyages nécessaires avec la capacité combinée
+        nb_voyages_poids = math.ceil(demande['quantite_poids'] / capacite_poids_combinee)
+        nb_voyages_volume = math.ceil(demande['quantite_volume'] / capacite_volume_combinee)
+        nb_voyages_necessaires = max(nb_voyages_poids, nb_voyages_volume)
+        
+        # Estimer la durée avec les deux véhicules
+        vitesse_moyenne = (vehicule1.get('vitesse_kmh', 80) + vehicule2.get('vitesse_kmh', 80)) / 2
+        
+        temps_conduite_par_voyage = (demande['distance_km'] * 2) / vitesse_moyenne
+        temps_total_conduite = temps_conduite_par_voyage * nb_voyages_necessaires
+        temps_operations = nb_voyages_necessaires * 3.0
+        
+        duree_estimee = math.ceil((temps_total_conduite + temps_operations) / 8.0)
+        
+        if duree_estimee > duree_max_jours:
+            return None  # Combinaison ne respecte pas non plus la contrainte
+        
+        # Calculer le coût combiné
+        # Répartir les voyages entre les deux véhicules
+        voyages_vehicule1 = math.ceil(nb_voyages_necessaires / 2)
+        voyages_vehicule2 = nb_voyages_necessaires - voyages_vehicule1
+        
+        # Coûts véhicule 1
+        distance_v1 = voyages_vehicule1 * demande['distance_km'] * 2
+        cout_fixe_v1 = duree_estimee * vehicule1['cout_fixe_jour']
+        cout_variable_v1 = distance_v1 * vehicule1['cout_variable_km']
+        cout_v1 = cout_fixe_v1 + cout_variable_v1
+        
+        # Coûts véhicule 2
+        distance_v2 = voyages_vehicule2 * demande['distance_km'] * 2
+        cout_fixe_v2 = duree_estimee * vehicule2['cout_fixe_jour']
+        cout_variable_v2 = distance_v2 * vehicule2['cout_variable_km']
+        cout_v2 = cout_fixe_v2 + cout_variable_v2
+        
+        cout_total_combinaison = cout_v1 + cout_v2
+        
         return {
-            'produits_a_transporter': produits_a_transporter,
-            'demande_equivalente': demande_equivalente,
-            'vehicule_utilise': vehicule_optimal['vehicule'],
-            'nb_vehicules_necessaires': vehicule_optimal['nb_vehicules_necessaires'],
-            'duree_max_autorisee': duree_max_jours,
-            'duree_reelle': vehicule_optimal['duree_reelle_jours'],
+            'vehicule_principal': vehicule1['nom'],
+            'vehicule_secondaire': vehicule2['nom'],
+            'vehicules_detail': [vehicule1, vehicule2],
+            'nb_voyages_total': nb_voyages_necessaires,
+            'voyages_vehicule1': voyages_vehicule1,
+            'voyages_vehicule2': voyages_vehicule2,
+            'duree_reelle_jours': duree_estimee,
             'respect_contrainte': True,
-            'analyses_vehicules': analyses_vehicules,
-            'vehicules_viables': vehicules_viables,
-            'vehicule_optimal': vehicule_optimal,
-            'planification_detaillee': resultats_planification
+            'cout_vehicule1': cout_v1,
+            'cout_vehicule2': cout_v2,
+            'cout_total': cout_total_combinaison,
+            'type_solution': 'combinaison',
+            'capacite_poids_combinee': capacite_poids_combinee,
+            'capacite_volume_combinee': capacite_volume_combinee
         }
-    
+    def _chercher_combinaison_optimale(self, demande, vehicules_data, duree_max_jours):
+        """
+        Cherche la meilleure combinaison de véhicules différents qui travaillent en parallèle
+        """
+        print(f"\n🔄 RECHERCHE DE COMBINAISON OPTIMALE DE VÉHICULES")
+        print(f"   Objectif: Respecter {duree_max_jours} jours avec véhicules complémentaires")
+        
+        # Analyser tous les véhicules individuellement
+        analyses_individuelles = []
+        for vehicule in vehicules_data:
+            analyse = self._analyser_vehicule_avec_contrainte(demande, vehicule, duree_max_jours)
+            analyses_individuelles.append(analyse)
+        
+        # Séparer véhicules viables seuls vs nécessitant combinaison
+        vehicules_viables_seuls = [a for a in analyses_individuelles if a['respect_contrainte']]
+        vehicules_necessitant_aide = [a for a in analyses_individuelles if a['necessite_combinaison']]
+        
+        print(f"   Véhicules viables seuls: {len(vehicules_viables_seuls)}")
+        print(f"   Véhicules nécessitant aide: {len(vehicules_necessitant_aide)}")
+        
+        # Si on a des véhicules viables seuls, prendre le meilleur
+        if vehicules_viables_seuls:
+            meilleur_seul = min(vehicules_viables_seuls, key=lambda x: x['cout_total'])
+            print(f"   ✅ Meilleur véhicule seul: {meilleur_seul['vehicule']['nom']} - {meilleur_seul['cout_total']:.2f}€")
+        else:
+            meilleur_seul = None
+            print(f"   ❌ Aucun véhicule ne peut réussir seul")
+        
+        # Chercher les meilleures combinaisons
+        meilleures_combinaisons = []
+        
+        if vehicules_necessitant_aide:
+            print(f"\n   🔍 Test des combinaisons de véhicules...")
+            
+            for i, vehicule_principal in enumerate(vehicules_necessitant_aide):
+                print(f"\n     Véhicule principal: {vehicule_principal['vehicule']['nom']}")
+                
+                # Pour chaque autre véhicule, tester la combinaison
+                for j, vehicule_secondaire in enumerate(analyses_individuelles):
+                    if i == j:  # Éviter de combiner avec soi-même
+                        continue
+                    
+                    combinaison = self._tester_combinaison_vehicules(
+                        demande, 
+                        vehicule_principal, 
+                        vehicule_secondaire, 
+                        duree_max_jours
+                    )
+                    
+                    if combinaison and combinaison['respect_contrainte']:
+                        meilleures_combinaisons.append(combinaison)
+                        print(f"       ✅ + {vehicule_secondaire['vehicule']['nom']}: {combinaison['cout_total']:.2f}€")
+        
+        # Sélectionner la meilleure option globale
+        toutes_options = []
+        
+        if meilleur_seul:
+            toutes_options.append({
+                'type': 'vehicule_seul',
+                'solution': meilleur_seul,
+                'cout_total': meilleur_seul['cout_total']
+            })
+        
+        for combinaison in meilleures_combinaisons:
+            toutes_options.append({
+                'type': 'combinaison',
+                'solution': combinaison,
+                'cout_total': combinaison['cout_total']
+            })
+        
+        if not toutes_options:
+            print(f"   ❌ Aucune solution trouvée")
+            return None
+        
+        # Sélectionner la solution la moins chère
+        meilleure_option = min(toutes_options, key=lambda x: x['cout_total'])
+        
+        print(f"\n   🏆 MEILLEURE SOLUTION SÉLECTIONNÉE:")
+        if meilleure_option['type'] == 'vehicule_seul':
+            solution = meilleure_option['solution']
+            print(f"      Type: Véhicule unique")
+            print(f"      Véhicule: {solution['vehicule']['nom']}")
+            print(f"      Coût: {solution['cout_total']:.2f}€")
+            print(f"      Durée: {solution['duree_reelle_jours']} jours")
+        else:
+            solution = meilleure_option['solution']
+            print(f"      Type: Combinaison de véhicules")
+            print(f"      Véhicule 1: {solution['vehicule_principal']['nom']}")
+            print(f"      Véhicule 2: {solution['vehicule_secondaire']['nom']}")
+            print(f"      Coût total: {solution['cout_total']:.2f}€")
+            print(f"      Durée: {solution['duree_reelle_jours']} jours")
+        
+        return meilleure_option['solution']
     def _analyser_vehicule_avec_contrainte(self, demande, vehicule, duree_max_jours):
         """Analyse un véhicule avec prise en compte de la contrainte temporelle"""
         
         # Calculer le nombre de voyages nécessaires avec un seul véhicule
         nb_voyages_poids = math.ceil(demande['quantite_poids'] / vehicule['capacite_poids_max'])
-        nb_voyages_volume = math.ceil(demande['quantite_volume'] / vehicule['capacite_volume_max'])
+        
+        # Gérer le cas où capacite_volume_max est 0
+        if vehicule['capacite_volume_max'] > 0:
+            nb_voyages_volume = math.ceil(demande['quantite_volume'] / vehicule['capacite_volume_max'])
+        else:
+            if demande['quantite_volume'] > 0:
+                return {
+                    'vehicule': vehicule,
+                    'voyages_par_vehicule': float('inf'),
+                    'contrainte_dominante': 'volume_impossible',
+                    'duree_un_vehicule': float('inf'),
+                    'respect_contrainte': False,
+                    'nb_vehicules_necessaires': float('inf'),
+                    'duree_reelle_jours': duree_max_jours,
+                    'distance_totale': 0,
+                    'cout_fixe_total': float('inf'),
+                    'cout_variable_total': 0,
+                    'cout_total': float('inf'),
+                    'cout_par_vehicule': float('inf'),
+                    'voyages_totaux': 0,
+                    'necessite_combinaison': False
+                }
+            else:
+                nb_voyages_volume = 0
+        
         voyages_par_vehicule = max(nb_voyages_poids, nb_voyages_volume)
+        
+        if voyages_par_vehicule == 0:
+            voyages_par_vehicule = 1
         
         # Estimer la durée avec un seul véhicule
         vitesse_utilisee = vehicule.get('vitesse_kmh', demande['vitesse_kmh'])
-        temps_conduite_par_voyage = (demande['distance_km'] * 2) / vitesse_utilisee  # Aller-retour
+        
+        if vitesse_utilisee <= 0:
+            vitesse_utilisee = 60
+        
+        temps_conduite_par_voyage = (demande['distance_km'] * 2) / vitesse_utilisee
         temps_total_conduite = temps_conduite_par_voyage * voyages_par_vehicule
         
-        # Temps de chargement/déchargement par voyage
-        temps_operations_par_voyage = 3.0  # 1.5h chargement + 1.5h déchargement
+        temps_operations_par_voyage = 3.0
         temps_total_operations = voyages_par_vehicule * temps_operations_par_voyage
         
-        # Estimation de la durée totale en jours (8h de travail par jour)
         temps_total_heures = temps_total_conduite + temps_total_operations
         duree_un_vehicule = math.ceil(temps_total_heures / 8.0)
         
-        # Vérifier si un seul véhicule respecte la contrainte
-        respect_contrainte = duree_un_vehicule <= duree_max_jours
-        
-        if respect_contrainte:
-            # Un seul véhicule suffit
+        # ✅ NOUVELLE LOGIQUE : Pas de multiplication automatique
+        if duree_un_vehicule <= duree_max_jours:
+            # Véhicule seul suffit
             nb_vehicules_necessaires = 1
             duree_reelle = duree_un_vehicule
+            respect_contrainte = True
+            necessite_combinaison = False
         else:
-            # Calculer le nombre de véhicules nécessaires
-            nb_vehicules_necessaires = math.ceil(duree_un_vehicule / duree_max_jours)
-            duree_reelle = duree_max_jours
-            respect_contrainte = True  # Avec plusieurs véhicules, on respecte la contrainte
+            # ✅ Au lieu de multiplier, marquer pour combinaison
+            nb_vehicules_necessaires = 1  # On garde 1 seul de ce type
+            duree_reelle = duree_un_vehicule  # Durée réelle si seul
+            respect_contrainte = False  # Ne respecte pas seul
+            necessite_combinaison = True  # ✅ NOUVEAU : Besoin d'aide
         
-        # Calculer les distances et coûts
-        voyages_totaux = voyages_par_vehicule * nb_vehicules_necessaires
+        # Calculs de coûts pour 1 seul véhicule
+        voyages_totaux = voyages_par_vehicule
         distance_aller_total = voyages_totaux * demande['distance_km']
-        distance_retour_total = (voyages_totaux - nb_vehicules_necessaires) * demande['distance_km']  # Pas de retour pour le dernier voyage de chaque véhicule
+        distance_retour_total = (voyages_totaux - 1) * demande['distance_km']
         distance_totale = distance_aller_total + distance_retour_total
         
-        # Coûts
-        cout_fixe_total = nb_vehicules_necessaires * duree_reelle * vehicule['cout_fixe_jour']
+        cout_fixe_total = duree_reelle * vehicule['cout_fixe_jour']
         cout_variable_total = distance_totale * vehicule['cout_variable_km']
+        
         cout_total = cout_fixe_total + cout_variable_total
-        cout_par_vehicule = cout_total / nb_vehicules_necessaires if nb_vehicules_necessaires > 0 else 0
+        cout_par_vehicule = cout_total
         
         return {
             'vehicule': vehicule,
             'voyages_par_vehicule': voyages_par_vehicule,
             'contrainte_dominante': 'poids' if nb_voyages_poids >= nb_voyages_volume else 'volume',
             'duree_un_vehicule': duree_un_vehicule,
-            'respect_contrainte': duree_un_vehicule <= duree_max_jours or nb_vehicules_necessaires > 1,
+            'respect_contrainte': respect_contrainte,
             'nb_vehicules_necessaires': nb_vehicules_necessaires,
             'duree_reelle_jours': duree_reelle,
             'distance_totale': distance_totale,
@@ -721,11 +835,11 @@ class OptimisateurNavettes:
             'cout_variable_total': cout_variable_total,
             'cout_total': cout_total,
             'cout_par_vehicule': cout_par_vehicule,
-            'voyages_totaux': voyages_totaux
+            'voyages_totaux': voyages_totaux,
+            'necessite_combinaison': necessite_combinaison  # ✅ NOUVEAU CHAMP
         }
-    
     def _planifier_multi_vehicules_melange(self, produits_a_transporter, demande_equivalente, vehicule_optimal, date_debut, heure_debut, duree_max_jours):
-        """Planifie les opérations avec mélange optimal des produits - remplissage homogène puis mélange"""
+        """Planifie les opérations avec mélange optimal des produits"""
         
         nb_vehicules = vehicule_optimal['nb_vehicules_necessaires']
         voyages_par_vehicule = vehicule_optimal['voyages_par_vehicule']
@@ -735,8 +849,19 @@ class OptimisateurNavettes:
         print(f"🔄 STRATÉGIE: Remplissage homogène prioritaire, puis mélange intelligent")
         print(f"⏰ CONTRAINTE TEMPORELLE STRICTE: {duree_max_jours} jours maximum")
         print(f"Véhicules utilisés: {nb_vehicules} x {vehicule['nom']}")
-        print(f"Voyages par véhicule: {voyages_par_vehicule}")
-        print(f"Voyages totaux: {voyages_par_vehicule * nb_vehicules}")
+        
+        # ✅ CORRECTION: Recalcul intelligent des voyages par véhicule
+        if nb_vehicules == 1:
+            # Un seul véhicule fait tous les voyages nécessaires
+            voyages_par_vehicule_reel = voyages_par_vehicule
+            print(f"Voyages par véhicule: {voyages_par_vehicule_reel}")
+            print(f"Voyages totaux: {voyages_par_vehicule_reel}")
+        else:
+            # Plusieurs véhicules se partagent le travail
+            voyages_par_vehicule_reel = math.ceil(voyages_par_vehicule / nb_vehicules)
+            total_voyages_necessaires = voyages_par_vehicule
+            print(f"Voyages par véhicule: {voyages_par_vehicule_reel} (répartis sur {nb_vehicules} véhicules)")
+            print(f"Total voyages nécessaires: {total_voyages_necessaires}")
         
         # Créer un pool global de toutes les unités de produits
         pool_produits = self._creer_pool_produits(produits_a_transporter)
@@ -748,33 +873,51 @@ class OptimisateurNavettes:
         planifications_vehicules = []
         date_limite = self._calculer_date_limite(date_debut, duree_max_jours)
         
+        # ✅ CORRECTION: Planification intelligente des véhicules
+        voyages_restants = voyages_par_vehicule  # Voyages totaux à effectuer
+        
         for vehicule_id in range(nb_vehicules):
             print(f"\n--- VÉHICULE {vehicule_id + 1} ---")
             
-            # Effectuer les navettes pour ce véhicule avec mélange optimal ET CONTRAINTE TEMPORELLE
+            # ✅ CORRECTION: Calculer le nombre de voyages pour ce véhicule spécifique
+            if nb_vehicules == 1:
+                # Un seul véhicule fait tout
+                voyages_ce_vehicule = voyages_par_vehicule
+            else:
+                # Répartir équitablement les voyages restants
+                vehicules_restants = nb_vehicules - vehicule_id
+                voyages_ce_vehicule = math.ceil(voyages_restants / vehicules_restants)
+                voyages_ce_vehicule = min(voyages_ce_vehicule, voyages_restants)
+            
+            print(f"    Voyages assignés à ce véhicule: {voyages_ce_vehicule}")
+            
+            # Vérifier s'il y a encore des produits à transporter
+            produits_restants = sum(info['quantite_restante'] for info in pool_produits.values())
+            if produits_restants == 0 or voyages_ce_vehicule == 0:
+                print(f"    ℹ️ Aucun produit restant ou aucun voyage nécessaire")
+                planifications_vehicules.append({
+                    'vehicule_id': vehicule_id + 1,
+                    'produits_transportes': {},
+                    'charge_totale': {'poids': 0, 'volume': 0},
+                    'voyages': [],
+                    'nb_voyages': 0
+                })
+                continue
+            
+            # Effectuer les navettes pour ce véhicule
             voyages_vehicule = self._effectuer_navettes_melange_avec_contrainte(
                 pool_produits,
                 demande_equivalente, 
                 vehicule, 
-                voyages_par_vehicule,
+                voyages_ce_vehicule,  # ✅ Utiliser le nombre correct
                 date_debut, 
                 heure_debut,
                 vehicule_id,
                 date_limite
             )
             
-            # Vérifier que ce véhicule respecte la contrainte temporelle
-            if voyages_vehicule and len(voyages_vehicule) > 0:
-                dernier_voyage = voyages_vehicule[-1]
-                date_fin_vehicule = dernier_voyage['aller']['date_arrivee']
-                
-                if not self._respecte_contrainte_temporelle(date_fin_vehicule, date_limite):
-                    print(f"    ❌ VÉHICULE {vehicule_id + 1} DÉPASSE LA CONTRAINTE DE {duree_max_jours} JOURS!")
-                    print(f"    Date de fin: {date_fin_vehicule}, Date limite: {date_limite}")
-                    # Réduire le nombre de voyages pour respecter la contrainte
-                    voyages_vehicule = self._ajuster_voyages_contrainte_temporelle(
-                        voyages_vehicule, date_limite, pool_produits
-                    )
+            # Mise à jour des voyages restants
+            voyages_restants -= len(voyages_vehicule)
             
             # Calculer la charge totale transportée par ce véhicule
             poids_total_vehicule = 0
@@ -813,20 +956,16 @@ class OptimisateurNavettes:
                 'nb_voyages': len(voyages_vehicule)
             })
         
-        # Vérifier que tous les produits ont été transportés MALGRÉ LA CONTRAINTE TEMPORELLE
+        # Vérifier que tous les produits ont été transportés
         completion_ok = self._verifier_completion_transport(produits_a_transporter, planifications_vehicules)
         
         if not completion_ok:
             print(f"\n⚠️ ATTENTION: La contrainte temporelle de {duree_max_jours} jours a empêché le transport complet!")
-            print(f"💡 SOLUTIONS POSSIBLES:")
-            print(f"   - Augmenter la durée autorisée à {duree_max_jours + 1} jours")
-            print(f"   - Ajouter des véhicules supplémentaires")
-            print(f"   - Utiliser des véhicules plus rapides ou avec plus de capacité")
         
-        # Calculer les statistiques globales avec contrainte respectée
+        # Calculer les statistiques globales
         total_voyages = sum(len(p['voyages']) for p in planifications_vehicules)
         
-        # Trouver la date de fin la plus tardive (qui doit être <= date_limite)
+        # Trouver la date de fin la plus tardive
         date_fin_globale = date_debut
         for planif in planifications_vehicules:
             if planif['voyages']:
@@ -839,17 +978,8 @@ class OptimisateurNavettes:
         date_fin_obj = datetime.strptime(date_fin_globale, '%Y-%m-%d')
         duree_reelle = (date_fin_obj - date_debut_obj).days + 1
         
-        # VÉRIFICATION FINALE DE LA CONTRAINTE TEMPORELLE
+        # Vérification finale de la contrainte temporelle
         contrainte_respectee = duree_reelle <= duree_max_jours
-        
-        if not contrainte_respectee:
-            print(f"\n🚨 ERREUR CRITIQUE: CONTRAINTE TEMPORELLE VIOLÉE!")
-            print(f"   Durée réelle: {duree_reelle} jours > {duree_max_jours} jours autorisés")
-            print(f"   Date de fin: {date_fin_globale}")
-            # Forcer le respect de la contrainte
-            duree_reelle = duree_max_jours
-            date_fin_globale = date_limite
-            contrainte_respectee = True
         
         print(f"\n✅ CONTRAINTE TEMPORELLE DE {duree_max_jours} JOURS: {'RESPECTÉE' if contrainte_respectee else 'VIOLÉE'}")
         print(f"📅 Durée réelle utilisée: {duree_reelle} jour(s)")
@@ -2950,8 +3080,8 @@ def main_complet():
     
     # Paramètres de l'instance (à adapter selon vos besoins)
     ID_CLIENT = "EGS-120"  # Remplacer par l'ID client réel
-    CIBLE_LONGITUDE = 2.3522  # Remplacer par les coordonnées réelles
-    CIBLE_LATITUDE = 48.8566
+    CIBLE_LONGITUDE = -2.2162  # Remplacer par les coordonnées réelles
+    CIBLE_LATITUDE = 31.6177
     
     try:
         # 1. CRÉATION DE L'INSTANCE AVEC DONNÉES RÉELLES

@@ -1,0 +1,88 @@
+version: '2'
+rules:
+- id: flatten-nested-try
+  description: Merge nested try-statement into a single try
+  explanation: |
+    Flattening try...catch statements nested within a try...finally generates
+    equivalent code that is easier to read and expand upon.
+  language:
+  - javascript
+  - typescript
+  tags:
+  - default
+  any:
+# TODO: should just need one pattern, but currently making ${something} optional
+#       leads to the replacement having catch () where we don't capture.
+  - pattern: |
+      try {
+          try {
+              ...
+          } catch (${something}) {
+              ...
+          }
+      } finally {
+          ...
+      }
+    replacement: |
+      try {
+          ...
+      } catch (${something}) {
+          ...
+      } finally {
+          ...
+      }
+  - pattern: |
+      try {
+          try {
+              ...
+          } catch {
+              ...
+          }
+      } finally {
+          ...
+      }
+    replacement: |
+      try {
+          ...
+      } catch {
+          ...
+      } finally {
+          ...
+      }
+  tests:
+  - match: |
+      try {
+          try {
+              something()
+          } catch (e) {
+              catching()
+          }
+      } finally {
+          finalling()
+      }
+    expect: |
+      try {
+          something()
+      } catch (e) {
+          catching()
+      } finally {
+          finalling()
+      }
+  - match: |
+      try {
+          try {
+              something()
+          } catch {
+              catching()
+          }
+      } finally {
+          finalling()
+      }
+    expect: |
+      try {
+          something()
+      } catch {
+          catching()
+      } finally {
+          finalling()
+      }

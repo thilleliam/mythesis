@@ -1,0 +1,26 @@
+version: '2'
+rules:
+- id: avoid-using-var
+  description: Use `const` or `let` instead of `var`.
+  explanation: |
+    `const` is preferred as it ensures you cannot reassign references (which can lead to buggy and confusing code).
+    `let` may be used if you need to reassign references - it's preferred to `var` because it is block- rather than
+    function-scoped.
+
+    From the [Airbnb JavaScript Style Guide](https://airbnb.io/javascript/#references--prefer-const)
+  any:
+  - pattern: var ${reference} = ${value};
+  - pattern: var ${reference};
+  language:
+  - javascript
+  - typescript
+  tags:
+  - airbnb-javascript-style-guide
+  - airbnb
+  - default
+  tests:
+  - match: var a = 1
+  - match: var b = 2
+  - no-match: const a = 1
+  - no-match: let b = 2
+  - match: var x;

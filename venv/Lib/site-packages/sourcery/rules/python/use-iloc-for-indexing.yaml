@@ -1,0 +1,65 @@
+version: '2'
+rules:
+- id: use_iloc
+  language: python
+  description: Use the [`.iloc`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.iloc.html) attribute for index-based selection
+  tags:
+  - pandas
+  any:
+  - pattern: |
+      ${df}[${index}]
+    condition: |
+      (df.has_type("pandas.DataFrame") or df.has_type("pandas.Series")) and
+      index.has_type("int")
+    replacement: |
+      ${df}.iloc[${index}]
+  - pattern: |
+      ${df}[${index1}:${index2}]
+    condition: |
+      (df.has_type("pandas.DataFrame") or df.has_type("pandas.Series")) and
+      index1.has_type("int") and index2.has_type("int")
+    replacement: |
+      ${df}.iloc[${index1}:${index2}]
+  explanation: |
+    Using 'iloc' is optimized for selecting data in Pandas based on index position
+    (https://pandas.pydata.org/pandas-docs/stable/user_guide/10min.html#selection).
+    This rule replaces the generic indexing with 'iloc' for index-based selection.
+
+    #### Before:
+    ```python
+    data = df[5]
+    ```
+
+    #### After:
+    ```python
+    data = df.iloc[5]
+    ```
+
+  tests:
+  - match: |
+      df: pandas.DataFrame
+      data = df[1]
+    expect: |
+      df: pandas.DataFrame
+      data = df.iloc[1]
+  - match: |
+      df: pandas.DataFrame
+      data = df[1:5]
+    expect: |
+      df: pandas.DataFrame
+      data = df.iloc[1:5]
+  - match: |
+      df: pandas.Series
+      data = df[1]
+    expect: |
+      df: pandas.Series
+      data = df.iloc[1]
+  - no-match: |
+      df: pandas.DataFrame
+      data = df["A"]
+  - no-match: |
+      df: pandas.DataFrame
+      data = df.loc[1]
+  - no-match: |
+      df: pandas.Series
+      data = df.iloc[1]

@@ -1,0 +1,173 @@
+version: '2'
+rules:
+- id: merge-nested-ifs
+  description: Merge nested if conditions
+  language: python
+  tags:
+  - default
+  all:
+  - pattern: |
+      if ${condition}:
+          if ${inner_condition}:
+              ${statements+}
+    replacement: |
+      if ${condition} and ${inner_condition}:
+          ${statements}
+  - capture: condition
+    constraint:
+      all:
+      - not:
+          kind: named_expression
+      - not:
+          contains:
+            kind: named_expression
+  - capture: inner_condition
+    constraint:
+      all:
+      - not:
+          kind: named_expression
+      - not:
+          contains:
+            kind: named_expression
+  explanation: |
+    Too much nesting can make code difficult to understand, and this is especially
+    true in Python, where there are no brackets to help out with the delineation of
+    different nesting levels.
+
+    Reading deeply nested code is confusing, since you have to keep track of which
+    conditions relate to which levels. We therefore strive to reduce nesting where
+    possible, and the situation where two `if` conditions can be combined using
+    `and` is an easy win.
+  tests:
+  - match: |
+      if a:
+          if b:
+              return c
+    expect: |
+      if a and b:
+          return c
+  - match: |
+      def func():
+        if a:
+          if b:
+            return c
+    expect: |
+      def func():
+        if a and b:
+          return c
+  - match: |
+      if a:
+         if b or c:
+             continue
+    expect: |
+      if a and (b or c):
+          continue
+  - match: |
+      if is_codalink:
+          if (int(parts[0]) > 1440) or (int(parts[1]) > 1024):
+              continue
+    expect: |
+      if is_codalink and ((int(parts[0]) > 1440) or (int(parts[1]) > 1024)):
+          continue
+  - no-match: |
+      def func():
+        if a := get_thing():
+          if b:
+            return c
+  - no-match: |
+      def func():
+        if b:
+          if a := get_thing():
+            return c
+  - no-match: |
+      if condition:
+        pass
+      elif item.sell_in < 0:
+        if item.quality < 50:
+          item.quality += 1
+  - no-match: |
+      if a:
+        if b:
+          f = 1
+        else:
+          f = 2
+  - no-match: |
+      if a:
+        if b:
+          f = 1
+        elif c:
+          f = 2
+        else:
+          f = 3
+  - no-match: |
+      if a:
+        if b:
+          f = 1
+        elif c:
+          f = 2
+        elif d:
+          f = 2
+        else:
+          f = 3
+  - no-match: |
+      if a:
+        pass
+      elif b:
+        if c and d:
+          item.quality -= item.quality
+        elif c:
+          if e:
+            item.quality = item.quality - 1
+  - no-match: |
+      if a:
+        if b:
+          f = 1
+      else:
+        f = 3
+  - no-match: |
+      if a:
+        if not b and s:
+          if item.quality > 0:
+            item.quality = item.quality - 1
+        elif b:
+          item.quality -= item.quality
+      else:
+        if item.quality < 50:
+          item.quality = item.quality + 1
+  - no-match: |
+      if a:
+        if b:
+          f = 1
+        elif c:
+          f = 2
+        else:
+          f = 4
+      else:
+        f = 3
+  - no-match: |
+      if a:
+        if b:
+          f = 1
+        else:
+          f = 2
+      else:
+        f = 3
+  - no-match: |
+      if update_db():
+        if something:
+          print('No problem')
+        else:
+          print('update_db will be called twice')
+  - no-match: |
+      if update_db():
+        if something:
+          print('No problem')
+        elif something_else:
+          print('update_db will be called twice')
+  - no-match: |
+      def enter_compare(self, node: Compare):
+        if len(node.ops) == 1:
+          if is_numeric_const_or_unary(node.left) and node.ops[0].reversible():
+            self.propose(FlipCompareProposal(self.ast, node))
+          elif self.can_simplify_compare(node):
+            self.propose(SimplifyCompareProposal(self.ast, node))

@@ -1,0 +1,31 @@
+version: '2'
+rules:
+- id: dont-reassign-caught-exceptions
+  description: Don't reassign the bound exception ${exc}
+  explanation: |
+    Reassigning exceptions may lead to unexpected behaviour, and the variable should be treated as if it were constant.
+  language:
+  - javascript
+  - typescript
+  tags:
+  - default
+  all:
+  - pattern: ${exc} = ${value};
+  - inside:
+      any:
+      - pattern: |
+          try {...} catch (${exc}) {...}
+      - pattern: |
+          try {...} catch (${exc}) {...} finally {...}
+  # TODO: refine this to the catch block only?
+  tests:
+  - match: |
+      try { whatever(); } catch (e) { e = new Error('something'); }
+  - match: |
+      try { whatever(); } catch (e) { e = new Error('something'); } finally { whateverNext(); }
+  - no-match: |
+      try { whatever(); } catch (e) { let e = new Error('something'); }
+  - no-match: |
+      try { whatever(); } catch (e) { const myError = new Error(`something went wrong: ${e.toString()}`); }
+  - no-match: |
+      try { whatever(); } catch (e) { let e = new Error('something'); } finally { whateverNext(); }

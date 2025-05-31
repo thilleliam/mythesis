@@ -1,0 +1,22 @@
+version: '2'
+rules:
+- id: dont-use-with
+  description: Avoid using `with` statements.
+  explanation: |
+    The `with` statement is deprecated, and may cease to work in browsers at any time.
+
+    `with` gives short-hand access to an object's properties, but the scope is inconsistent and it's better just to use normal attribute setting.
+  kind: with_statement
+  language:
+  - javascript
+  - typescript
+  tags:
+  - default
+  tests:
+  - match: |
+      with (thing) {
+        y = 5;
+        x = 2;
+      }
+  - no-match: const a = 1
+  - no-match: let b = 2

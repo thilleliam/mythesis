@@ -1,0 +1,36 @@
+version: '2'
+rules:
+- id: return-outside-function
+  description: Cannot use `return` outside a function definition
+  explanation: |
+    The `return` statement ends function execution and specifies a value to be returned to the function caller.
+    If `return` is used outside a function definition it will throw a `SyntaxError`.
+
+    However in a node.js script a `return` statement is allowed outside a function as node.js
+    scripts are wrapped in a module function - https://nodejs.org/api/modules.html#modules_the_module_wrapper
+  language:
+  - javascript
+  - typescript
+  tags:
+  - default
+  all:
+  - kind: return_statement
+  - not:
+      inside:
+        kind:
+        - function
+        - function_declaration
+        - generator_function
+        - generator_function_declaration
+        - arrow_function
+        - method_definition
+  tests:
+  - match: |
+      return
+  - match: |
+      function() {}
+      return 1
+  - no-match: |
+      () => { return 1 }
+  - no-match: |
+      { get one() { return 1 } }

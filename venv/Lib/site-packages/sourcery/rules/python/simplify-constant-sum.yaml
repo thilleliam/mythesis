@@ -1,0 +1,29 @@
+version: '2'
+rules:
+- id: simplify-constant-sum
+  description: Simplify constant sum() call
+  language: python
+  tags:
+  - default
+  pattern: sum(1 for ${item} in ${collection} if ${test})
+  replacement: |
+    sum(bool(${test})
+    for ${item} in ${collection})
+  explanation: |
+    As `sum` add the values it treats `True` as `1`, and `False` as `0`. We make use
+    of this fact to simplify the generator expression inside the `sum` call.
+  tests:
+  - match: sum(1 for book in books if book.author == "Terry Pratchett")
+    expect: sum(bool(book.author == "Terry Pratchett") for book in books)
+  - match: |
+      source = [-1, 2, 0, 2]
+      results = sum(1 for token in source if token)
+    expect: |
+      source = [-1, 2, 0, 2]
+      results = sum(bool(token) for token in source)
+  - match: results = sum(1 for token in source if condition)
+    expect: results = sum(bool(condition) for token in source)
+  - no-match: results = sum(1 for token in source.split() if token == 1 for source in sources)
+  - no-match: results = sum("str" for token in source.split() if token == 1)
+  - no-match: results = sum(1.2 for token in source.split() if token == 1)
+  - no-match: results = sum(1 for token in source.split() if token == 1 if token)

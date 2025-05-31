@@ -1,0 +1,50 @@
+version: '2'
+rules:
+- id: tuple-literal
+  language: python
+  description: Replace `tuple()` with `()`
+  tags:
+  - default
+  all:
+  - pattern: tuple()
+  - not:
+      inside:
+        kind: case_clause
+  replacement: ()
+  explanation: |
+    The most concise and Pythonic way to create an empty tuple is to use the `()`
+    literal.
+
+    This fits in with the way we create tuples with items, saving a bit of
+    mental energy that might be taken up with thinking about two different ways of
+    creating tuples:
+
+    ```python
+    x = ("first", "second")
+    ```
+
+    Doing things this way has the added advantage of being a nice little performance
+    improvement. Here are the timings before and after the change:
+
+    ```
+    $ python3 -m timeit "tuple()"
+    10000000 loops, best of 5: 22.6 nsec per loop
+    ```
+
+    ```
+    $ python3 -m timeit "()"
+    50000000 loops, best of 5: 5.46 nsec per loop
+    ```
+  tests:
+  - match: x = tuple()
+    expect: x = ()
+  - no-match: x = list()
+  - no-match: x = dict()
+  - no-match: |
+      foo = (1, 2, 3)
+
+      match foo:
+        case tuple():
+          print("Yay!")
+        case _:
+          print("Nay!")

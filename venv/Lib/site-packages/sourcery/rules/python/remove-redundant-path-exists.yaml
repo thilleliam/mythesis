@@ -1,0 +1,66 @@
+version: '2'
+rules:
+- id: remove-redundant-path-exists
+  description: Remove unnecessary `path.exists()` check.
+  language: python
+  tags:
+  - default
+  any:
+  - pattern: ${path}.exists() and ${path}.is_dir()
+    replacement: ${path}.is_dir()
+    condition: path.has_type("pathlib.Path")
+  - pattern: ${path}.exists() and ${path}.is_file()
+    replacement: ${path}.is_file()
+    condition: path.has_type("pathlib.Path")
+  - pattern: ${path}.exists() and ${path}.is_symlink()
+    replacement: ${path}.is_symlink()
+    condition: path.has_type("pathlib.Path")
+  explanation: |
+    The following functions already contain a check whether a path exists:
+    * `pathlib.Path.is_dir()`
+    * `pathlib.Path.is_file()`
+    * `pathlib.Path.is_symlink()`
+    There's no need to explicitly call `pathlib.Path.exists()` before.
+  tests:
+  - match: |
+      from pathlib import Path
+
+      p = Path("/home/user/mydir")
+      if p.exists() and p.is_dir():
+        do_sth()
+    expect: |
+      from pathlib import Path
+
+      p = Path("/home/user/mydir")
+      if p.is_dir():
+        do_sth()
+  - match: |
+      from pathlib import Path
+
+      p = Path("/home/user/mydir/some_file.py")
+      if p.exists() and p.is_file():
+        do_sth()
+    expect: |
+      from pathlib import Path
+
+      p = Path("/home/user/mydir/some_file.py")
+      if p.is_file():
+        do_sth()
+  - match: |
+      from pathlib import Path
+
+      p = Path("/home/user/some-tool")
+      if p.exists() and p.is_symlink():
+        do_sth()
+    expect: |
+      from pathlib import Path
+
+      p = Path("/home/user/some-tool")
+      if p.is_symlink():
+        do_sth()
+  - no-match: |
+      from custom_lib import Path
+
+      p = Path("/home/user/mydir")
+      if p.exists() and p.is_dir():
+        do_sth()

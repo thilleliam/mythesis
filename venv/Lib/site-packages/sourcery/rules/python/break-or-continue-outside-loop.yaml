@@ -1,0 +1,98 @@
+version: '2'
+rules:
+- id: break-or-continue-outside-loop
+  language: python
+  description: Remove break or continue statement found outside for or while loop
+  tags:
+  - default
+  all:
+  - kind: [break_statement, continue_statement]
+  - not:
+      inside:
+        kind: [while_statement, for_statement]
+      field: body
+      until:
+        kind: [function_definition, class_definition]
+  replacement: ''
+  explanation: |
+    The [`break`](https://docs.python.org/3/reference/simple_stmts.html#break) and
+    [`continue`](https://docs.python.org/3/reference/simple_stmts.html#the-continue-statement)
+    are used to control the behaviour of
+    [`for`](https://docs.python.org/3/reference/compound_stmts.html#the-for-statement)
+    and
+    [`while`](https://docs.python.org/3/reference/compound_stmts.html#the-while-statement)
+    loops. Using them outside those loops is a
+    [`SyntaxError`](https://docs.python.org/3/library/exceptions.html#SyntaxError).
+
+    This error may be very easy to pass through since sometimes it is caused by a
+    wrong indentation.
+  tests:
+  - match: |
+      def handle_invalid_number(numbers):
+          for number in numbers:
+              if is_valid(number):
+                  continue
+          break
+          handle(number)
+    expect: |
+      def handle_invalid_number(numbers):
+          for number in numbers:
+              if is_valid(number):
+                  continue
+          handle(number)
+  - match: |
+      def f():
+          print('foo')
+          break
+          print('bar')
+    expect: |
+      def f():
+          print('foo')
+          print('bar')
+  - match: |
+      for i in range(10):
+          print(i)
+      else:
+          continue
+    expect: |
+      for i in range(10):
+          print(i)
+      else:
+          pass
+  - match: |
+      for i in range(10):
+          def f():
+              x()
+              break
+    expect: |
+      for i in range(10):
+          def f():
+              x()
+  - match: |
+      def handle_invalid_number(numbers):
+          for number in numbers:
+              if is_valid(number):
+                  continue
+          continue
+          handle(number)
+    expect: |
+      def handle_invalid_number(numbers):
+          for number in numbers:
+              if is_valid(number):
+                  continue
+          handle(number)
+  - no-match: |
+      for i in range(10):
+          break
+  - no-match: |
+      def f():
+          while is_valid(number):
+              if can_cause_chaos(number):
+                  break
+              else:
+                  def g():
+                      print('my func')
+                  continue
+  - no-match: |
+      while True:
+        continue

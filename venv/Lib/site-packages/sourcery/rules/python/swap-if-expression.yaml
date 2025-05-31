@@ -1,0 +1,33 @@
+version: '2'
+rules:
+- id: swap-if-expression
+  description: Swap if/else branches of if expression to remove negation
+  language: python
+  tags:
+  - default
+  all:
+  - pattern: |
+      ${a} if not ${cond} else ${b}
+    replacement: |
+      ${b} if ${cond} else ${a}
+  - capture: a
+    constraint:
+      not:
+        kind: conditional_expression
+  - capture: b
+    constraint:
+      not:
+        kind: conditional_expression
+  explanation: |
+    Negated conditions are more difficult to read than positive ones, so it is best
+    to avoid them where we can. By swapping the `if` and `else` conditions around we
+    can invert the condition and make it positive.
+  tests:
+  - match: my_hat = hats.bowler if not weather.is_sunny() else hats.baseball_cap
+    expect: my_hat = hats.baseball_cap if weather.is_sunny() else hats.bowler
+  - match: a = b if not cond else c
+    expect: a = c if cond else b
+  - match: func(b if not cond else c, other_arg)
+    expect: func(c if cond else b, other_arg)
+  - no-match: a = b if not cond else c if thing else d
+  - no-match: a = b if cond else c

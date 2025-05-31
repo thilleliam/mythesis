@@ -1,0 +1,130 @@
+rules:
+
+- id: identity-comprehension
+
+  # Note that this refactoring may change behavior slightly, as shown by the Bottle
+  # tests.
+  # There is a small, but significative difference between `[x for x in xs]` and
+  # `list(xs)`: the call to `list` attempts to calculate `len(xs)` in order to
+  # pre-allocate the list, whereas the list comprehension expands the result on demand.
+  # This can be problematic depending on how `xs.__len__` is implemented.
+  # In Bottle, one of the classes is defined as (stripping other methods):
+  #
+  # class WSGIHeaderDict:
+  #   def keys(self):
+  #       return [x for x in self]
+
+  #   def __len__(self):
+  #       return len(self.keys())
+  #
+  # which is fine. However, if we refactor `keys` to `return list(self)`, then an
+  # infinite recursion problem appears: `list(self)` tries to compute `len(self)`, which
+  # calls `len(self.keys())` which leads back to `keys`.
+  #
+  # Previously this refactoring had a check `coll != self` in the list-comprehension
+  # case. However, this is only helpful to prevent Bottle from failing, but is not a
+  # general solution.
+
+  description: Replace identity comprehension with call to collection constructor
+  tags:
+  - default
+  any:
+
+  - pattern: |
+      [${item} for ${item} in ${coll}]
+    replacement: |
+      list(${coll})
+
+  - pattern: |
+      dict(${coll}.items())
+    condition: |
+      coll.has_type("dict")
+    replacement: |
+      dict(${coll})
+
+  - pattern: |
+      {
+        ${key}: ${value}
+        for ${key}, ${value}
+        in ${coll}.items()
+      }
+    condition: |
+      coll.has_type("dict")
+    replacement: |
+      dict(${coll})
+
+  - pattern: |
+      {
+        ${key}: ${value}
+        for ${key}, ${value}
+        in ${coll}
+      }
+    replacement: |
+      dict(${coll})
+
+  - pattern: |
+      {${item} for ${item} in ${coll}}
+    replacement: |
+      set(${coll})
+
+  explanation: |
+    Convert list/set/tuple comprehensions that do not change the input elements into.
+
+    #### Before
+
+    ```python
+    # List comprehensions
+    [item for item in coll]
+    [item for item in friends.names()]
+
+    # Dict comprehensions
+    {k: v for k, v in coll}
+    {k: v for k, v in coll.items()}  # Only if we know coll is a `dict`
+
+    # Unneeded call to `.items()`
+    dict(coll.items())  # Only if we know coll is a `dict`
+
+    # Set comprehensions
+    {item for item in coll}
+    ```
+
+    #### After
+
+    ```python
+    # List comprehensions
+    list(iter(coll))
+    list(iter(friends.names()))
+
+    # Dict comprehensions
+    dict(coll)
+    dict(coll)
+
+    # Unneeded call to `.items()`
+    dict(coll)
+
+    # Set comprehensions
+    set(coll)
+    ```
+
+    All these comprehensions are just creating a copy of the original collection.
+    They can all be simplified by simply constructing a new collection directly. The
+    resulting code is easier to read and shows the intent more clearly.
+  tests:
+  - match: |
+      y = [x for x in xs()]
+    expect: |
+      y = list(xs())
+  - no-match: |
+      y = [x1, x2, x3]
+  - match: |
+      y = {x for x in xs()}
+    expect: |
+      y = set(xs())
+  - no-match: |
+      y = {x1, x2, x3}
+  - match: |
+      y = {k: v for k, v in xs()}
+    expect: |
+      y = dict(xs())
+  - no-match: |
+      y = {k1: v1, k2: v2, k3: v3}

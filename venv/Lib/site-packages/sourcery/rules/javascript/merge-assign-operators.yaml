@@ -1,0 +1,64 @@
+version: '2'
+rules: []
+# TODO Reinstate this when we can check that var is not used in the value.
+#rules:
+#- id: merge-assign-operators
+#  description: Replace assignment and augmented assignment with single assignment
+#  explanation: |
+#    When we mutate a variable multiple times without reading or writing its value in
+#    between, it's more readable and more efficient to change its value only once.
+#    This way, it's clearer which values this variable can have at various points.
+#  language:
+#  - javascript
+#  - typescript
+#  tags:
+#  - default
+#  any:
+#  - pattern: |
+#      ${var} = ${initial};
+#      ${var} += ${value};
+#    replacement: |
+#      ${var} = ${initial} + ${value};
+#  - pattern: |
+#      ${var} = ${initial};
+#      ${var} -= ${value};
+#    replacement: |
+#      ${var} = ${initial} - ${value};
+#  - pattern: |
+#      ${var} = ${initial};
+#      ${var} *= ${value};
+#    replacement: |
+#      ${var} = ${initial} * ${value};
+#  - pattern: |
+#      ${var} = ${initial};
+#      ${var} /= ${value};
+#    replacement: |
+#      ${var} = ${initial} / ${value};
+#  tests:
+#  - match: |
+#      x = 42
+#      x += 22
+#    expect: |
+#      x = 42 + 22;
+#  - match: |
+#      value = 42
+#      other_value = 33
+#      number = value
+#      number -= other_value
+#    expect: |
+#      value = 42
+#      other_value = 33
+#      number = value - other_value;
+#  - match: |
+#      number = 3.14
+#      number *= 2
+#    expect: |
+#      number = 3.14 * 2;
+#  - match: |
+#      number = 5
+#      number /= 5
+#    expect: |
+#      number = 5 / 5;
+#  - no-match: |
+#      x = 42
+#      x += x + 22

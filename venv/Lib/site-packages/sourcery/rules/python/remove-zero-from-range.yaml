@@ -1,0 +1,30 @@
+version: '2'
+rules:
+- id: remove-zero-from-range
+  description: Replace range(0, x) with range(x)
+  language: python
+  tags:
+  - default
+  pattern: range(0, ${x})
+  replacement: range(${x})
+  explanation: |
+    The default starting value for a call to `range()` is 0, so it is unnecessary to
+    explicitly define it. This refactoring removes such zeros, slightly shortening
+    the code.
+  tests:
+  - match: |
+      for i in range(0, len(x)):
+          do_t()
+    expect: |
+      for i in range(len(x)):
+          do_t()
+  - match: squares = range(0, x)
+    expect: squares = range(x)
+  - match: |
+      for i in range(0, len(x)):
+        do_t()
+    expect: |
+      for i in range(len(x)):
+        do_t()
+  - no-match: squares = range(1, x)
+  - no-match: squares = item.range(0, x)

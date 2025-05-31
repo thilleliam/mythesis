@@ -1,0 +1,66 @@
+version: '2'
+rules:
+- id: remove-redundant-if-statement
+  description: Remove an `if` statement where the condition is `true`.
+  explanation: |
+    If the condition of an `if` statement is `true`, its body will always be executed. Conversely, if the condition
+    is always `false`, then its body will never be executed. In the first case, we can replace the `if` statement with
+    its body, and in the second case we can remove it altogether.
+  language:
+  - javascript
+  - typescript
+  tags:
+  - default
+  any:
+  - pattern: |
+      if (true) {
+        ...
+      }
+    replacement: |
+      ...
+  - pattern: |
+      if (false) {
+        ...
+      }
+    replacement: ''
+  tests:
+  - match: |
+      if (true) {
+        console.log("great!")
+      }
+    expect: |
+      console.log("great!")
+  - match: |
+      if (true) {
+        doSomething();
+        doSomethingElse();
+      }
+    expect: |
+      doSomething();
+      doSomethingElse();
+  - match: |
+      if (false) {
+        doSomething();
+      }
+      doSomethingElse();
+    expect: |
+      doSomethingElse();
+  - no-match: |
+      if (a && b) {
+        console.log(a, b)
+      }
+  - no-match: |
+      if (true && true) {  // a separate rule will change `true && true` into `true` first
+        doSomething()
+      }
+  - no-match: |
+      if (true) {
+      } else {
+        doSomething();
+      }
+  - no-match: |
+      if (false) {
+        whatever();
+      } else {
+        doSomething();
+      }

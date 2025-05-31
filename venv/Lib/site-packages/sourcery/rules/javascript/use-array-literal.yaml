@@ -1,0 +1,49 @@
+version: '2'
+rules:
+- id: use-array-literal
+  description: Use literal syntax for array creation.
+  explanation: |
+    Use of the Array constructor to construct a new array is generally discouraged in favor of
+    array literal notation because of the single-argument pitfall and because the Array global
+    may be redefined. The exception is when the Array constructor is used to intentionally create
+    sparse arrays of a specified size by giving the constructor a single numeric argument.
+
+    From [ESLint](https://eslint.org/docs/latest/rules/no-array-constructor.html)
+    From the [Airbnb JavaScript Style Guide](https://airbnb.io/javascript/#arrays--literals)
+  tags:
+  - airbnb-javascript-style-guide
+  - airbnb
+  - default
+  # TODO Handle creation without the new (e.g. const var = Array())
+  all:
+  - pattern: |
+      new Array(${args*})
+    replacement: |
+      [${args}]
+  - not:
+      pattern: |
+        new Array(${arg})
+  language:
+  - javascript
+  - typescript
+  tests:
+  - match: |
+      const items = new Array();
+    expect: |
+      const items = [];
+  - match: |
+      let var = new Array()
+    expect: |
+      let var = []
+  - match: |
+      let var = new Array(0, 1, 2)
+    expect: |
+      let var = [0, 1, 2]
+  - match: |
+      const var = new Array(0, 1, 2)
+    expect: |
+      const var = [0, 1, 2]
+  - no-match: |
+      const var = new Array(0)
+  - no-match: |
+      const items = [];

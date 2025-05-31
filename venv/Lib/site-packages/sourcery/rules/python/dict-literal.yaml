@@ -1,0 +1,88 @@
+version: '2'
+rules:
+- id: dict-literal
+  language: python
+  description: Replace `dict()` with `{}`
+  tags:
+  - default
+  all:
+  - pattern: dict()
+  - not:
+      inside:
+        kind: case_clause
+  replacement: '{}'
+  explanation: |
+    The most concise and Pythonic way to create a dictionary is to use the `{}`
+    notation.
+
+    This fits in with the way we create dictionaries with items, saving a bit of
+    mental energy that might be taken up with thinking about two different ways of
+    creating dicts.
+
+    ```python
+    x = {"first": "thing"}
+    ```
+
+    Doing things this way has the added advantage of being a nice little performance
+    improvement.
+
+    Here are the timings before and after the change:
+
+    ```
+    $ python3 -m timeit "x = dict()"
+    5000000 loops, best of 5: 69.8 nsec per loop
+    ```
+
+    ```
+    $ python3 -m timeit "x = {}"
+    20000000 loops, best of 5: 29.4 nsec per loop
+    ```
+
+    Similar reasoning and performance results hold for replacing `list()` with `[]`.
+  tests:
+  - match: x = dict()
+    expect: x = {}
+  - no-match: x = list()
+  - no-match: x = tuple()
+  - no-match: |
+      foo = (1, 2, 3)
+
+      match foo:
+        case dict():
+          print("Yay!")
+        case _:
+          print("Nay!")
+  - match: squares = dict()
+    expect: squares = {}
+  - match: 'squares: Dict[str, str] = dict()'
+    expect: 'squares: Dict[str, str] = {}'
+  - no-match: squares = dict({'a':'b'})
+  - no-match: squares = dict(a='b')
+  - no-match: squares = dict([('a', 'b')])
+  - no-match: squares = dict(zip(['a'], ['b']))
+  - no-match: squares = dict.fromkeys(['a'], 'b')
+  - no-match: squares = dict.fromkeys(['a'])
+  - no-match: squares = dict.fromkeys(['a'], None)
+  - no-match: |
+      squares = list()
+      squares.append('a')
+  - no-match: |
+      squares = item.dict()
+      squares.append('a')
+  - match: foo(dict())
+    expect: foo({})
+  - match: foo(names=dict())
+    expect: foo(names={})
+  - match: |
+      def foo():
+          return dict()
+    expect: |
+      def foo():
+          return {}
+  - no-match: |
+      def f(things: dict[str, int] | Mapping[str, int]):
+          match things:
+              case dict():
+                  print("this is a dict")
+              case _:
+                  print("this is some other mapping")

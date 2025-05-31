@@ -1,0 +1,54 @@
+version: '2'
+rules:
+- id: use-ternary-operator
+  description: Replace if statement with ternary operator
+  explanation: |
+    The ternary operator is a simpler and more elegant way to write conditional assignments
+    to a variable than the long form.
+  language:
+  - javascript
+  - typescript
+  tags:
+  - default
+  any:
+  - pattern: |
+      if (${condition}) {
+        var ${var} = ${true_value}
+      } else {
+        var ${var} = ${false_value}
+      }
+    replacement: |
+      var ${var} = ${condition} ? ${true_value} : ${false_value};
+  - pattern: |
+      if (${condition}) {
+        let ${var} = ${true_value}
+      } else {
+        let ${var} = ${false_value}
+      }
+    replacement: |
+      let ${var} = ${condition} ? ${true_value} : ${false_value};
+  tests:
+  - match: |
+      if (cond) {
+          var x = 1
+      } else {
+          var x = 2
+      }
+    expect: |
+      var x = cond ? 1 : 2;
+  - match: |
+      if (cond) {
+          var x = 1;
+      } else {
+          var x = 2;
+      }
+    expect: |
+      var x = cond ? 1 : 2;
+  - match: |
+      if (cond) {
+          let x = 1
+      } else {
+          let x = 2
+      }
+    expect: |
+      let x = cond ? 1 : 2;

@@ -1,0 +1,82 @@
+version: '2'
+rules:
+- id: dont-use-wrappers-for-builtins
+  description: Don't use `new` syntax with `String`, `Number` and `Boolean` objects
+  explanation: |
+    Although possible, there aren’t any good reasons to use these primitive wrappers as constructors.
+    They tend to confuse other developers more than anything else because they seem like they should act as primitives, but they do not.
+
+    If you wish to convert a value to another type, use these without the `new` syntax.
+
+    From [ESLint](https://eslint.org/docs/latest/rules/no-new-wrappers)
+  tags:
+  - default
+  any:
+  - pattern: |
+      new Boolean(true)
+    replacement: |
+      true
+  - pattern: |
+      new Boolean(false)
+    replacement: |
+      false
+  - pattern: |
+      new Boolean(...)
+    replacement: |
+      Boolean(...)
+  - pattern: |
+      new String(${value})
+    replacement: |
+      ${value}
+    condition: value.is_kind("string")
+  - pattern: |
+      new String(...)
+    replacement: |
+      String(...)
+  - pattern: |
+      new Number(${value})
+    replacement: |
+      ${value}
+    condition: value.is_kind("number")
+  - pattern: |
+      new Number(...)
+    replacement: |
+      Number(...)
+  language:
+  - javascript
+  - typescript
+  tests:
+  - match: |
+      const items = new Boolean(true);
+    expect: |
+      const items = true;
+  - match: |
+      func(new Boolean(value))
+    expect: |
+      func(Boolean(value))
+  - no-match: |
+      const items = true;
+  - no-match: |
+      const items = false;
+  - match: |
+      let thing = new String("thing");
+    expect: |
+      let thing = "thing";
+  - match: |
+      let thing = new String(value);
+    expect: |
+      let thing = String(value);
+  - no-match: |
+      let thing = String(value);
+  - match: |
+      let thing = new Number(1);
+    expect: |
+      let thing = 1;
+  - match: |
+      let thing = new Number(1.2);
+    expect: |
+      let thing = 1.2;
+  - match: |
+      let thing = new Number(value);
+    expect: |
+      let thing = Number(value);

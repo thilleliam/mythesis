@@ -1,0 +1,38 @@
+version: '2'
+rules:
+- id: simplify-ternary
+  description: Avoid unneeded ternary statements
+  explanation: |
+    It is possible to simplify certain ternary statements into either use of an `||` or `!`.
+    This makes the code easier to read, since there is no conditional logic.
+  language:
+  - javascript
+  - typescript
+  tags:
+  - default
+  any:
+  - pattern: |
+      ${left} ? ${left} : ${right}
+    replacement: |
+      ${left} || ${right}
+  - pattern: |
+      ${value} ? true : false
+    replacement: |
+      !!${value}
+  - pattern: |
+      ${value} ? false : true
+    replacement: |
+      !${value}
+  tests:
+  - match: |
+      const foo = a ? a : b;
+    expect: |
+      const foo = a || b;
+  - match: |
+      const bar = c ? true : false;
+    expect: |
+      const bar = !!c;
+  - match: |
+      const baz = c ? false : true;
+    expect: |
+      const baz = !c;

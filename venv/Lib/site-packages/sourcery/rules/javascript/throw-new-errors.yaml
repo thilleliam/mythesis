@@ -1,0 +1,38 @@
+version: '2'
+rules:
+- id: throw-new-errors
+  description: New errors should not be created without being thrown.
+  explanation: |
+    Although it is valid to construct an error without throwing it, this behaviour is likely unintended: errors
+    must be explicitly thrown.
+  language:
+  - javascript
+  - typescript
+  tags:
+  - default
+  all:
+  - pattern: new Error(...)
+  - pattern: ${error}  # TODO: replace with as-pattern if we implement it
+  - inside:
+      pattern: |
+        ...
+        ${error};
+        ...
+    until:
+      pattern: statement_block  # optimisation - don't go above the current block
+  tests:
+  - match: |
+      new Error("whatever");
+  - match: |
+      if (x == 0) {
+        new Error("x must not be zero")
+      }
+  - no-match: throw new Error("not a problem")
+  - no-match: ErrorInterface.default = new Error("Unknown Error");
+  - no-match: const myError = new Error("Deferred raise")
+  - no-match: |
+      try {
+        something();
+      } catch (e) {
+        throw new Error(e.toString());
+      }

@@ -1,0 +1,65 @@
+version: '2'
+rules:
+- id: dont-concatenate-string-literals
+  # TODO: this rule could have replacements, but we don't have that power yet.
+  description: Do not concatenate string literals
+  explanation: |
+    String literals should not be written across multiple lines because this makes them
+    harder to read, maintain and search for. Instead, let them be longer than the
+    maximum line length.
+
+    From the [Airbnb JavaScript Style Guide](https://airbnb.io/javascript/#strings--line-length)
+  language:
+  - javascript
+  - typescript
+  tags:
+  - airbnb-javascript-style-guide
+  - airbnb
+  any:
+  # flag string literals containing line breaks
+  - all:
+    - kind: string
+    - pattern: ${s}
+      condition: |
+        s.matches_regex(r"\n")
+  # flag string literals concatenated with `+`
+  - all:
+    - pattern: ${left} + ${right}
+    # TODO: this is a hack to apply the "kind" condition to `left` and `right`. This
+    # would look much nicer if we had constraints on captures.
+    - contains:
+        all:
+        - kind: string
+        - pattern: ${left}
+    - contains:
+        all:
+        - kind: string
+        - pattern: ${right}
+  tests:
+  # line breaks
+  - match: |
+      const errorMessage = 'This is a super long error that was thrown because \
+        of Batman. When you stop to think about how Batman had anything to do \
+        with this, you would get nowhere \
+        fast.';
+  - match: |
+      const errorMessage = "This is a super long error that was thrown because \
+        of Batman. When you stop to think about how Batman had anything to do \
+        with this, you would get nowhere \
+        fast.";
+  - no-match: |
+      const errorMessage = `This is a super long error that was thrown because
+        of Batman. When you stop to think about how Batman had anything to do
+        with this, you would get nowhere
+        fast.`;
+  # concatenation
+  - match: |
+      const errorMessage = 'This is a super long error that was thrown because ' +
+        'of Batman. When you stop to think about how Batman had anything to do ' +
+        'with this, you would get nowhere ' +
+        'fast.';
+  - match: |
+      console.log("why are we" + "concatenated?")
+  - no-match: |
+      concatenated_piece = "concatenated?"
+      console.log("why are we" + concatenated_piece)

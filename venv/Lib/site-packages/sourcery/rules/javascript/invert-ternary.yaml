@@ -1,0 +1,21 @@
+version: '2'
+rules:
+- id: invert-ternary
+  description: Invert ternary operator to remove negation
+  explanation: |
+    Negated conditions are more difficult to read than positive ones, so it is best
+    to avoid them where we can. By inverting the ternary condition and swapping the
+    expressions we can simplify the code.
+  pattern: '!${condition} ? ${first} : ${second}'
+  replacement: '${condition} ? ${second} : ${first}'
+  condition: not first.is_kind('ternary_expression') and not second.is_kind('ternary_expression')
+  tags:
+  - default
+  language:
+  - javascript
+  - typescript
+  tests:
+  - match: "const beverage = !too_young ? 'Beer' : 'Juice';"
+    expect: "const beverage = too_young ? 'Juice': 'Beer';"
+  - no-match: "const beverage = age >= 21 ? 'Beer' : 'Juice';"
+  - no-match: "const beverage = !too_young ? 'Beer' : likes_juice ? 'Juice' : 'Pop';"

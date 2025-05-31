@@ -1,0 +1,69 @@
+version: '2'
+rules:
+- id: use-isna
+  description: |
+    Use `.isna()` or `.isnull()` instead of `== np.nan` for detecting missing values.
+  language: python
+  tags:
+  - default
+  pattern: ${expr} == numpy.nan
+  replacement: ${expr}.isna()
+  # Missing check:
+  # `expr` is related to a `pandas.DataFrame`
+  # Improve or remove this rule if it triggers in too many wrong cases.
+  # See the discussion in the PR:
+  # https://github.com/sourcery-ai/core/pull/2577
+  explanation: |
+    Use `.isna()` or `.isnull()` for detecting missing values.
+
+    A comparison like `df['column'] == np.nan` doesn't produce the expected results when checking for missing or NaN (Not a Number) values. This is due to the peculiar nature of NaN: It is not considered equal to any value, even itself.
+
+    ```
+    data = {
+        'A': [1, 2, np.nan, 4],
+        'B': [9, 10, 11, 12]
+    }
+    df = pd.DataFrame(data)
+
+    print(df['A'] == np.nan)
+    ```
+
+    The output:
+
+    0    False
+    1    False
+    2    False
+    3    False
+    Name: A, dtype: bool
+
+    ```
+    print(df['A'].isna())
+    ```
+
+    The output:
+
+    0    False
+    1    False
+    2     True
+    3    False
+    Name: A, dtype: bool
+
+    See also [Pandas Docs / Missing Data](https://pandas.pydata.org/pandas-docs/stable/user_guide/missing_data.html)
+  tests:
+  - match: |
+      import numpy as np
+
+      df['column'] == np.nan
+    expect: |
+      import numpy as np
+
+      df['column'].isna()
+  - match: |
+      import numpy
+      df['column'] == numpy.nan
+    expect: |
+      import numpy
+      df['column'].isna()
+  - no-match: |
+      import whatever as np
+      df['column'] == np.nan

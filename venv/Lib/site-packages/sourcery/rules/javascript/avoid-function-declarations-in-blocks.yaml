@@ -1,0 +1,47 @@
+version: '2'
+rules:
+- id: avoid-function-declarations-in-blocks
+  description: Avoid function declarations, favouring function assignment expressions, inside blocks.
+  explanation: |
+    Function declarations may be hoisted in Javascript, but the behaviour is inconsistent between browsers.
+    Hoisting is generally confusing and should be avoided. Rather than using function declarations inside blocks, you
+    should use function expressions, which create functions in-scope.
+  language:
+  - javascript
+  - typescript
+  tags:
+  - default
+  all:
+  - kind:
+    - function_declaration
+    - generator_function_declaration
+  - inside:
+      kind: statement_block
+  tests:
+  - match: |
+      if (x) {
+        function foo() {}
+      }
+  - match: |
+      function foo() {
+        function bar() {
+        }
+      }
+  - match: |
+      for (var p = 0; p < 10; p++) {
+        function foo() {
+          console.log(p);
+        }
+        foo()
+      }
+  - match: |
+      try {
+        function something(arg) {
+          const result = somethingElse(arg);
+          console.log(result);
+        }
+      } catch (err) {
+        console.log(err);
+      }
+  - no-match: if (anything) { const foo = function foo() {} }
+  - no-match: "function foo () {}\nif (anything) { foo() }"

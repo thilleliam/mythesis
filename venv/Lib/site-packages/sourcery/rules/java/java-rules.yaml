@@ -1,0 +1,12 @@
+version: '2'
+
+rules: []
+
+# only re-enable this rule once we decide to support Java for real
+# - id: avoid-single-character-names-variables-java
+#   pattern: ${var} = ${value};
+#   condition: var.character_count() == 1
+#   description: Avoid single character names
+#   language: java
+#   tags:
+#   - default

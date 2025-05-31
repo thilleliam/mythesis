@@ -1772,30 +1772,31 @@ class TransfererEquipementApp:
         except Exception as e:
             messagebox.showerror("Erreur", f"Impossible d'exporter les résultats: {str(e)}")
             print(f"Erreur lors de l'exportation des résultats: {str(e)}")
-
     def creer_tableau(self, parent):
         """Crée le tableau des transferts d'équipements"""
         # Frame pour les boutons d'action
         btn_frame = ttk.Frame(parent, padding=5)
         btn_frame.pack(fill=X, pady=5)
-        
+
         ttk.Button(btn_frame, text="Ajouter nouveau", command=lambda: self.basculer_vers_formulaire(nouveau=True), 
-                  bootstyle=SUCCESS).pack(side=LEFT, padx=5)
+                bootstyle=SUCCESS).pack(side=LEFT, padx=5)
         ttk.Button(btn_frame, text="Modifier sélection", command=self.modifier_selection, 
-                  bootstyle=WARNING).pack(side=LEFT, padx=5)
+                bootstyle=WARNING).pack(side=LEFT, padx=5)
         ttk.Button(btn_frame, text="Supprimer sélection", command=self.supprimer, 
-                  bootstyle=DANGER).pack(side=LEFT, padx=5)
+                bootstyle=DANGER).pack(side=LEFT, padx=5)
         ttk.Button(btn_frame, text="Rafraîchir", command=self.charger_donnees, 
-                  bootstyle=INFO).pack(side=LEFT, padx=5)
+                bootstyle=INFO).pack(side=LEFT, padx=5)
         ttk.Button(btn_frame, text="Exporter PDF", command=self.generer_rapport, 
-                  bootstyle=SECONDARY).pack(side=LEFT, padx=5)
-        
-        # Configuration du tableau
-        columns = ("id", "id_client", "localisation", "volet", "nom_equipement", "modalite_transport", 
-                  "total_equipements", "nouvelle_longitude", "nouvelle_latitude", "12_semaines", "11_semaines", 
-                  "10_semaines", "9_semaines", "8_semaines", "7_semaines", "6_semaines", "5_semaines", 
-                  "4_semaines", "3_semaines", "2_semaines", "1_semaines", "0_semaines")
-        
+                bootstyle=SECONDARY).pack(side=LEFT, padx=5)
+
+        # Colonnes SANS nouvelle_longitude et nouvelle_latitude
+        columns = (
+            "id", "id_client", "localisation", "volet", "nom_equipement", "modalite_transport", 
+            "total_equipements", 
+            "12_semaines", "11_semaines", "10_semaines", "9_semaines", "8_semaines", "7_semaines", 
+            "6_semaines", "5_semaines", "4_semaines", "3_semaines", "2_semaines", "1_semaines", "0_semaines"
+        )
+
         self.tree = ttk.Treeview(parent, columns=columns, show="headings")
         self.tree.pack(fill=BOTH, expand=True)
 
@@ -1807,14 +1808,12 @@ class TransfererEquipementApp:
         self.tree.heading("nom_equipement", text="Nom Équipement", command=lambda: self.trier_tableau("nom_equipement"))
         self.tree.heading("modalite_transport", text="Modalité Transport", command=lambda: self.trier_tableau("modalite_transport"))
         self.tree.heading("total_equipements", text="Total", command=lambda: self.trier_tableau("total_equipements"))
-        self.tree.heading("nouvelle_longitude", text="Long.", command=lambda: self.trier_tableau("nouvelle_longitude"))
-        self.tree.heading("nouvelle_latitude", text="Lat.", command=lambda: self.trier_tableau("nouvelle_latitude"))
-        
+
         # Configuration des en-têtes pour les semaines
         for i in range(12, -1, -1):
             col_name = f"{i}_semaines"
             self.tree.heading(col_name, text=f"{i} sem.", command=lambda i=i: self.trier_tableau(f"{i}_semaines"))
-        
+
         # Configuration des largeurs de colonnes
         self.tree.column("id", width=50)
         self.tree.column("id_client", width=120)
@@ -1823,25 +1822,22 @@ class TransfererEquipementApp:
         self.tree.column("nom_equipement", width=200)
         self.tree.column("modalite_transport", width=120)
         self.tree.column("total_equipements", width=60)
-        self.tree.column("nouvelle_longitude", width=70)
-        self.tree.column("nouvelle_latitude", width=70)
-        
+
         # Configuration des largeurs pour les semaines
-        for col in columns[9:]:
+        for col in columns[7:]:
             self.tree.column(col, width=60)
 
         # Binding pour la sélection d'élément avec double-clic
         self.tree.bind("<Double-1>", self.modifier_selection)
-        
+
         # Ajout des barres de défilement
         y_scrollbar = ttk.Scrollbar(parent, orient="vertical", command=self.tree.yview)
         y_scrollbar.pack(side="right", fill="y")
-        
+
         x_scrollbar = ttk.Scrollbar(parent, orient="horizontal", command=self.tree.xview)
         x_scrollbar.pack(side="bottom", fill="x")
-        
-        self.tree.configure(yscrollcommand=y_scrollbar.set, xscrollcommand=x_scrollbar.set)
 
+        self.tree.configure(yscrollcommand=y_scrollbar.set, xscrollcommand=x_scrollbar.set)
     def creer_formulaire(self, parent):
         """Crée le formulaire de saisie"""
         # Frame pour les informations de base
@@ -2163,16 +2159,10 @@ class TransfererEquipementApp:
             transferts = query.all()
             
             # Ajouter les données au tableau
+            # ...dans charger_donnees...
             for transfert in transferts:
                 transfert_obj, nom_equipement, localisation = transfert
-                
-                # Coordonnées (non sauvegardées dans la BD, utilisées uniquement dans l'interface)
-                # Les valeurs de longitude et latitude sont temporairement ajoutées au tableau
-                # mais ne sont pas réellement stockées en base de données
-                nouvelle_longitude = 0.0  # Valeur par défaut
-                nouvelle_latitude = 0.0   # Valeur par défaut
-                
-                # Créer la ligne dans le tableau
+
                 self.tree.insert("", "end", values=(
                     transfert_obj.id,
                     transfert_obj.id_client,
@@ -2181,8 +2171,6 @@ class TransfererEquipementApp:
                     nom_equipement or "",
                     transfert_obj.modalite_transport or "",
                     transfert_obj.total_equipements or 0,
-                    nouvelle_longitude,
-                    nouvelle_latitude,
                     transfert_obj.douze_semaines_avant or 0,
                     transfert_obj.onze_semaines_avant or 0,
                     transfert_obj.dix_semaines_avant or 0,

@@ -1,0 +1,89 @@
+# These optional rules flag or remove various debugging statements.
+#
+# All rules in this file have the tags:
+#
+# * `remove-debugging-statements`
+# * `no-debug`.
+#
+
+rules:
+- id: remove-breakpoint
+  description: Remove breakpoints from production code
+  explanation: Breakpoints shouldn't be used in production code.
+  pattern: breakpoint(...)
+  replacement: ''
+  tests:
+  - match: breakpoint()
+  - match: breakpoint("sth")
+  tags:
+  - remove-debugging-statements
+  - no-debug
+
+- id: remove-pdb-set_trace
+  description: Remove `pdb.set_trace` calls from production code
+  explanation: Breakpoints shouldn't be used in production code.
+  pattern: pdb.set_trace(...)
+  replacement: ''
+  tests:
+  - match: |
+      import pdb
+      pdb.set_trace()
+  - match: |
+      import pdb as pdb_debug
+      pdb_debug.set_trace()
+  tags:
+  - remove-debugging-statements
+  - no-debug
+
+- id: flag-print
+  description: Remove `print` statements from production code
+  explanation: |
+    `print` statements shouldn't be used in production code.
+    Use:
+
+    * a CLI framework for output
+    * `logger.debug()` for debugging information.
+  pattern: print(...)
+  tests:
+  - match: print("sth")
+  - match: print(x, y)
+  - no-match: custom_print("sth")
+  tags:
+  - remove-debugging-statements
+  - no-debug
+
+- id: flag-streamlit-show
+  description: Don't use Streamlit's `experimental_show` in production code
+  explanation: |
+    `st.experimental_show` should be used only for debugging purposes. See the [Streamlit docs](https://docs.streamlit.io/library/api-reference/utilities/st.experimental_show) Use `st.write()` in production
+  pattern: streamlit.experimental_show(...)
+  replacement: ''
+  tests:
+  - match: |
+      import streamlit as st
+      st.experimental_show(df)
+  - match: |
+      import streamlit as st
+      def some_function():
+        st.experimental_show(df)
+  - match: |
+      import streamlit
+      streamlit.experimental_show(df)
+  - no-match: |
+      import streamlit as st
+      st.snow(df)
+  - match: |
+      from streamlit import experimental_show
+      experimental_show(something)
+  - match: |
+      from streamlit import experimental_show as exp_show
+      exp_show(something)
+  - no-match: other_package.experimental_show()
+  - no-match: |
+      import st_other_package as st
+      def some_function():
+        st.experimental_show(df)
+  tags:
+  - remove-debugging-statements
+  - no-debug
+  - streamlit

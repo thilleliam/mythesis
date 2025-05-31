@@ -1,0 +1,28 @@
+version: '2'
+# TODO: need condition about wrapping parentheses?
+rules: []
+#  - id: wrap-immediately-invoked-function-expressions
+#    description: Wrap immediately-invoked function expressions in parentheses.
+#    explanation: |
+#      An immediately-invoked function is a single unit and wrapping the expression in parentheses clearly expresses this.
+#
+#      From the [Airbnb JavaScript Style Guide](https://airbnb.io/javascript/#functions--iife)
+#    tags:
+#    - airbnb-javascript-style-guide
+#    - airbnb
+#    - default
+#    language:
+#    - javascript
+#    - typescript
+#    pattern: "function() {...}()"
+#    replacement: "(function() {...}())"
+#    condition: not pattern.has_kind("parenthesized_expression")
+#    tests:
+#      - match: |
+#          function() {
+#            console.log("Hello");
+#          }();
+#        expect: |
+#          (function() {console.log("Hello")}());
+#      - no-match: |
+#          (function() {console.log("Hello")}());

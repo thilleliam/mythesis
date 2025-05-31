@@ -1,0 +1,38 @@
+version: '2'
+rules: []
+# TODO Needs NodeKindField matcher
+# - id: de-morgan
+#   description: Simplify logical expression using De Morgan identities
+#   explanation: |
+#     When reading logical statements it is important for them to be as simple as
+#     possible. This rule applies De Morgan's laws to simplify code by removing
+#     double negatives or pushing negations deeper into statements.
+#   language:
+#   - javascript
+#   - typescript
+#   tags:
+#   - default
+#   all:
+#   - inside:
+#     - any:
+#       - kind: if_statement
+#         field: condition
+#       - kind: while_statement
+#         field: condition
+#       - kind: do_statement
+#         field: condition
+#       - kind: ternary_statement
+#         field: condition
+#   - any:
+#     - pattern: |
+#         !!${a}
+#       replacement: |
+#         ${a}
+#   tests:
+#   - match: |
+#       if (a < b) {
+#         c = a
+#       } else {
+#         c = b
+#       }
+#     expect: c = Math.min(a, b)

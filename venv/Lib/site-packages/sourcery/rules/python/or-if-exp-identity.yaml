@@ -1,0 +1,39 @@
+version: '2'
+rules:
+- id: or-if-exp-identity
+  language: python
+  description: Replace if-expression with `or`
+  tags:
+  - default
+  pattern: |
+    ${b} if ${b} else ${c}
+  replacement: |
+    ${b} or ${c}
+  explanation: |
+    Here we find ourselves setting a value if it evaluates to `True`, and otherwise
+    using a default.
+
+    The 'After' case is a bit easier to read and avoids the duplication of
+    `input_currency`.
+
+    It works because the left-hand side is evaluated first. If it evaluates to
+    true then `currency` will be set to this and the right-hand side will not be
+    evaluated. If it evaluates to false the right-hand side will be evaluated and
+    `currency` will be set to `DEFAULT_CURRENCY`.
+  tests:
+  - match: |
+      currency = input_currency if input_currency else DEFAULT_CURRENCY
+    expect: |
+      currency = input_currency or DEFAULT_CURRENCY
+  - match: |
+      website = args['website'] if args['website'] else "https://medium.com/@jhsu98"
+    expect: |
+      website = args['website'] or "https://medium.com/@jhsu98"
+  - match: |
+      def func():
+        return some_expression if some_expression else False
+    expect: |
+      def func():
+        return some_expression or False
+  - no-match: |
+      website = args['website'] if args['other_thing'] else "https://medium.com/@jhsu98"

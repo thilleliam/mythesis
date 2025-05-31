@@ -1,0 +1,194 @@
+version: '2'
+rules:
+- id: misplaced-break-or-continue
+  description: This `break` or `continue` does not refer to any valid loop or statement.
+  explanation: |
+    A `break` or `continue` cannot be outside a suitable loop or block statement.
+  language:
+  - javascript
+  - typescript
+  tags:
+  - default
+  any:
+  # break without label
+  - all:
+    - pattern: break;
+    - not:
+        inside:
+          kind:
+          - while_statement
+          - for_statement
+          - for_in_statement
+          - switch_statement
+          - do_statement
+        until:
+          # it doesn't count if we are inside a function
+          kind:
+          - function
+          - function_declaration
+          - generator_function
+          - generator_function_declaration
+          - arrow_function
+          - class_static_block
+  # labeled break
+  - all:
+    # we are breaking out of "label", but we are not inside a labeled statement with
+    # that label
+    - pattern: break ${label};
+    - not:
+        inside:
+          pattern: |
+            ${label}: ...
+        until:
+          # but it doesn't count if we are inside a function
+          kind:
+          - function
+          - function_declaration
+          - generator_function
+          - generator_function_declaration
+          - arrow_function
+          - class_static_block
+  # continue without label
+  - all:
+    - pattern: continue;
+    - not:
+        inside:
+          kind:
+          - while_statement
+          - for_statement
+          - for_in_statement
+          - do_statement
+        until:
+          # it doesn't count if we are inside a function
+          kind:
+          - function
+          - function_declaration
+          - generator_function
+          - generator_function_declaration
+          - arrow_function
+          - class_static_block
+  # labeled continue
+  - all:
+    # we are continuing "label", but we are not inside a labeled statement with
+    # that statement
+    - pattern: continue ${label};
+    - not:
+        # check if we are inside a labelled while/for/do statement
+        inside:
+          all:
+          # check if we are in a while/for/do statement
+          # this is not as simple as the labeled break statement check because the
+          # continue statement cannot be inside any labeled statement (it does not work
+          # with labeled blocks, for instance)
+          - kind:
+            - while_statement
+            - for_statement
+            - for_in_statement
+            - do_statement
+          # give a name to the statement to refer to it when checking for a label
+          - pattern: ${stmt}
+          # now check if this statement is labeled
+          - inside:
+              pattern: |
+                ${label}: ${stmt}
+        until:
+          # but it doesn't count if we are inside a function
+          kind:
+          - function
+          - function_declaration
+          - generator_function
+          - generator_function_declaration
+          - arrow_function
+          - class_static_block
+  tests:
+  # break without label
+  - match: break;
+  - no-match: |
+      while (true) {
+        break;
+      }
+  - match: |
+      while (true) {
+        function f() {
+          break;
+        }
+      }
+
+  # break with label
+  - match: break foo;
+  - match: |
+      while (true) {
+        break foo;
+      }
+  - no-match: |
+      foo: while (true) {
+        break foo;
+      }
+  - match: |
+      foo: while (true) {
+        function f() {
+          break foo;
+        }
+      }
+  - match: |
+      bar: while (true) {
+        break foo;
+      }
+  - no-match: |
+      foo: while (true) {
+        bar: while (true) {
+          break foo;
+        }
+      }
+  - no-match: |
+      foo: {
+        this_is_executed();
+        if (true) {
+          break foo;
+        }
+        never_executed();
+      }
+
+  # unlabeled continue
+  - match: continue;
+  - no-match: |
+      while (true) {
+        continue;
+      }
+  - match: |
+      while (true) {
+        function f() {
+          continue;
+        }
+      }
+
+  # labeled continue
+  - match: continue foo;
+  - match: |
+      bar: while (true) {
+        continue foo;
+      }
+  - no-match: |
+      foo: while (true) {
+        continue foo;
+      }
+  - match: |
+      foo: while (true) {
+        function f() {
+          continue foo;
+        }
+      }
+  - no-match: |
+      foo: while (true) {
+        bar: while (true) {
+          continue foo;
+        }
+      }
+  - match: |
+      foo: {
+        this_is_executed();
+        if (true) {
+          continue foo;
+        }
+        never_executed();
+      }
