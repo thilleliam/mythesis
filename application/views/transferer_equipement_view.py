@@ -1365,7 +1365,7 @@ class TransfererEquipementApp:
                         # Rediriger stdout vers interface + terminal
                         sys.stdout = TeeOutput(original_stdout, self.meta_results_text)
                         
-                        from application.models.heuristique_version5 import (
+                        from application.models.heuristique_version4 import (
                             creer_instance_optimisation,
                             main_complet_TOUTES_CORRECTIONS,
                             OptimisateurNavettes,
