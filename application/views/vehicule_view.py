@@ -726,6 +726,7 @@ class VehiculeApp(ttk.Frame):
             return
 
         # Supprimer de la BDD
+        session = self.get_session()
         try:
             vehicule = session.query(Vehicule).filter_by(immatriculation=immatriculation).first()
             if not vehicule:
@@ -741,6 +742,8 @@ class VehiculeApp(ttk.Frame):
         except Exception as e:
             session.rollback()
             messagebox.showerror("Erreur", f"Impossible de supprimer le véhicule: {str(e)}")
+        finally:
+            session.close()
 
     
     def affectation_tournee(self):

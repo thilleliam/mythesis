@@ -5,7 +5,7 @@ from application.database import SessionLocal
 from datetime import date
 
 class Vehicule(Base):
-    __tablename__ = "vehicules"  # Ajoute cette ligne
+    __tablename__ = "vehicules"  
     table_args = {"extend_existing": True}  
 
     immatriculation = Column(String(255), primary_key=True)
