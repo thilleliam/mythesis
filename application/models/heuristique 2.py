@@ -167,7 +167,116 @@ class OptimisateurNavettes:
             'vehicule_optimal': vehicule_optimal,
             'planification_detaillee': resultats_planification
         }
-    
+    def _calculer_capacite_utilisable(self, demande_partielle, vehicule):
+        """Calcule la capacité réellement utilisable pour une demande donnée"""
+        poids_transportable = 0
+        volume_transportable = 0
+        produits_transportes = {}
+        valeur_transportee = 0
+        
+        for produit in demande_partielle:
+            # Calculer combien d'unités de ce produit peuvent être transportées
+            max_unites_poids = int((vehicule['capacite_poids_max'] - poids_transportable) / produit['poids_unitaire'])
+            max_unites_volume = int((vehicule['capacite_volume_max'] - volume_transportable) / produit['volume_unitaire'])
+            max_unites = min(max_unites_poids, max_unites_volume, produit['quantite'])
+            
+            if max_unites > 0:
+                poids_produit = max_unites * produit['poids_unitaire']
+                volume_produit = max_unites * produit['volume_unitaire']
+                
+                poids_transportable += poids_produit
+                volume_transportable += volume_produit
+                produits_transportes[produit['nom']] = max_unites
+                valeur_transportee += max_unites  # Ou une autre métrique de valeur
+        
+        return {
+            'poids_transportable': poids_transportable,
+            'volume_transportable': volume_transportable,
+            'produits_transportes': produits_transportes,
+            'valeur_transportee': valeur_transportee
+        }
+    def calculer_flotte_heterogene_optimale(self, produits_a_transporter, vehicules_data, date_debut, heure_debut, duree_max_jours=7):
+        """
+        Sélection itérative de véhicules hétérogènes pour optimiser la flotte globale
+        """
+        flotte_selectionnee = []
+        demande_restante = copy.deepcopy(produits_a_transporter)
+        cout_total_flotte = 0
+
+        while self._demande_restante_existe(demande_restante):
+            # 1. Analyser TOUS les véhicules pour la demande restante
+            analyses_vehicules = []
+            for vehicule in vehicules_data:
+                analyse = self._analyser_vehicule_pour_demande_partielle(demande_restante, vehicule, duree_max_jours)
+                analyses_vehicules.append(analyse)
+            
+            # 2. Sélectionner le véhicule le plus efficace pour cette iteration
+            vehicule_optimal_iteration = min(analyses_vehicules, key=lambda x: x['cout_par_unite_transportee'])
+            
+            # 3. Ajouter à la flotte
+            flotte_selectionnee.append(vehicule_optimal_iteration)
+            cout_total_flotte += vehicule_optimal_iteration['cout_total']
+            
+            # 4. Mettre à jour la demande restante
+            demande_restante = self._soustraire_capacite_transportee(demande_restante, vehicule_optimal_iteration)
+            
+            # 5. Vérification de convergence
+            if len(flotte_selectionnee) > 20:  # Sécurité anti-boucle infinie
+                break
+
+    def _analyser_vehicule_pour_demande_partielle(self, demande_partielle, vehicule, duree_max_jours):
+        """Analyse un véhicule spécifiquement pour une demande résiduelle"""
+        
+        # Calculer ce que ce véhicule peut transporter de la demande restante
+        capacite_reelle_utilisable = self._calculer_capacite_utilisable(demande_partielle, vehicule)
+        
+        # Utiliser la méthode existante pour calculer le coût
+        demande_equivalente = {
+            'quantite_poids': capacite_reelle_utilisable['poids_transportable'],
+            'quantite_volume': capacite_reelle_utilisable['volume_transportable'],
+            'distance_km': demande_partielle[0].get('distance_km', 800) if demande_partielle else 800,
+            'vitesse_kmh': demande_partielle[0].get('vitesse_kmh', 80) if demande_partielle else 80
+        }
+        
+        # Si aucune charge transportable, retourner un coût très élevé
+        if capacite_reelle_utilisable['valeur_transportee'] == 0:
+            return {
+                'vehicule': vehicule,
+                'capacite_utilisable': capacite_reelle_utilisable,
+                'cout_total': float('inf'),
+                'cout_par_unite_transportee': float('inf'),
+                'demande_satisfaite': {}
+            }
+        
+        analyse_cout = self._analyser_vehicule_avec_contrainte(demande_equivalente, vehicule, duree_max_jours)
+        cout_total = analyse_cout['cout_total']
+        
+        # Coût par unité de valeur transportée
+        cout_par_efficacite = cout_total / (capacite_reelle_utilisable['valeur_transportee'] + 0.001)
+        
+        return {
+            'vehicule': vehicule,
+            'capacite_utilisable': capacite_reelle_utilisable,
+            'cout_total': cout_total,
+            'cout_par_unite_transportee': cout_par_efficacite,
+            'demande_satisfaite': capacite_reelle_utilisable['produits_transportes']
+        }
+    def _soustraire_capacite_transportee(self, demande_actuelle, vehicule_selectionne):
+        """
+        Soustrait la capacité du véhicule sélectionné de la demande restante
+        """
+        demande_mise_a_jour = []
+        
+        for produit in demande_actuelle:
+            quantite_transportee_par_vehicule = vehicule_selectionne['demande_satisfaite'].get(produit['nom'], 0)
+            quantite_restante = produit['quantite'] - quantite_transportee_par_vehicule
+            
+            if quantite_restante > 0:
+                produit_restant = copy.deepcopy(produit)
+                produit_restant['quantite'] = quantite_restante
+                demande_mise_a_jour.append(produit_restant)
+        
+        return demande_mise_a_jour
     def _analyser_vehicule_avec_contrainte(self, demande, vehicule, duree_max_jours):
         """Analyse un véhicule avec prise en compte de la contrainte temporelle"""
         
@@ -834,6 +943,16 @@ class OptimisateurNavettes:
         print(f"      → Pauses: {pauses_repos} repos, {pauses_nuit} nuit")
         
         return resultat
+    def _demande_restante_existe(self, demande_restante):
+        """Vérifie s'il reste de la demande à traiter"""
+        if not demande_restante:
+            return False
+        
+        for produit in demande_restante:
+            if produit.get('quantite', 0) > 0:
+                return True
+        
+        return False
 
 
 class OptimisateurNavettesMultiSemaines:
@@ -2720,6 +2839,7 @@ def main_complet_mega_complexe():
     print("20 Types d'Équipements × 12 Semaines × Demandes Variables × 10 Types de Véhicules")
     print("Scénario: Chaîne logistique industrielle avec saisonnalité et pics de demande")
     print("="*200)
+    # Dans main(), ajouter un fallback
     
     # ✅ FLOTTE ULTRA-ÉTENDUE : 10 TYPES DE VÉHICULES
     vehicules_disponibles = [
@@ -3113,7 +3233,7 @@ def main_complet_mega_complexe():
         # OPTIMISATION AVEC VOTRE SYSTÈME EXISTANT
         try:
             optimiseur = OptimisateurNavettes()
-            resultats_semaine = optimiseur.calculer_navettes_optimales(
+            resultats_semaine = optimiseur.calculer_flotte_heterogene_optimale(
                 produits_semaine,
                 vehicules_disponibles,
                 date_semaine,
@@ -3149,7 +3269,24 @@ def main_complet_mega_complexe():
                 
         except Exception as e:
             print(f"❌ Erreur lors de l'optimisation: {e}")
-    
+    try:
+        # Essayer la flotte hétérogène
+        resultats_semaine = optimiseur.calculer_flotte_heterogene_optimale(
+            produits_semaine, vehicules_disponibles, date_semaine, HEURE_DEBUT, 7
+        )
+        
+        if not resultats_semaine:
+            # Fallback vers l'ancienne méthode
+            print("   🔄 Fallback vers flotte homogène...")
+            resultats_semaine = optimiseur.calculer_navettes_optimales(
+                produits_semaine, vehicules_disponibles, date_semaine, HEURE_DEBUT, 7
+            )
+            
+    except Exception as e:
+        print(f"   ❌ Erreur flotte hétérogène: {e}")
+        resultats_semaine = optimiseur.calculer_navettes_optimales(
+            produits_semaine, vehicules_disponibles, date_semaine, HEURE_DEBUT, 7
+        )
     # ✅ RAPPORT FINAL DU DÉFI ULTIME
     print(f"\n" + "="*200)
     print("🏆 RAPPORT FINAL DU DÉFI ULTIME - SUPPLY CHAIN ANNUELLE")

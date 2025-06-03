@@ -1,36 +1,36 @@
 @startuml
 actor Conducteur
 participant "App Mobile" as Mobile
-participant "Flask API (Serveur)"
+participant "Flask API (Serveur)" as API
 database "Base MySQL" as MySQL
 
 ' Connexion
 Conducteur -> Mobile : Lancer l'application
 Conducteur -> Mobile : S'authentifier
-Mobile -> Flask API : Requête login (ID + mot de passe)
-Flask API -> MySQL : SELECT utilisateur
-MySQL --> Flask API : Résultat
-Flask API --> Mobile : Résultat (OK / Erreur)
+Mobile -> API : Requête login (ID + mot de passe)
+API -> MySQL : SELECT utilisateur
+MySQL --> API : Résultat
+API --> Mobile : Résultat (OK / Erreur)
 
 ' Consultation des missions
 Conducteur -> Mobile : Consulter missions
-Mobile -> Flask API : GET /missions
-Flask API -> MySQL : SELECT missions WHERE conducteur_id = X
-MySQL --> Flask API : Liste missions
-Flask API --> Mobile : Liste missions
+Mobile -> API : GET /missions
+API -> MySQL : SELECT missions WHERE conducteur_id = X
+MySQL --> API : Liste missions
+API --> Mobile : Liste missions
 
 ' Suivi de la mission
 Conducteur -> Mobile : Démarrer mission
 Conducteur -> Mobile : Valider étapes
 Conducteur -> Mobile : Clôturer mission
-Mobile -> Flask API : POST /missions/maj
-Flask API -> MySQL : UPDATE mission SET état = ...
-MySQL --> Flask API : OK
-Flask API --> Mobile : Confirmation MAJ
+Mobile -> API : POST /missions/maj
+API -> MySQL : UPDATE mission SET état = ...
+MySQL --> API : OK
+API --> Mobile : Confirmation MAJ
 
 ' Synchronisation
-Mobile -> Flask API : POST /sync
-Flask API -> MySQL : INSERT / UPDATE données
-MySQL --> Flask API : OK
-Flask API --> Mobile : Synchronisation réussie
+Mobile -> API : POST /sync
+API -> MySQL : INSERT / UPDATE données
+MySQL --> API : OK
+API --> Mobile : Synchronisation réussie
 @enduml
