@@ -1,57 +1,94 @@
 @startuml
 left to right direction
-' On inverse ici pour obtenir un affichage vertical
-
 skinparam actorStyle awesome
 
-actor Conducteur
-actor Client
-actor Planificateur
-
-rectangle "Conducteur – Application Mobile" {
-  (Lancer l'application mobile)
-  (S'authentifier via mobile)
-  (Consulter missions planifiées)
-  (Démarrer une mission)
-  (Valider étapes mission)
-  (Clôturer la mission)
-  (Synchroniser avec serveur)
-
-  Conducteur --> (Lancer l'application mobile)
-  Conducteur --> (S'authentifier via mobile)
-  Conducteur --> (Consulter missions planifiées)
-  Conducteur --> (Démarrer une mission)
-  Conducteur --> (Valider étapes mission)
-  Conducteur --> (Clôturer la mission)
-  Conducteur --> (Synchroniser avec serveur)
+rectangle "Application Mobile" {
+  actor Conducteur
+  (S'authentifier) as AuthMobile
+  (Consulter missions)
+  (Géolocalisation GPS)
+  (Valider étapes)
+  (Clôturer mission)
+  
+  Conducteur --> (Consulter missions)
+  Conducteur --> (Géolocalisation GPS)
+  Conducteur --> (Valider étapes)
+  Conducteur --> (Clôturer mission)
+  
+  (Consulter missions) ..> AuthMobile : <<include>>
+  (Géolocalisation GPS) ..> AuthMobile : <<include>>
+  (Valider étapes) ..> AuthMobile : <<include>>
+  (Clôturer mission) ..> AuthMobile : <<include>>
 }
 
-rectangle "Client – Web Service" {
-  (Accéder à l'interface web)
-  (S'authentifier via web)
-  (Déposer une commande)
-  (Confirmer la commande)
-
-  Client --> (Accéder à l'interface web)
-  Client --> (S'authentifier via web)
-  Client --> (Déposer une commande)
-  Client --> (Confirmer la commande)
+rectangle "Page Web" {
+  actor Client
+  (S'authentifier) as AuthWeb
+  (Passer commande)
+  (Confirmer commande)
+  
+  Client --> (Passer commande)
+  Client --> (Confirmer commande)
+  
+  (Passer commande) ..> AuthWeb : <<include>>
+  (Confirmer commande) ..> AuthWeb : <<include>>
 }
 
-rectangle "Gestionnaire – Interface Desktop" {
-  (Lancer l'application desktop)
-  (S'authentifier via desktop)
-  (Modifier planning des tournées)
-  (Affecter véhicules et chauffeurs)
-  (Exporter rapports)
+rectangle "Application Desktop" {
+  actor Gestionnaire
+  (S'authentifier) as AuthDesktop
+  (Gérer chantiers)
+  (Planifier tournées)
+  (Optimiser transferts)
   (Visualiser KPI)
-
-  Planificateur --> (Lancer l'application desktop)
-  Planificateur --> (S'authentifier via desktop)
-  Planificateur --> (Modifier planning des tournées)
-  Planificateur --> (Affecter véhicules et chauffeurs)
-  Planificateur --> (Exporter rapports)
-  Planificateur --> (Visualiser KPI)
+  (Carte interactive)
+  (Traiter commandes)
+  (Affecter conducteurs)
+  (Affecter véhicules)
+  
+  Gestionnaire --> (Gérer chantiers)
+  Gestionnaire --> (Planifier tournées)
+  Gestionnaire --> (Optimiser transferts)
+  Gestionnaire --> (Visualiser KPI)
+  Gestionnaire --> (Carte interactive)
+  Gestionnaire --> (Traiter commandes)
+  Gestionnaire --> (Affecter conducteurs)
+  Gestionnaire --> (Affecter véhicules)
+  
+  (Gérer chantiers) ..> AuthDesktop : <<include>>
+  (Planifier tournées) ..> AuthDesktop : <<include>>
+  (Optimiser transferts) ..> AuthDesktop : <<include>>
+  (Visualiser KPI) ..> AuthDesktop : <<include>>
+  (Carte interactive) ..> AuthDesktop : <<include>>
+  (Traiter commandes) ..> AuthDesktop : <<include>>
+  (Affecter conducteurs) ..> AuthDesktop : <<include>>
+  (Affecter véhicules) ..> AuthDesktop : <<include>>
 }
-@enduml
 
+rectangle "Application Gestion Matériel" {
+  actor "Assistant Administratif" as Assistant
+  (S'authentifier) as AuthMateriel
+  (Gérer disponibilité véhicules)
+  (Gérer équipements)
+  
+  Assistant --> (Gérer disponibilité véhicules)
+  Assistant --> (Gérer équipements)
+  
+  (Gérer disponibilité véhicules) ..> AuthMateriel : <<include>>
+  (Gérer équipements) ..> AuthMateriel : <<include>>
+}
+
+rectangle "Application RH" {
+  actor "Assistant RH" as AssistantRH
+  (S'authentifier) as AuthRH
+  (Gérer informations conducteurs)
+  (Gérer congés conducteurs)
+  
+  AssistantRH --> (Gérer informations conducteurs)
+  AssistantRH --> (Gérer congés conducteurs)
+  
+  (Gérer informations conducteurs) ..> AuthRH : <<include>>
+  (Gérer congés conducteurs) ..> AuthRH : <<include>>
+}
+
+@enduml
