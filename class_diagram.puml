@@ -1,76 +1,157 @@
 @startuml
 
-' Style général
+!theme plain
+scale 1.2
+
+' Configuration pour améliorer la lisibilité et corriger l'export PNG
+skinparam dpi 300
+skinparam backgroundColor White
+skinparam shadowing false
+skinparam linetype ortho
+skinparam minClassWidth 100
+skinparam nodesep 80
+skinparam ranksep 100
+
 skinparam class {
     BackgroundColor White
-    ArrowColor #2C3E50
-    BorderColor #2C3E50
-    AttributeFontColor #2C3E50
-    AttributeFontSize 12
-    StereotypeFontSize 12
-    FontSize 13
-    FontColor #2C3E50
-}
-skinparam linetype ortho
-skinparam page 2
-
-' Définition des couleurs pastel
-skinparam stereotypeCBackgroundColor #A8D5E5
-skinparam classBackgroundColor {
-    <<Ressource>> #E8F4EA
-    <<Transport>> #FCE8E8
-    <<Gestion>> #FFF3E0
-    <<Equipement>> #E3F2FD
+    ArrowColor #1B2631
+    BorderColor #1B2631
+    BorderThickness 2
+    AttributeFontColorhsl(210, 28.90%, 14.90%)
+    AttributeFontSize 13
+    FontSize 14
+    FontColor #1B2631
+    FontStyle bold
+    HeaderFontSize 16
+    HeaderFontStyle bold
 }
 
-' Layout
+skinparam arrow {
+    FontSize 12
+    FontColor #1B2631
+    Thickness 3
+}
+
+' Couleurs différenciées par stéréotype
+skinparam class {
+    BackgroundColor<<Ressource>> #E8F8F5
+    BackgroundColor<<Transport>> #FDF2E9
+    BackgroundColor<<Gestion>> #EBF5FB
+    BackgroundColor<<Equipement>> #F4ECF7
+    BorderColor<<Ressource>> #16A085
+    BorderColor<<Transport>> #D68910
+    BorderColor<<Gestion>> #2E86C1
+    BorderColor<<Equipement>> #8E44AD
+}
+
+' Layout dirigé de gauche à droite pour éviter les problèmes d'export
 left to right direction
 
-class Equipement <<Equipement>> {
-    + ID_equipement: Integer <<PK>>
-    + quantite: Integer
-    + nomEquipement: String(255)
-    + typeEquipement: String(255)
-    + etat: String(255)
-    + poids: Float {nullable} // en kilogrammes
-    + volume: Float {nullable} // en mètres cubes
+' Niveau 1 : Gestion
+class Chantier <<Gestion>> {
+    + id_client: String
+    + localisation: String
+    + latitude: Float
+    + longitude: Float
+    + nature_terrain: String
+    + distanceAllerGoudron: Float
+    + distanceAllerPiste: Float
+    + temps_aller: Float
     --
-    # commandes: List<CommandeEquipement>
-    # transferer_equipements: List<TransfererEquipement>
+    + calculer_temps_aller(): Float
+}
+
+class Commande <<Gestion>> {
+    + id_commande: Integer
+    + id_client: String
+    + id_equipement: Integer
+    + nature_service: String
+    + type_vehicule: String
+    + quantite_requise: Float
+    + lieu_chargement: String
+    + date_commande: DateTime
+    + date_livraison: DateTime
+    + statut: String
+    --
+    + est_en_retard(): Boolean
+    + associer_tournee(): void
+    + calculer_delai_livraison(): Float
+}
+
+' Niveau 2 : Ressources Transport
+class Conducteur <<Ressource>> {
+    + id_conducteur: String
+    + nom: String
+    + prenom: String
+    + numero_telephone: String
+    + categorie: String
+    + disponibilite: Enum
+    + commentaire_disponibilite: String
+    --
+    + total_parcouru(): Float
+    + affecter_a_tournee(): void
 }
 
 class Vehicule <<Ressource>> {
-    + immatriculation: String <<PK>>
+    + immatriculation: String
     + numero_chassis: String
     + numero_interne: String
     + marque_modele: String
     + type_vehicule: String
     + capacite_tonne: Float
     + capacite_volume: Float
-    + etat: Enum["Disponible", "En panne", "En service"]
+    + etat: Enum
     --
     + est_disponible(): Boolean
-    + affecter_a_tournee(session, id_conducteur, id_commande, objectif, lieu_depart, destination, itineraire, date_heure_depart): Tournee
+    + affecter_a_tournee(): Tournee
 }
 
-class Conducteur <<Ressource>> {
-    + id_conducteur: String <<PK>>
-    + nom: String
-    + prenom: String
-    + numero_telephone: String
-    + categorie: String
-    + disponibilite: Enum["disponible", "conge", "autres"]
-    + commentaire_disponibilite: String
+' Niveau 2 : Équipements
+class Equipement <<Equipement>> {
+    + ID_equipement: Integer
+    + nomEquipement: String
+    + typeEquipement: String
+    + poids: Float
+    + volume: Float
+}
+
+class CommandeEquipement <<Equipement>> {
+    + id_commande: Integer
+    + id_equipement: Integer
+    + quantite: Integer
+}
+
+class TransfererEquipement <<Equipement>> {
+    + id: Integer
+    + volet: String
+    + nom_equipement: String
+    + id_equipement: Integer
+    + modalite_transport: String
+    + total_equipements: Integer
+    + id_client: String
+    + douze_semaines_avant: Integer
+    + onze_semaines_avant: Integer
+    + dix_semaines_avant: Integer
+    + neuf_semaines_avant: Integer
+    + huit_semaines_avant: Integer
+    + sept_semaines_avant: Integer
+    + six_semaines_avant: Integer
+    + cinq_semaines_avant: Integer
+    + quatre_semaines_avant: Integer
+    + trois_semaines_avant: Integer
+    + deux_semaines_avant: Integer
+    + un_semaines_avant: Integer
+    + zero_semaines_avant: Integer
     --
-    + total_parcouru(): Float
-    + affecter_a_tournee(id_commande, objectif, lieu_depart, destination, itineraire, date_heure_depart): void
+    + get_equipement(): Equipement
 }
 
+' Niveau 3 : Transport & Exécution
 class Tournee <<Transport>> {
-    + id_tournee: Integer <<PK>>
-    + id_conducteur: String <<FK>>
-    + immatriculation_vehicule: String <<FK>>
-    + id_commande: Integer <<FK>>
+    + id_tournee: Integer
+    + id_conducteur: String
+    + immatriculation_vehicule: String
+    + id_commande: Integer
     + objectif: String
     + lieu_depart: String
     + destination: String
@@ -86,116 +167,58 @@ class Tournee <<Transport>> {
 }
 
 class EtapeRotation <<Transport>> {
-    + id_etape: Integer <<PK>>
-    + id_tournee: Integer <<FK>>
-    + ordre: Integer
+    + id_etape: Integer
+    + id_tournee: Integer
+    + ordre_etape: Integer
     + type_etape: String
+    + lieu: String
+    + materiel_concerne: String
+    + quantite: Integer
+    + date_heure_prevue: DateTime
+    + date_heure_reelle: DateTime
+    + statut: String
+    + commentaires: Text
+    + created_at: DateTime
+    + updated_at: DateTime
+    --
+    + __repr__(): String
 }
 
 class Affectation <<Gestion>> {
-    + id_affectation: Integer <<PK>>
-    + id_conducteur: String <<FK>>
-    + immatriculation_vehicule: String <<FK>>
-    + id_tournee: Integer <<FK>>
+    + id_affectation: Integer
+    + id_conducteur: String
+    + immatriculation_vehicule: String
+    + id_tournee: Integer
     + date_affectation: DateTime
 }
 
-class TransfererEquipement <<Equipement>> {
-    + id: Integer <<PK>>
-    + volet: String
-    + nom_equipement: String
-    + id_equipement: Integer <<FK>>
-    + modalite_transport: String
-    + total_equipements: Integer
-    + id_client: String <<FK>>
-    + douze_semaines_avant: Integer
-    + onze_semaines_avant: Integer
-    + dix_semaines_avant: Integer
-    + neuf_semaines_avant: Integer
-    + huit_semaines_avant: Integer
-    + sept_semaines_avant: Integer
-    + six_semaines_avant: Integer
-    + cinq_semaines_avant: Integer
-    + quatre_semaines_avant: Integer
-    + trois_semaines_avant: Integer
-    + deux_semaines_avant: Integer
-    + un_semaines_avant: Integer
-    + zero_semaines_avant: Integer
-    --
-    + get_equipement(session): Equipement
-}
+' Placement spatial optimisé pour l'export PNG
+Chantier -down- Commande
 
-class Commande <<Gestion>> {
-    + id_commande: Integer <<PK>>
-    + id_client: String <<FK>>
-    + id_equipement: Integer <<FK>>
-    + nature_service: String
-    + type_vehicule: String
-    + quantite_requise: Float
-    + lieu_chargement: String
-    + date_commande: DateTime
-    + date_livraison: DateTime
-    + statut: String
-    --
-    + est_en_retard(date_actuelle): Boolean
-    + associer_tournee(id_tournee): void
-    + calculer_delai_livraison(distance, weight): Float
-}
+Conducteur -down- Vehicule
 
-class CommandeEquipement <<Gestion>> {
-    + id_commande: Integer <<FK>>
-    + id_equipement: Integer <<FK>>
-    + quantite: Integer
-}
+Equipement -right- CommandeEquipement
+CommandeEquipement -down- TransfererEquipement
 
-class Chantier <<Gestion>> {
-    + id_client: String <<PK>>
-    + localisation: String
-    + latitude: Float
-    + longitude: Float
-    + nature_terrain: String
-    + distanceAllerGoudron: Float
-    + distanceAllerPiste: Float
-    + temps_aller: Float
-    --
-    + calculer_temps_aller(): Float
-}
+Tournee -right- EtapeRotation
+EtapeRotation -down- Affectation
 
-class Segment <<Transport>> {
-    + id: Integer <<PK>>
-    + point1_nom: String
-    + point1_latitude: Float
-    + point1_longitude: Float
-    + point1_type: String
-    + point1_id_reference: String
-    + point2_nom: String
-    + point2_latitude: Float
-    + point2_longitude: Float
-    + point2_type: String
-    + point2_id_reference: String
-    + distance_km: Float
-    + couleur: String
-    + epaisseur: Integer
-    + afficher_distance: Boolean
-    + nom_segment: String
-    + description: Text
-    + date_creation: DateTime
-    + date_modification: DateTime
-    + cree_par: String
-}
+' Relations
+Chantier ||--o{ Commande
+Commande ||--o{ CommandeEquipement
+Commande ||--o{ Tournee
 
-' Relations avec cardinalités et descriptions
-Conducteur "1" -- "*" Tournee : conduit >
-Vehicule "1" -- "*" Tournee : est utilisé dans >
-Tournee "1" -- "*" EtapeRotation : contient >
-Tournee "1" -- "*" Affectation : possède >
-Conducteur "1" -- "*" Affectation : est affecté à >
-Vehicule "1" -- "*" Affectation : est assigné à >
-Equipement "1" -- "*" TransfererEquipement : est transféré >
-Equipement "1" -- "*" CommandeEquipement : est commandé >
-Commande "1" -- "*" CommandeEquipement : contient >
-Commande "1" -- "*" Tournee : génère >
-Chantier "1" -- "*" Tournee : est desservi par >
-Chantier "1" -- "*" Commande : passe >
+Equipement ||--o{ CommandeEquipement
+Equipement ||--o{ TransfererEquipement
 
-@enduml 
+Conducteur ||--o{ Tournee
+Vehicule ||--o{ Tournee
+Tournee ||--o{ EtapeRotation
+
+Conducteur ||--o{ Affectation
+Vehicule ||--o{ Affectation
+Tournee ||--o{ Affectation
+
+Chantier ||--o{ TransfererEquipement
+
+@enduml
