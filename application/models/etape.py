@@ -1,15 +1,3 @@
-# etape.py
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
-from sqlalchemy.orm import relationship
-from application.database import Base
-
-class EtapeRotation(Base):
-    __tablename__ = "etapes_rotation"
-    
-    # Vos colonnes...
-    id_etape = Column(Integer, primary_key=True, autoincrement=True)
-    id_tournee = Column(Integer, ForeignKey("tournees.id_tournee"))
-    # autres colonnes...
-    
-    # Utilisez back_populates au lieu de backref pour être cohérent
-    
+version https://git-lfs.github.com/spec/v1
+oid sha256:f0a55dec5b3d320014900fe87f4e6482fcec76f94c5b3e53b885340fe6ccc7a6
+size 1261

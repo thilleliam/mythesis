@@ -1,0 +1,140 @@
+@startuml Transport_Ultra_Simple
+
+skinparam backgroundColor #FAFAFA
+skinparam activity {
+  BackgroundColor #E8F4FD
+  BorderColor #1E88E5
+  FontColor #0D47A1
+}
+
+skinparam decision {
+  BackgroundColor #FFF3E0
+  BorderColor #FF9800
+  FontColor #E65100
+}
+
+title ALGORITHME D'OPTIMISATION DE TRANSPORT MULTI-SEMAINES
+
+start
+
+:PHASE 1 : INITIALISATION|
+:Configuration systeme|
+:Parametres temporels : H_max=7j, H_work=11h, H_stop=18h, V_m=75km/h|
+:Calcul distance A->B par formule Haversine|
+:Configuration contraintes : T_break=0.25h, T_night=13h, D_depot=50km|
+
+:PHASE 2 : CHARGEMENT VEHICULES|
+:Requete SQL base de donnees|
+:SELECT vehicules disponibles JOIN type_vehicule|
+:Construction ensemble L avec capacites C_w, C_v|
+:Extraction couts fixes F_l et variables G_l|
+
+:PHASE 3 : CHARGEMENT DEMANDES|
+:Extraction TransfererEquipement pour 12 semaines|
+:Mapping colonnes temporelles vers semaines|
+:Agregation par semaine : dw_AB[s], dv_AB[s]|
+:Conversion kg vers tonnes : W_p^s = dw_AB[s]/1000|
+
+:PHASE 4 : CALCULS PREPARATOIRES|
+:Calcul temps conduite : T_conduite = D/V_m + N_pauses×T_break|
+:Estimation voyages : nb_voyages = max(ceil(W/C_w), ceil(V/C_v))|
+:Duree utilisation : duree = ceil(nb_voyages×temps/8)|
+:Distance totale estimee : dist = nb_voyages×D×2|
+
+:PHASE 5 : CRITERE GLOUTON|
+:Detection repositionnement : r=1 si nouveau, r=0 si reutilise|
+:Calcul distance repositionnement selon etat precedent|
+:Critere selection : φ_{l,k}^s = (couts_totaux)/poids_transportable|
+
+:PHASE 6 : CLASSIFICATION PRODUITS|
+:Classification criticite : κ_p = 1 si critique, 0 sinon|
+
+if (Produits critiques κ_p=1 existent ?) then (OUI)
+  :TRAITEMENT PRIORITAIRE PRODUITS CRITIQUES|
+  :Pour chaque produit critique p|
+  :Calcul capacite maximale : q_max = min(C_w/w_p, C_v/v_p)|
+  :Selection vehicule optimal : (l*,k*) = argmin(φ/q_max)|
+  :Affectation homogene exclusive 1 produit/vehicule|
+  :Retrait vehicule de flotte_disponible|
+  :Retrait produit de demandes_restantes|
+else (NON)
+endif
+
+:PHASE 7 : HEURISTIQUE GLOUTONNE PRINCIPALE|
+:Initialisation : demandes_restantes, flotte_disponible|
+
+while (Demandes restantes ET Vehicules disponibles ?) is (OUI)
+  :SELECTION VEHICULE OPTIMAL|
+  :Evaluation tous vehicules disponibles|
+  :Calcul critere φ_{l,k}^s pour chaque vehicule|
+  :Selection minimum : (l*,k*) = argmin φ_{l,k}^s|
+  
+  :CHARGEMENT MIXTE OPTIMAL|
+  :Calcul efficacite produits : η_p = w_p/v_p + 0.1×w_p|
+  :Tri produits par efficacite decroissante|
+  :Algorithme sac-a-dos bi-dimensionnel|
+  :Respect capacites poids C_w et volume C_v|
+  
+  :VERIFICATION CONTRAINTES TEMPORELLES|
+  :Verification contrainte 18h00|
+  if (Heure arrivee > 18h00 ?) then (OUI)
+    :Arret nocturne obligatoire N_nuits=1|
+    :Ajout 13h repos supplementaires|
+  endif
+  :Verification duree hebdomadaire <= H_max×H_work|
+  
+  :ANTICIPATION INTER-SEMAINES|
+  if (Sous-utilisation ρ < 0.7 ?) then (OUI)
+    :Calcul capacite libre residuelle|
+    :Analyse demandes semaine suivante S+1|
+    :Chargement anticipe dans capacite libre|
+    :α_{p,l*,k*}^{s,s+1} = quantites_anticipees|
+    :Reduction demandes S+1 : q_p^{s+1} -= α|
+  endif
+  
+  :MISE A JOUR ETATS|
+  :Position finale vehicule : Σ_{l*,k*}^s = A ou B|
+  :Instant disponibilite : Θ_{l*,k*}^s = instant_final|
+  :Contrainte continuite : τ_{l,k,1}^{s+1} >= Θ + Ψ|
+  :Retrait vehicule de flotte_disponible|
+  :Ajout a vehicules_utilises|
+  :Mise a jour demandes_restantes|
+  
+endwhile (NON)
+
+:PHASE 8 : FONCTION OBJECTIF|
+:Calcul cout fixe par semaine : Somme u_{l,k}×F_l×nb_jours|
+:Calcul cout variable par semaine : Somme G_l×D_effectif|
+:Calcul cout repositionnement : Somme r_{l,k}×G_l×dist_repo|
+:Cout total semaine : Z^s = fixe + variable + repositionnement|
+:Cout total global : Z = Somme Z^s|
+
+:OPTIMISATIONS VNS|
+if (Flotte > 1 vehicule ?) then (OUI)
+  :VNS ELIMINATE (k=1) : Test suppression vehicule|
+  :Tentative redistribution sur flotte reduite|
+  if (Economie > 0 ?) then (OUI)
+    :Conservation solution amelioree|
+  endif
+  
+  :VNS MULTI-VOISINAGES (k=2,3,4)|
+  :k=2 : Elimination double vehicules|
+  :k=3 : Echange charges inter-vehicules|
+  :k=4 : Exploration complete non-gloutonne|
+  
+  if (Amelioration trouvee ?) then (OUI)
+    :Conservation nouvelle solution optimale|
+  endif
+endif
+
+:RESULTATS FINAUX|
+:Cout total optimise Z_final|
+:Nombre vehicules utilises|
+:Planning detaille par semaine|
+:Taux respect contraintes temporelles|
+:Efficacite anticipation inter-semaines|
+:Metriques performance globales|
+
+stop
+
+@enduml
