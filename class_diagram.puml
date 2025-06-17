@@ -157,9 +157,9 @@ class Tournee <<Transport>> {
     + destination: String
     + itineraire: String
     + km_parcouru: Float
-    + date_heure_depart: DateTime
-    + date_heure_reception: DateTime
-    + date_heure_retour: DateTime
+    + date_heure_prevu: DateTime
+    + date_heure_debut: DateTime
+    + date_heure_cloture: DateTime
     + date_heure_arrivee: DateTime
     + duree: String
     --
